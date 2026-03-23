@@ -77,6 +77,24 @@
       display: block;
     }
 
+    .status-error {
+      border-color: rgba(85, 46, 36, 0.28);
+      background: rgba(85, 46, 36, 0.1);
+      color: #552e24;
+    }
+
+    .status-pending {
+      border-color: rgba(157, 124, 66, 0.28);
+      background: rgba(157, 124, 66, 0.1);
+      color: #171411;
+    }
+
+    .status-success {
+      border-color: rgba(34, 53, 47, 0.28);
+      background: rgba(34, 53, 47, 0.1);
+      color: #22352f;
+    }
+
     .btn-loading .label-default,
     .btn-idle .label-loading {
       display: none;
@@ -270,12 +288,12 @@
     function setStatus(kind, message) {
       const status = document.getElementById("status");
       const kindClasses = {
-        error: "show border-claret/30 bg-claret/10 text-claret",
-        pending: "show border-brass/30 bg-brass/10 text-ink",
-        success: "show border-pine/30 bg-pine/10 text-pine"
+        error: "status-error",
+        pending: "status-pending",
+        success: "status-success"
       };
 
-      status.className = `status-panel mt-5 border px-4 py-4 text-sm leading-6 ${kindClasses[kind] || kindClasses.pending}`;
+      status.className = `status-panel show mt-5 border px-4 py-4 text-sm leading-6 ${kindClasses[kind] || kindClasses.pending}`;
       status.textContent = message;
     }
 
