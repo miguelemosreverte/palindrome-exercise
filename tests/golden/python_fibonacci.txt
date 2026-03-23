@@ -1,0 +1,27 @@
+# Prompt: Calculá los primeros 10 números de Fibonacci usando Python.
+# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Date: 2026-03-23T22:18:03.494Z
+# Pass: true
+
+---RESPONSE---
+<python>
+# Definimos la función para calcular los números de Fibonacci
+def fibonacci(n):
+    secuencia = []
+    a, b = 0, 1
+    for _ in range(n):
+        secuencia.append(a)
+        a, b = b, a + b
+    return secuencia
+
+# Calculamos los primeros 10 números de Fibonacci
+numeros_fibonacci = fibonacci(10)
+
+# Mostramos los resultados
+print(numeros_fibonacci)
+</python>
+
+---BLOCKS---
+{
+  "python": "# Definimos la función para calcular los números de Fibonacci\ndef fibonacci(n):\n    secuencia = []\n    a, b = 0, 1\n    for _ in range(n):\n        secuencia.append(a)\n        a, b = b, a + b\n    return secuencia\n\n# Calculamos los primeros 10 números de Fibonacci\nnumeros_fibonacci = fibonacci(10)\n\n# Mostramos los resultados\nprint(numeros_fibonacci)"
+}

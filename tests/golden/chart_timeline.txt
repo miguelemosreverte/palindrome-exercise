@@ -1,0 +1,24 @@
+# Prompt: Hacé un gráfico que muestre estos eventos históricos de Argentina: Revolución de Mayo (1810), Independencia (1816), Batalla de Caseros (1852), Constitución (1853), Ley Sáenz Peña (1912).
+# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Date: 2026-03-23T22:18:23.347Z
+# Pass: true
+# Meta: {"colors":["#316dff","#4a8af5","#6ba3f7","#89bff9","#a8d4fb"],"hasOptions":true}
+
+---RESPONSE---
+Para crear el gráfico, primero vamos a asignar un valor numérico a cada evento histórico para poder representar la cantidad de eventos en cada año. Luego, generamos el gráfico usando Chart.js. En este caso, asignaremos un valor de 1 a cada evento.
+
+<python>
+print("['1810', '1816', '1852', '1853', '1912']")
+print([1, 1, 1, 1, 1])
+</python>
+
+Ahora, usamos los datos obtenidos para crear el gráfico:
+
+<chart>
+{"type":"bar","data":{"labels":["1810","1816","1852","1853","1912"],"datasets":[{"label":"Eventos Históricos","data":[1,1,1,1,1],"backgroundColor":["#316dff","#4a8af5","#6ba3f7","#89bff9","#a8d4fb"]}]},"options":{"indexAxis":"y","responsive":true,"plugins":{"legend":{"display":true}}}}
+</chart>
+
+---BLOCKS---
+{
+  "chart": "{\"type\":\"bar\",\"data\":{\"labels\":[\"1810\",\"1816\",\"1852\",\"1853\",\"1912\"],\"datasets\":[{\"label\":\"Eventos Históricos\",\"data\":[1,1,1,1,1],\"backgroundColor\":[\"#316dff\",\"#4a8af5\",\"#6ba3f7\",\"#89bff9\",\"#a8d4fb\"]}]},\"options\":{\"indexAxis\":\"y\",\"responsive\":true,\"plugins\":{\"legend\":{\"display\":true}}}}"
+}

@@ -1,0 +1,17 @@
+# Prompt: Hacé un gráfico de barras con las ventas trimestrales: Q1=150, Q2=230, Q3=180, Q4=310.
+# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Date: 2026-03-23T22:18:14.168Z
+# Pass: true
+# Meta: {"colors":["#316dff","#4a8af5","#6ba3f7","#89bff9"],"hasOptions":true}
+
+---RESPONSE---
+Para crear un gráfico de barras con las ventas trimestrales, primero definimos los datos y luego los utilizamos en un gráfico de Chart.js. Aquí está el gráfico:
+
+<chart>
+{"type":"bar","data":{"labels":["Q1","Q2","Q3","Q4"],"datasets":[{"label":"Ventas","data":[150,230,180,310],"backgroundColor":["#316dff","#4a8af5","#6ba3f7","#89bff9"]}]},"options":{"responsive":true,"plugins":{"legend":{"display":true}}}}
+</chart>
+
+---BLOCKS---
+{
+  "chart": "{\"type\":\"bar\",\"data\":{\"labels\":[\"Q1\",\"Q2\",\"Q3\",\"Q4\"],\"datasets\":[{\"label\":\"Ventas\",\"data\":[150,230,180,310],\"backgroundColor\":[\"#316dff\",\"#4a8af5\",\"#6ba3f7\",\"#89bff9\"]}]},\"options\":{\"responsive\":true,\"plugins\":{\"legend\":{\"display\":true}}}}"
+}

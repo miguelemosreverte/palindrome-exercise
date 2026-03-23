@@ -699,6 +699,13 @@
         while (true) {
           const openIdx = remaining.indexOf(openTag);
           if (openIdx === -1) { result += remaining; break; }
+          // Skip if this is a prose mention (followed by : or other non-whitespace)
+          const afterTag = remaining[openIdx + openTag.length];
+          if (afterTag && afterTag !== '\n' && afterTag !== '\r' && afterTag !== ' ' && afterTag !== '{' && afterTag !== '"' && afterTag !== undefined) {
+            result += remaining.slice(0, openIdx + openTag.length);
+            remaining = remaining.slice(openIdx + openTag.length);
+            continue;
+          }
           const closeIdx = remaining.indexOf(closeTag, openIdx + openTag.length);
           if (closeIdx === -1) { result += remaining; break; }
           result += remaining.slice(0, openIdx) + `%%${name}_${arr.length}%%`;
@@ -855,7 +862,13 @@
       try {
         let clean = configStr.trim();
         if (clean.startsWith('```')) clean = clean.replace(/^```\w*\n?/, '').replace(/```$/, '').trim();
-        const config = JSON.parse(clean);
+        let config;
+        try { config = JSON.parse(clean); } catch {
+          // Try fixing common LLM mistakes: extra trailing braces, Python vars
+          let fixed = clean;
+          for (let i = 0; i < 3; i++) fixed = fixed.replace(/\}\s*\}$/, '}');
+          config = JSON.parse(fixed);
+        }
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
           logToolAttempt('chart', configStr, null, 'Canvas not found: ' + canvasId);

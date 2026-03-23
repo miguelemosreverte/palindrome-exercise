@@ -1,3 +1,4 @@
+const SYSTEM_PROMPT = require('../lib/system-prompt');
 const { authFromRequest } = require('../lib/auth');
 const { consumeAnonymousAccess, consumePaidAccess } = require('../lib/access');
 const { readJsonBody } = require('../lib/http');
@@ -91,26 +92,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: `Responde de forma clara, breve y util en espanol.
-
-Tenés acceso a herramientas. Cuando necesites usarlas, escribí el bloque correspondiente:
-
-1. **Búsqueda web**: Para buscar información actual, escribí:
-<web_search>tu consulta de búsqueda</web_search>
-El sistema va a ejecutar la búsqueda y darte los resultados. Después sintetizá la respuesta.
-
-2. **Python**: Para ejecutar código Python (cálculos, análisis, etc), escribí:
-<python>
-tu código python aquí
-</python>
-El código se ejecuta en el navegador con Pyodide. Podés usar numpy, pandas. Usá print() para mostrar resultados.
-
-3. **Gráficos**: Para generar un gráfico, escribí un bloque JSON de Chart.js:
-<chart>
-{"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30]}]}}
-</chart>
-
-Usá las herramientas cuando sea útil. Podés combinarlas en una misma respuesta.` },
+          { role: 'system', content: SYSTEM_PROMPT },
           ...history.map(m => ({ role: m.role, content: m.content })),
           ...(prompt ? [{ role: 'user', content: prompt }] : []),
         ],

@@ -1,0 +1,16 @@
+# Prompt: Usá Python para calcular la raíz cuadrada de 144 y el factorial de 10.
+# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Date: 2026-03-23T22:18:07.054Z
+# Pass: true
+
+---RESPONSE---
+<python>
+import math
+print("La raíz cuadrada de 144 es:", math.sqrt(144))
+print("El factorial de 10 es:", math.factorial(10))
+</python>
+
+---BLOCKS---
+{
+  "python": "import math\nprint(\"La raíz cuadrada de 144 es:\", math.sqrt(144))\nprint(\"El factorial de 10 es:\", math.factorial(10))"
+}
