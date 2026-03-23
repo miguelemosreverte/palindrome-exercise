@@ -1,0 +1,8 @@
+{
+  "name": "mercadopago-chutesai-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "uuid": "^9.0.0"
+  }
+}

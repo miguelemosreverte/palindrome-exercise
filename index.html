@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChutesAI Access Desk</title>
+  <meta
+    name="description"
+    content="Editorial-style access page for ChutesAI credits, paid securely through MercadoPago."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,700&display=swap"
+    rel="stylesheet"
+  >
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: "#f3ecdf",
+            parchment: "#e7dcc8",
+            ink: "#171411",
+            smoke: "#5e564c",
+            brass: "#9d7c42",
+            pine: "#22352f",
+            claret: "#552e24"
+          },
+          fontFamily: {
+            serif: ["Newsreader", "Georgia", "serif"],
+            sans: ["Instrument Sans", "system-ui", "sans-serif"]
+          },
+          boxShadow: {
+            editorial: "0 30px 80px rgba(23, 20, 17, 0.18)"
+          },
+          backgroundImage: {
+            "hero-photo":
+              "linear-gradient(180deg, rgba(23,20,17,0.15), rgba(23,20,17,0.7)), url('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1800&q=80')"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      font-family: "Instrument Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(157, 124, 66, 0.15), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(85, 46, 36, 0.14), transparent 32%),
+        #f3ecdf;
+    }
+
+    .paper-noise::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.08;
+      background-image:
+        linear-gradient(rgba(23, 20, 17, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 20, 17, 0.025) 1px, transparent 1px);
+      background-size: 14px 14px;
+      mix-blend-mode: multiply;
+    }
+
+    .status-panel {
+      display: none;
+    }
+
+    .status-panel.show {
+      display: block;
+    }
+
+    .btn-loading .label-default,
+    .btn-idle .label-loading {
+      display: none;
+    }
+  </style>
+</head>
+<body class="paper-noise min-h-screen bg-paper text-ink">
+  <div class="relative overflow-hidden">
+    <div class="absolute inset-x-0 top-0 h-px bg-black/10"></div>
+
+    <header class="relative z-10 border-b border-black/10">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10">
+        <div>
+          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-smoke/80">ChutesAI Access Desk</p>
+          <p class="mt-1 font-serif text-2xl tracking-tight">MercadoPago Bridge</p>
+        </div>
+        <div class="hidden items-center gap-8 text-sm text-smoke md:flex">
+          <a class="transition hover:text-ink" href="#briefing">Briefing</a>
+          <a class="transition hover:text-ink" href="#terms">Terms</a>
+          <a class="transition hover:text-ink" href="#checkout">Checkout</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="relative isolate">
+        <div class="absolute inset-0 bg-hero-photo bg-cover bg-center"></div>
+        <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(243,236,223,0.1),rgba(243,236,223,0.58)_45%,rgba(243,236,223,0.94)_80%)]"></div>
+        <div class="relative mx-auto grid min-h-[calc(100vh-81px)] max-w-7xl gap-10 px-6 py-14 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-16">
+          <div class="flex flex-col justify-between">
+            <div class="max-w-3xl">
+              <p class="mb-5 inline-flex border border-black/20 bg-paper/60 px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-smoke backdrop-blur">
+                Payment-backed access to open inference
+              </p>
+              <h1 class="max-w-3xl font-serif text-6xl leading-[0.9] tracking-[-0.04em] text-ink sm:text-7xl lg:text-[6.5rem]">
+                A cleaner front door for ChutesAI credits.
+              </h1>
+              <p class="mt-6 max-w-xl text-base leading-7 text-smoke sm:text-lg">
+                Purchase a single access package in Argentine pesos, route checkout through MercadoPago, and receive your ChutesAI credential after confirmation.
+              </p>
+            </div>
+
+            <div class="mt-12 grid gap-5 border-t border-black/15 pt-8 sm:grid-cols-3">
+              <div>
+                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">Settlement</p>
+                <p class="mt-2 font-serif text-3xl">ARS 500</p>
+              </div>
+              <div>
+                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">Delivery</p>
+                <p class="mt-2 font-serif text-3xl">API Key</p>
+              </div>
+              <div>
+                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">Workflow</p>
+                <p class="mt-2 font-serif text-3xl">3 steps</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-end">
+            <aside class="w-full max-w-xl border border-black/15 bg-paper/90 p-6 shadow-editorial backdrop-blur-xl sm:p-8" id="checkout">
+              <div class="flex items-start justify-between gap-6 border-b border-black/10 pb-6">
+                <div>
+                  <p class="text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-smoke/80">Issue 01</p>
+                  <h2 class="mt-2 font-serif text-4xl leading-none">Access Brief</h2>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs uppercase tracking-[0.28em] text-smoke/70">Price</p>
+                  <p class="mt-2 font-serif text-4xl">500 <span class="text-base uppercase tracking-[0.2em] text-smoke">ARS</span></p>
+                </div>
+              </div>
+
+              <div class="grid gap-5 py-6 text-sm leading-6 text-smoke sm:grid-cols-2">
+                <div>
+                  <p class="font-semibold uppercase tracking-[0.22em] text-ink">Included</p>
+                  <p class="mt-2">Immediate checkout initiation and stored payment reference for post-payment recovery.</p>
+                </div>
+                <div>
+                  <p class="font-semibold uppercase tracking-[0.22em] text-ink">Outcome</p>
+                  <p class="mt-2">Confirmed buyers are routed to a success screen where the generated ChutesAI key is retrieved.</p>
+                </div>
+              </div>
+
+              <div class="space-y-3 border-y border-black/10 py-6 text-sm text-ink">
+                <div class="flex items-center justify-between gap-6">
+                  <span>MercadoPago checkout</span>
+                  <span class="text-smoke">Enabled</span>
+                </div>
+                <div class="flex items-center justify-between gap-6">
+                  <span>Open-source inference access</span>
+                  <span class="text-smoke">Included</span>
+                </div>
+                <div class="flex items-center justify-between gap-6">
+                  <span>API key retrieval</span>
+                  <span class="text-smoke">After approval</span>
+                </div>
+              </div>
+
+              <div class="pt-6">
+                <button
+                  class="btn-idle inline-flex w-full items-center justify-center gap-3 bg-ink px-6 py-4 text-sm font-semibold uppercase tracking-[0.22em] text-paper transition hover:bg-pine disabled:cursor-not-allowed disabled:opacity-60"
+                  id="payBtn"
+                  type="button"
+                  onclick="startPayment()"
+                >
+                  <span class="label-default">Proceed To Checkout</span>
+                  <span class="label-loading">Preparing Preference...</span>
+                </button>
+                <p class="mt-3 text-xs leading-5 text-smoke">
+                  Card and wallet processing is handled by MercadoPago. Returned payment references are stored locally to recover the success state if needed.
+                </p>
+              </div>
+
+              <div class="status-panel mt-5 border px-4 py-4 text-sm leading-6" id="status"></div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="border-y border-black/10 bg-black/[0.03]" id="briefing">
+        <div class="mx-auto grid max-w-7xl gap-12 px-6 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:px-10">
+          <div>
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-smoke/75">Field Notes</p>
+            <h2 class="mt-3 max-w-md font-serif text-5xl leading-none tracking-[-0.04em]">Editorial clarity over dashboard clutter.</h2>
+          </div>
+          <div class="grid gap-8 sm:grid-cols-3">
+            <article class="border-t border-black/15 pt-4">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">01</p>
+              <h3 class="mt-3 font-serif text-3xl">Single purpose</h3>
+              <p class="mt-3 text-sm leading-6 text-smoke">One product, one price, one clear action. The page is built to reduce hesitation before payment.</p>
+            </article>
+            <article class="border-t border-black/15 pt-4">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">02</p>
+              <h3 class="mt-3 font-serif text-3xl">Premium tone</h3>
+              <p class="mt-3 text-sm leading-6 text-smoke">Newspaper typography, parchment surfaces, and a cinematic background create a more deliberate sales surface.</p>
+            </article>
+            <article class="border-t border-black/15 pt-4">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-smoke/80">03</p>
+              <h3 class="mt-3 font-serif text-3xl">Practical payoff</h3>
+              <p class="mt-3 text-sm leading-6 text-smoke">The checkout button still calls the existing preference API and preserves the reference used by the success page.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="mx-auto max-w-7xl px-6 py-14 lg:px-10" id="terms">
+        <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+          <div class="border border-black/10 bg-paper/70 p-8">
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-smoke/80">Transaction Path</p>
+            <ol class="mt-5 space-y-5">
+              <li class="border-t border-black/10 pt-5">
+                <p class="font-serif text-2xl">01. Preference issued</p>
+                <p class="mt-2 text-sm leading-6 text-smoke">The page requests a MercadoPago preference from the backend and records the external reference in local storage.</p>
+              </li>
+              <li class="border-t border-black/10 pt-5">
+                <p class="font-serif text-2xl">02. Payment completed</p>
+                <p class="mt-2 text-sm leading-6 text-smoke">MercadoPago handles the transaction and returns the buyer to the success flow with the stored reference intact.</p>
+              </li>
+              <li class="border-t border-black/10 pt-5">
+                <p class="font-serif text-2xl">03. Key delivered</p>
+                <p class="mt-2 text-sm leading-6 text-smoke">The confirmation screen polls Firebase for approval and reveals the generated ChutesAI API key when it is available.</p>
+              </li>
+            </ol>
+          </div>
+
+          <div class="grid gap-6 sm:grid-cols-2">
+            <div class="border border-black/10 bg-[#efe5d3] p-8">
+              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-smoke/80">Why this version</p>
+              <p class="mt-4 font-serif text-3xl leading-tight">The UI now reads like a cover story, not a utility form.</p>
+            </div>
+            <div class="border border-black/10 bg-[#ded0b9] p-8">
+              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-smoke/80">Tailwind setup</p>
+              <p class="mt-4 text-sm leading-6 text-ink">Tailwind is loaded through the CDN for fast iteration inside a static HTML entrypoint.</p>
+            </div>
+            <div class="border border-black/10 bg-[#e9dbc4] p-8 sm:col-span-2">
+              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-smoke/80">Operational note</p>
+              <p class="mt-4 max-w-2xl text-sm leading-6 text-ink">
+                When the frontend is served from the same origin as the Vercel functions, the page uses that origin automatically. If it is served elsewhere, set <code class="bg-black/5 px-1.5 py-1 text-xs">data-api-base</code> on the body to point at the deployed backend.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const bodyApiBase = document.body.dataset.apiBase || "";
+    const isGitHubPages = window.location.hostname.endsWith("github.io");
+    const API_BASE = bodyApiBase || (isGitHubPages ? "" : window.location.origin);
+
+    function setStatus(kind, message) {
+      const status = document.getElementById("status");
+      const kindClasses = {
+        error: "show border-claret/30 bg-claret/10 text-claret",
+        pending: "show border-brass/30 bg-brass/10 text-ink",
+        success: "show border-pine/30 bg-pine/10 text-pine"
+      };
+
+      status.className = `status-panel mt-5 border px-4 py-4 text-sm leading-6 ${kindClasses[kind] || kindClasses.pending}`;
+      status.textContent = message;
+    }
+
+    function setButtonLoading(isLoading) {
+      const btn = document.getElementById("payBtn");
+      btn.disabled = isLoading;
+      btn.classList.toggle("btn-loading", isLoading);
+      btn.classList.toggle("btn-idle", !isLoading);
+    }
+
+    async function startPayment() {
+      if (!API_BASE) {
+        setStatus("error", "Backend not configured. Set a backend origin with the body data-api-base attribute before using GitHub Pages.");
+        return;
+      }
+
+      setButtonLoading(true);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/create-preference`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to create payment");
+        }
+
+        const data = await res.json();
+        localStorage.setItem("payment_ref", data.external_reference);
+        window.location.href = data.init_point;
+      } catch (err) {
+        setButtonLoading(false);
+        setStatus("error", `Error: ${err.message}`);
+      }
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("status") === "failure") {
+      setStatus("error", "Payment was not completed. Please review the details and try again.");
+    }
+  </script>
+</body>
+</html>

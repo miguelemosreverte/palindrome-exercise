@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Confirmed — ChutesAI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>ChutesAI Access</h1>
+
+    <div id="loading" class="status pending">
+      <div class="spinner"></div>
+      <p style="margin-top: 0.5rem">Confirming payment...</p>
+    </div>
+
+    <div id="success" style="display:none" class="status success">
+      <p>Payment confirmed! Here is your API key:</p>
+      <div class="api-key" id="apiKey"></div>
+      <p style="margin-top: 1rem; color: #888; font-size: 0.85rem;">
+        Copy this key and use it with ChutesAI. Keep it safe — it won't be shown again.
+      </p>
+    </div>
+
+    <div id="error" style="display:none" class="status error">
+      <p id="errorMsg">Something went wrong.</p>
+    </div>
+  </div>
+
+  <script>
+    const FIREBASE_RTDB = 'https://signaling-dcfad-default-rtdb.firebaseio.com';
+    const NAMESPACE = 'mercadopago-bridge/payments';
+
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref') || localStorage.getItem('payment_ref');
+
+    if (!ref) {
+      showError('No payment reference found. Please start a new payment.');
+    } else {
+      pollPayment(ref);
+    }
+
+    async function pollPayment(ref) {
+      const maxAttempts = 30; // 60 seconds at 2s intervals
+      let attempts = 0;
+
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await fetch(`${FIREBASE_RTDB}/${NAMESPACE}/${ref}.json`);
+          const data = await res.json();
+
+          if (data && data.status === 'approved' && data.api_key) {
+            clearInterval(interval);
+            showSuccess(data.api_key);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            showError('Payment confirmation is taking longer than expected. If you completed the payment, please contact support.');
+          }
+        } catch (err) {
+          clearInterval(interval);
+          showError('Error checking payment status: ' + err.message);
+        }
+      }, 2000);
+    }
+
+    function showSuccess(apiKey) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('success').style.display = 'block';
+      document.getElementById('apiKey').textContent = apiKey;
+      localStorage.removeItem('payment_ref');
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errorMsg').textContent = msg;
+    }
+  </script>
+</body>
+</html>
