@@ -12,11 +12,12 @@ module.exports = async function handler(req, res) {
     const body = await readJsonBody(req);
     const prompt = String(body.prompt || '').trim();
     const model = String(body.model || '').trim();
+    const history = Array.isArray(body.messages) ? body.messages : [];
     const auth = authFromRequest(req);
     const accessToken = req.headers['x-access-token'] || body.access_token || null;
     const anonymousId = req.headers['x-demo-session'] || body.anonymous_id || null;
 
-    if (!prompt) return res.status(400).json({ error: 'Prompt vacio' });
+    if (!prompt && !history.length) return res.status(400).json({ error: 'Prompt vacio' });
     if (!model) return res.status(400).json({ error: 'Modelo vacio' });
 
     const estimatedCostBeforeRequest = estimateCostUsd(prompt, 'x'.repeat(1200));
@@ -51,10 +52,11 @@ module.exports = async function handler(req, res) {
         model,
         messages: [
           { role: 'system', content: 'Responde de forma clara, breve y util en espanol.' },
-          { role: 'user', content: prompt },
+          ...history.map(m => ({ role: m.role, content: m.content })),
+          ...(prompt ? [{ role: 'user', content: prompt }] : []),
         ],
         temperature: 0.7,
-        max_tokens: 400,
+        max_tokens: 2048,
         stream: true,
       }),
     });

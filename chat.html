@@ -647,6 +647,14 @@
       return d.innerHTML;
     }
 
+    function formatAssistantHtml(text) {
+      let html = escapeHtml(text);
+      // Convert <think>...</think> blocks into collapsible details
+      html = html.replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/g,
+        '<details style="margin:8px 0;border:1px solid var(--line);border-radius:12px;padding:0;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Razonamiento</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">$1</div></details>');
+      return html;
+    }
+
     function renderMessages(items) {
       messagesNode.innerHTML = '';
       if (!items.length) {
@@ -663,14 +671,15 @@
       scrollToBottom();
     }
 
-    function appendMessageToUI(role, content) {
+    function appendMessageToUI(role, content, streaming) {
       const row = document.createElement('div');
       row.className = 'msg-row msg-fade';
 
       if (role === 'user') {
         row.innerHTML = `<div class="msg-user"><div class="msg-user-bubble">${escapeHtml(content)}</div></div>`;
       } else {
-        row.innerHTML = `<div class="msg-assistant-row"><div class="msg-model-badge"></div><div class="msg-assistant-text">${escapeHtml(content)}</div></div>`;
+        const formatted = streaming ? escapeHtml(content) : formatAssistantHtml(content);
+        row.innerHTML = `<div class="msg-assistant-row"><div class="msg-model-badge"></div><div class="msg-assistant-text">${formatted}</div></div>`;
       }
 
       messagesNode.appendChild(row);
@@ -797,7 +806,7 @@
       promptInput.value = '';
       promptInput.style.height = 'auto';
 
-      const assistantDiv = appendMessageToUI('assistant', '');
+      const assistantDiv = appendMessageToUI('assistant', '', true);
       scrollToBottom();
       let fullText = '';
 
@@ -811,7 +820,12 @@
             'X-Demo-Session': demoSessionId,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: demoSessionId }),
+          body: JSON.stringify({
+            prompt: content,
+            model: modelSelect.value,
+            anonymous_id: demoSessionId,
+            messages: chat.messages.slice(0, -1),
+          }),
         });
 
         if (
@@ -826,7 +840,12 @@
               'Content-Type': 'application/json',
               'X-Demo-Session': demoSessionId,
             },
-            body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: demoSessionId }),
+            body: JSON.stringify({
+              prompt: content,
+              model: modelSelect.value,
+              anonymous_id: demoSessionId,
+              messages: chat.messages.slice(0, -1),
+            }),
           });
         }
 
@@ -851,6 +870,9 @@
             } catch {}
           }
         }
+
+        // Apply formatting (collapsible think tags) after stream ends
+        assistantDiv.innerHTML = formatAssistantHtml(fullText);
 
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
