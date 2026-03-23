@@ -690,14 +690,29 @@
     }
 
     function _formatAssistantHtml(text) {
-      // Extract special blocks before escaping
+      // Extract special blocks using simple split (avoids regex backtracking on large text)
       let thinkBlocks = [], chartBlocks = [], pythonBlocks = [], searchBlocks = [];
 
-      let cleaned = text
-        .replace(/<think>([\s\S]*?)<\/think>/g, (_, inner) => { thinkBlocks.push(inner.trim()); return `%%THINK_${thinkBlocks.length-1}%%`; })
-        .replace(/<chart>([\s\S]*?)<\/chart>/g, (_, inner) => { chartBlocks.push(inner.trim()); return `%%CHART_${chartBlocks.length-1}%%`; })
-        .replace(/<python>([\s\S]*?)<\/python>/g, (_, inner) => { pythonBlocks.push(inner.trim()); return `%%PYTHON_${pythonBlocks.length-1}%%`; })
-        .replace(/<web_search>([\s\S]*?)<\/web_search>/g, (_, inner) => { searchBlocks.push(inner.trim()); return `%%SEARCH_${searchBlocks.length-1}%%`; });
+      function extractBlocks(str, openTag, closeTag, name, arr) {
+        let result = '';
+        let remaining = str;
+        while (true) {
+          const openIdx = remaining.indexOf(openTag);
+          if (openIdx === -1) { result += remaining; break; }
+          const closeIdx = remaining.indexOf(closeTag, openIdx + openTag.length);
+          if (closeIdx === -1) { result += remaining; break; }
+          result += remaining.slice(0, openIdx) + `%%${name}_${arr.length}%%`;
+          arr.push(remaining.slice(openIdx + openTag.length, closeIdx).trim());
+          remaining = remaining.slice(closeIdx + closeTag.length);
+        }
+        return result;
+      }
+
+      let cleaned = text;
+      cleaned = extractBlocks(cleaned, '<think>', '</think>', 'THINK', thinkBlocks);
+      cleaned = extractBlocks(cleaned, '<chart>', '</chart>', 'CHART', chartBlocks);
+      cleaned = extractBlocks(cleaned, '<python>', '</python>', 'PYTHON', pythonBlocks);
+      cleaned = extractBlocks(cleaned, '<web_search>', '</web_search>', 'SEARCH', searchBlocks);
 
       // Handle unclosed <chart> (streaming) — show placeholder
       const chartOpenIdx = cleaned.lastIndexOf('<chart>');
@@ -720,10 +735,21 @@
 
       let html = escapeHtml(cleaned);
 
-      // Code blocks
-      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
-      html = html.replace(/```(\w*)\n([\s\S]*)$/, '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
-      html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
+      // Code blocks — use split to avoid regex backtracking
+      const PRE_STYLE = 'margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;';
+      const parts = html.split('```');
+      if (parts.length >= 3) {
+        html = '';
+        for (let i = 0; i < parts.length; i++) {
+          if (i % 2 === 0) { html += parts[i]; }
+          else {
+            const code = parts[i].replace(/^\w*\n/, '');
+            html += `<pre style="${PRE_STYLE}"><code>${code}</code></pre>`;
+          }
+        }
+      }
+      // Inline code
+      html = html.replace(/`([^`\n]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
 
       // Markdown — simple, non-catastrophic patterns
       try {
