@@ -812,16 +812,17 @@
     let pyodideReady = false;
     let pyodideInstance = null;
 
-    async function loadPyodide() {
+    async function initPyodide() {
       if (pyodideInstance) return pyodideInstance;
-      if (!window.loadPyodide) {
+      if (!window._pyodideLoader) {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js';
         document.head.appendChild(script);
         await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; });
+        // Save reference before anything overwrites it
+        window._pyodideLoader = window.loadPyodide;
       }
-      pyodideInstance = await window.loadPyodide();
-      await pyodideInstance.loadPackage(['numpy']);
+      pyodideInstance = await window._pyodideLoader();
       pyodideReady = true;
       return pyodideInstance;
     }
@@ -830,19 +831,23 @@
       const el = document.getElementById(outputId);
       if (!el) return null;
       try {
-        const pyodide = await loadPyodide();
-        pyodide.runPython('import io, sys; sys.stdout = io.StringIO()');
+        el.textContent = '⏳ Cargando Python...';
+        const pyodide = await initPyodide();
+        el.textContent = '⏳ Ejecutando...';
+        // Capture stdout
+        pyodide.runPython('import io as _io, sys as _sys; _sys.stdout = _io.StringIO()');
         await pyodide.runPythonAsync(code);
-        const output = pyodide.runPython('sys.stdout.getvalue()');
+        const output = pyodide.runPython('_sys.stdout.getvalue()');
         el.textContent = output || '(sin output)';
         el.style.color = '#86efac';
         logToolAttempt('python', code, output, null);
         return null;
       } catch (err) {
-        el.textContent = 'Error: ' + err.message;
+        const msg = String(err.message || err).slice(0, 500);
+        el.textContent = 'Error: ' + msg;
         el.style.color = '#fca5a5';
-        logToolAttempt('python', code, null, err.message);
-        return { tool: 'python', error: err.message };
+        logToolAttempt('python', code, null, msg);
+        return { tool: 'python', error: msg };
       }
     }
 

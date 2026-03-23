@@ -4,10 +4,10 @@ const { readJsonBody } = require('../lib/http');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
 const PREFERRED_FIRST = [
-  'mistralai/Mistral-Small',
-  'mistralai/Mistral',
-  'meta-llama/Llama-4-Scout-17B-16E-Instruct',
-  'Qwen/Qwen3-32B',
+  'Mistral',
+  'Llama-4',
+  'Llama-3',
+  'Qwen',
 ];
 
 async function handleGetModels(req, res) {
@@ -23,8 +23,10 @@ async function handleGetModels(req, res) {
       .slice(0, 16)
       .map((m) => ({ id: m.id, label: `${m.root || m.id} · $${m.pricing?.prompt ?? '?'} in / $${m.pricing?.completion ?? '?'} out` }));
     models.sort((a, b) => {
-      const aS = PREFERRED_FIRST.findIndex(p => a.id.includes(p));
-      const bS = PREFERRED_FIRST.findIndex(p => b.id.includes(p));
+      const aid = a.id.toLowerCase();
+      const bid = b.id.toLowerCase();
+      const aS = PREFERRED_FIRST.findIndex(p => aid.includes(p.toLowerCase()));
+      const bS = PREFERRED_FIRST.findIndex(p => bid.includes(p.toLowerCase()));
       return (aS >= 0 ? aS : 999) - (bS >= 0 ? bS : 999);
     });
     return res.status(200).json({ models });
