@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="topbar">Back office de usuarios, uso total y presupuesto estimado.</div>
@@ -81,6 +82,28 @@
           <div class="stat-label">Chars out</div>
           <div class="stat-value" id="responseTotalValue">0</div>
         </div>
+      </section>
+
+      <section class="split-grid">
+        <article class="card tile">
+          <div class="section-kicker">Gasto vs restante</div>
+          <canvas id="budgetChart" height="220"></canvas>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Estados de pagos</div>
+          <canvas id="paymentsChart" height="220"></canvas>
+        </article>
+      </section>
+
+      <section class="split-grid">
+        <article class="card tile">
+          <div class="section-kicker">Uso por día</div>
+          <canvas id="usageChart" height="220"></canvas>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Top usuarios por gasto</div>
+          <canvas id="usersChart" height="220"></canvas>
+        </article>
       </section>
 
       <section class="admin-layout">
@@ -190,6 +213,113 @@
     let adminData;
     let filteredUsers = [];
     let selectedUserId = null;
+    let charts = [];
+
+    function destroyCharts() {
+      charts.forEach((chart) => chart.destroy());
+      charts = [];
+    }
+
+    function buildDailyUsage(events) {
+      const byDay = {};
+      Object.values(events || {}).forEach((event) => {
+        const day = new Date(event.created_at || Date.now()).toISOString().slice(0, 10);
+        byDay[day] = (byDay[day] || 0) + Number(event.estimated_cost_usd || 0);
+      });
+      return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+    }
+
+    function buildPaymentStatuses(payments) {
+      const counts = {};
+      Object.values(payments || {}).forEach((payment) => {
+        const key = payment.status || 'unknown';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return counts;
+    }
+
+    function renderCharts(data) {
+      destroyCharts();
+
+      const budgetCtx = document.getElementById('budgetChart');
+      const paymentsCtx = document.getElementById('paymentsChart');
+      const usageCtx = document.getElementById('usageChart');
+      const usersCtx = document.getElementById('usersChart');
+
+      charts.push(new Chart(budgetCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Gastado', 'Restante'],
+          datasets: [{
+            data: [data.budget.estimated_spent_usd, Math.max(data.budget.estimated_remaining_usd, 0)],
+            backgroundColor: ['#316dff', '#89e0c8'],
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          plugins: { legend: { position: 'bottom' } },
+        },
+      }));
+
+      const paymentStatuses = buildPaymentStatuses(data.payments);
+      charts.push(new Chart(paymentsCtx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(paymentStatuses),
+          datasets: [{
+            label: 'Pagos',
+            data: Object.values(paymentStatuses),
+            backgroundColor: ['#316dff', '#89e0c8', '#ff9f6e', '#112033'],
+            borderRadius: 10,
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+        },
+      }));
+
+      const dailyUsage = buildDailyUsage(data.usage_events);
+      charts.push(new Chart(usageCtx, {
+        type: 'line',
+        data: {
+          labels: dailyUsage.map(([day]) => day),
+          datasets: [{
+            label: 'USD estimado',
+            data: dailyUsage.map(([, value]) => Number(value.toFixed(6))),
+            borderColor: '#316dff',
+            backgroundColor: 'rgba(49,109,255,0.18)',
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+        },
+      }));
+
+      const topUsers = [...data.users]
+        .sort((a, b) => (b.estimated_cost_usd || 0) - (a.estimated_cost_usd || 0))
+        .slice(0, 8);
+      charts.push(new Chart(usersCtx, {
+        type: 'bar',
+        data: {
+          labels: topUsers.map((user) => (user.email || user.user_id || '').slice(0, 18)),
+          datasets: [{
+            label: 'USD estimado',
+            data: topUsers.map((user) => user.estimated_cost_usd || 0),
+            backgroundColor: '#112033',
+            borderRadius: 10,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true } },
+        },
+      }));
+    }
 
     function updateSelectedUser(user) {
       if (!user) {
@@ -287,6 +417,7 @@
         document.getElementById('usageUsersJson').textContent = JSON.stringify(data.usage_users, null, 2);
         document.getElementById('anonymousJson').textContent = JSON.stringify(data.anonymous_demo_sessions, null, 2);
         document.getElementById('firebaseJson').textContent = JSON.stringify(data.raw_firebase, null, 2);
+        renderCharts(data);
         filteredUsers = [...data.users];
         if (filteredUsers.length) {
           selectedUserId = filteredUsers[0].user_id;

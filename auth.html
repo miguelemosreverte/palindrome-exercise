@@ -83,6 +83,7 @@
 
   <script src="app.js"></script>
   <script>
+    AppBridge.checkAutoRedirect();
     const statusNode = document.getElementById('status');
 
     async function handleAuth(event, path) {
@@ -100,9 +101,10 @@
 
         AppBridge.setToken(data.token);
         AppBridge.setUser(data.user);
+        AppBridge.setUserRole(data.role);
         AppBridge.setStatus(statusNode, 'success', 'Cuenta lista. Redirigiendo...');
         setTimeout(() => {
-          window.location.href = data.role === 'admin' ? '/admin.html' : '/dashboard.html';
+          window.location.href = data.role === 'admin' ? '/admin.html' : '/chat.html';
         }, 500);
       } catch (error) {
         AppBridge.setStatus(statusNode, 'error', error.message);
@@ -112,5 +114,6 @@
     document.getElementById('registerForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/register'));
     document.getElementById('loginForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/login'));
   </script>
+
 </body>
 </html>

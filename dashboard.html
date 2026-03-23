@@ -111,6 +111,10 @@
     async function loadDashboard() {
       try {
         const data = await AppBridge.apiFetch('/api/auth/me');
+        if (data.role === 'admin') {
+          window.location.replace('/admin.html');
+          return;
+        }
         document.getElementById('emailValue').textContent = data.user.email;
         document.getElementById('lastLoginValue').textContent = AppBridge.formatDate(data.user.last_login_at);
         document.getElementById('requestsValue').textContent = data.usage.requests || 0;

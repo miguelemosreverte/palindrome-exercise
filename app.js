@@ -27,9 +27,18 @@ function setUser(user) {
   if (user) localStorage.setItem('auth_user', JSON.stringify(user));
 }
 
+function getUserRole() {
+  return localStorage.getItem('auth_role') || 'user';
+}
+
+function setUserRole(role) {
+  if (role) localStorage.setItem('auth_role', role);
+}
+
 function logout() {
   clearToken();
   localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_role');
   window.location.href = '/';
 }
 
@@ -52,6 +61,9 @@ async function apiFetch(path, options = {}) {
   } catch {}
 
   if (!res.ok) {
+    if (res.status === 401) {
+      logout();
+    }
     throw new Error(data.error || 'Request failed');
   }
 
@@ -80,11 +92,18 @@ function formatUsd(value) {
 function bindAuthLinks() {
   const authLinks = document.querySelectorAll('[data-auth-link]');
   const user = getUser();
+  const role = getUserRole();
+
   for (const link of authLinks) {
     if (user) {
       link.textContent = user.email;
-      link.href = '/dashboard.html';
+      link.href = role === 'admin' ? '/admin.html' : '/chat.html';
     }
+  }
+
+  const adminOnlyLinks = document.querySelectorAll('[data-admin-only]');
+  for (const link of adminOnlyLinks) {
+    link.style.display = role === 'admin' ? '' : 'none';
   }
 
   const logoutButtons = document.querySelectorAll('[data-logout]');
@@ -93,17 +112,29 @@ function bindAuthLinks() {
   }
 }
 
+function checkAutoRedirect() {
+  const user = getUser();
+  const role = getUserRole();
+  const path = window.location.pathname;
+  if (user && (path === '/' || path === '/index.html' || path === '/auth.html')) {
+    window.location.href = role === 'admin' ? '/admin.html' : '/chat.html';
+  }
+}
+
 window.AppBridge = {
   API_BASE,
   apiFetch,
   bindAuthLinks,
+  checkAutoRedirect,
   clearToken,
   formatDate,
   formatUsd,
   getToken,
   getUser,
+  getUserRole,
   logout,
   setStatus,
   setToken,
   setUser,
+  setUserRole,
 };
