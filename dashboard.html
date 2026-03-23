@@ -37,6 +37,24 @@
             <div class="amount" style="font-size:28px" id="lastLoginValue">-</div>
           </div>
         </div>
+        <div class="hero-metric">
+          <div class="card stat-card">
+            <div class="stat-label">Disponible total</div>
+            <div class="stat-value" id="limitValue">USD 0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Consumido</div>
+            <div class="stat-value" id="usedValue">USD 0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Restante</div>
+            <div class="stat-value" id="creditValue">USD 0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Utilización</div>
+            <div class="stat-value" id="usagePctValue">0%</div>
+          </div>
+        </div>
         <div class="stats">
           <div class="card stat-card">
             <div class="stat-label">Requests</div>
@@ -49,10 +67,6 @@
           <div class="card stat-card">
             <div class="stat-label">Gasto estimado</div>
             <div class="stat-value" id="costValue">USD 0</div>
-          </div>
-          <div class="card stat-card">
-            <div class="stat-label">Saldo disponible</div>
-            <div class="stat-value" id="creditValue">USD 0</div>
           </div>
         </div>
       </section>
@@ -102,7 +116,13 @@
         document.getElementById('requestsValue').textContent = data.usage.requests || 0;
         document.getElementById('promptCharsValue').textContent = data.usage.prompt_chars || 0;
         document.getElementById('costValue').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
+        document.getElementById('limitValue').textContent = AppBridge.formatUsd(data.access.credit_limit_usd || 0);
+        document.getElementById('usedValue').textContent = AppBridge.formatUsd(data.access.spent_estimated_usd || 0);
         document.getElementById('creditValue').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
+        const utilizationPct = data.access.credit_limit_usd
+          ? (((data.access.spent_estimated_usd || 0) / data.access.credit_limit_usd) * 100).toFixed(1)
+          : '0.0';
+        document.getElementById('usagePctValue').textContent = `${utilizationPct}%`;
         document.getElementById('lastUsedValue').textContent = AppBridge.formatDate(data.usage.last_used_at);
         const firstToken = data.access.tokens?.[0];
         if (firstToken) {

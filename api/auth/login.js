@@ -18,14 +18,16 @@ module.exports = async function handler(req, res) {
     const body = await readJsonBody(req);
 
     if (isDefaultAdminLogin(body.email, body.password)) {
+      const role = 'admin';
       const token = createToken({
         sub: 'admin-root',
         email: 'admin',
-        role: 'admin',
+        role,
       });
 
       return res.status(200).json({
         token,
+        role,
         user: {
           id: 'admin-root',
           email: 'admin',
@@ -42,14 +44,16 @@ module.exports = async function handler(req, res) {
     }
 
     await updateLastLogin(user.id);
+    const role = isAdmin(user.email) ? 'admin' : 'user';
     const token = createToken({
       sub: user.id,
       email: user.email,
-      role: isAdmin(user.email) ? 'admin' : 'user',
+      role,
     });
 
     return res.status(200).json({
       token,
+      role,
       user: publicUser(user),
     });
   } catch (error) {
