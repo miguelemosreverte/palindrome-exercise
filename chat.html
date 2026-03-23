@@ -649,8 +649,8 @@
     function getChat(id) { return chats.find(c => c.id === id); }
 
     function getDemoSessionId() {
-      let id = localStorage.getItem('demo_session_id');
-      if (!id) { id = crypto.randomUUID(); localStorage.setItem('demo_session_id', id); }
+      let id = sessionStorage.getItem('demo_session_id');
+      if (!id) { id = crypto.randomUUID(); sessionStorage.setItem('demo_session_id', id); }
       return id;
     }
 

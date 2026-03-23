@@ -61,6 +61,15 @@
     const statusNode = document.getElementById('status');
     const modelSelect = document.getElementById('modelSelect');
 
+    function getDemoAnonymousId() {
+      let id = sessionStorage.getItem('demo_anon_id');
+      if (!id) {
+        id = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+        sessionStorage.setItem('demo_anon_id', id);
+      }
+      return id;
+    }
+
     async function loadModels() {
       try {
         const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
@@ -76,10 +85,7 @@
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const button = event.currentTarget.querySelector('button');
-      const anonymousId =
-        localStorage.getItem('demo_anon_id') ||
-        `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-      localStorage.setItem('demo_anon_id', anonymousId);
+      const anonymousId = getDemoAnonymousId();
       button.disabled = true;
       AppBridge.setStatus(statusNode, 'pending', 'Ejecutando demo...');
 
