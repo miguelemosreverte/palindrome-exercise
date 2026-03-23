@@ -3,7 +3,45 @@ const { consumeAnonymousAccess, consumePaidAccess } = require('../lib/access');
 const { readJsonBody } = require('../lib/http');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
+const PREFERRED_FIRST = [
+  'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+  'meta-llama/Llama-3.3-70B-Instruct',
+  'Qwen/Qwen3-32B',
+  'mistralai/Mistral-Small',
+];
+
+async function handleGetModels(req, res) {
+  try {
+    const demoBase = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
+    const response = await fetch(`${demoBase}/models`, {
+      headers: { Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}` },
+    });
+    if (!response.ok) throw new Error(`${response.status}`);
+    const data = await response.json();
+    const models = (data.data || [])
+      .filter((m) => Array.isArray(m.input_modalities) && m.input_modalities.includes('text'))
+      .slice(0, 16)
+      .map((m) => ({ id: m.id, label: `${m.root || m.id} · $${m.pricing?.prompt ?? '?'} in / $${m.pricing?.completion ?? '?'} out` }));
+    models.sort((a, b) => {
+      const aS = PREFERRED_FIRST.findIndex(p => a.id.includes(p));
+      const bS = PREFERRED_FIRST.findIndex(p => b.id.includes(p));
+      return (aS >= 0 ? aS : 999) - (bS >= 0 ? bS : 999);
+    });
+    return res.status(200).json({ models });
+  } catch (error) {
+    return res.status(200).json({
+      models: [
+        { id: 'Qwen/Qwen3-32B-TEE', label: 'Qwen/Qwen3-32B' },
+        { id: 'deepseek-ai/DeepSeek-V3.2-TEE', label: 'DeepSeek V3.2' },
+        { id: 'chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE', label: 'Mistral Small 3.1' },
+      ],
+      warning: error.message,
+    });
+  }
+}
+
 module.exports = async function handler(req, res) {
+  if (req.method === 'GET') return handleGetModels(req, res);
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -51,7 +89,26 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'Responde de forma clara, breve y util en espanol.' },
+          { role: 'system', content: `Responde de forma clara, breve y util en espanol.
+
+Tenés acceso a herramientas. Cuando necesites usarlas, escribí el bloque correspondiente:
+
+1. **Búsqueda web**: Para buscar información actual, escribí:
+<web_search>tu consulta de búsqueda</web_search>
+El sistema va a ejecutar la búsqueda y darte los resultados. Después sintetizá la respuesta.
+
+2. **Python**: Para ejecutar código Python (cálculos, análisis, etc), escribí:
+<python>
+tu código python aquí
+</python>
+El código se ejecuta en el navegador con Pyodide. Podés usar numpy, pandas. Usá print() para mostrar resultados.
+
+3. **Gráficos**: Para generar un gráfico, escribí un bloque JSON de Chart.js:
+<chart>
+{"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30]}]}}
+</chart>
+
+Usá las herramientas cuando sea útil. Podés combinarlas en una misma respuesta.` },
           ...history.map(m => ({ role: m.role, content: m.content })),
           ...(prompt ? [{ role: 'user', content: prompt }] : []),
         ],

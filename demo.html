@@ -94,7 +94,7 @@
 
     async function loadModels() {
       try {
-        const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
+        const data = await AppBridge.apiFetch('/api/demo-stream', { method: 'GET' });
         modelSelect.innerHTML = data.models
           .map((model) => `<option value="${model.id}">${model.label}</option>`)
           .join('');

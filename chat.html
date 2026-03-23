@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     body {
       overflow: hidden;
@@ -647,68 +648,186 @@
       return d.innerHTML;
     }
 
-    function formatAssistantHtml(text) {
-      // Handle <think> blocks first (before escaping)
-      let thinkBlocks = [];
-      let cleaned = text.replace(/<think>([\s\S]*?)<\/think>/g, (_, inner) => {
-        thinkBlocks.push(inner.trim());
-        return `%%THINK_${thinkBlocks.length - 1}%%`;
-      });
+    let chartCounter = 0;
 
-      // Handle unclosed <think> (still streaming)
-      let pendingThink = '';
-      const openIdx = cleaned.lastIndexOf('<think>');
-      if (openIdx !== -1 && cleaned.indexOf('</think>', openIdx) === -1) {
-        pendingThink = cleaned.slice(openIdx + 7);
-        cleaned = cleaned.slice(0, openIdx) + `%%THINK_PENDING%%`;
+    function formatAssistantHtml(text) {
+      // Extract special blocks before escaping
+      let thinkBlocks = [], chartBlocks = [], pythonBlocks = [], searchBlocks = [];
+
+      let cleaned = text
+        .replace(/<think>([\s\S]*?)<\/think>/g, (_, inner) => { thinkBlocks.push(inner.trim()); return `%%THINK_${thinkBlocks.length-1}%%`; })
+        .replace(/<chart>([\s\S]*?)<\/chart>/g, (_, inner) => { chartBlocks.push(inner.trim()); return `%%CHART_${chartBlocks.length-1}%%`; })
+        .replace(/<python>([\s\S]*?)<\/python>/g, (_, inner) => { pythonBlocks.push(inner.trim()); return `%%PYTHON_${pythonBlocks.length-1}%%`; })
+        .replace(/<web_search>([\s\S]*?)<\/web_search>/g, (_, inner) => { searchBlocks.push(inner.trim()); return `%%SEARCH_${searchBlocks.length-1}%%`; });
+
+      // Handle unclosed tags (streaming)
+      let pendingThink = '', pendingPython = '', pendingSearch = '';
+      for (const [tag, setter] of [['<think>', v => pendingThink = v], ['<python>', v => pendingPython = v], ['<web_search>', v => pendingSearch = v]]) {
+        const idx = cleaned.lastIndexOf(tag);
+        const closeTag = tag.replace('<', '</');
+        if (idx !== -1 && cleaned.indexOf(closeTag, idx) === -1) {
+          setter(cleaned.slice(idx + tag.length));
+          const placeholder = tag.includes('think') ? '%%THINK_PENDING%%' : tag.includes('python') ? '%%PYTHON_PENDING%%' : '%%SEARCH_PENDING%%';
+          cleaned = cleaned.slice(0, idx) + placeholder;
+        }
       }
 
-      // Escape HTML
       let html = escapeHtml(cleaned);
 
-      // Code blocks (```lang\n...\n```)
-      html = html.replace(/```(\w*)\n([\s\S]*?)```/g,
-        '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
-      // Unclosed code block (streaming)
-      html = html.replace(/```(\w*)\n([\s\S]*)$/,
-        '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
+      // Code blocks
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
+      html = html.replace(/```(\w*)\n([\s\S]*)$/, '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
+      html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
 
-      // Inline code
-      html = html.replace(/`([^`]+)`/g,
-        '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
-
-      // Bold
+      // Markdown
       html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-      // Italic
       html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-
-      // Headers
       html = html.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:12px 0 4px;">$1</div>');
       html = html.replace(/^## (.+)$/gm, '<div style="font-size:17px;font-weight:800;margin:14px 0 6px;">$1</div>');
       html = html.replace(/^# (.+)$/gm, '<div style="font-size:20px;font-weight:800;margin:16px 0 8px;">$1</div>');
-
-      // Bullet lists
       html = html.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:16px;">• $1</div>');
-      // Numbered lists
       html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:16px;">$1. $2</div>');
 
       // Restore think blocks
-      thinkBlocks.forEach((block, i) => {
-        html = html.replace(`%%THINK_${i}%%`,
-          `<details style="margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Razonamiento</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">${escapeHtml(block)}</div></details>`);
-      });
+      const detailStyle = 'margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);';
+      const summaryStyle = 'cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;';
+      const innerStyle = 'padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;';
 
-      // Pending think (still streaming)
-      if (pendingThink || html.includes('%%THINK_PENDING%%')) {
-        const thinkContent = pendingThink ? escapeHtml(pendingThink) : '';
-        html = html.replace('%%THINK_PENDING%%',
-          `<details open style="margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Pensando...</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">${thinkContent}</div></details>`);
+      thinkBlocks.forEach((block, i) => {
+        html = html.replace(`%%THINK_${i}%%`, `<details style="${detailStyle}"><summary style="${summaryStyle}">Razonamiento</summary><div style="${innerStyle}">${escapeHtml(block)}</div></details>`);
+      });
+      if (html.includes('%%THINK_PENDING%%')) {
+        html = html.replace('%%THINK_PENDING%%', `<details open style="${detailStyle}"><summary style="${summaryStyle}">Pensando...</summary><div style="${innerStyle}">${escapeHtml(pendingThink)}</div></details>`);
       }
 
-      // Convert remaining newlines to <br> (but not inside pre blocks)
-      html = html.replace(/\n/g, '<br>');
+      // Chart blocks
+      chartBlocks.forEach((block, i) => {
+        const id = `chart-${chartCounter++}`;
+        html = html.replace(`%%CHART_${i}%%`, `<div style="margin:12px 0;border-radius:16px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${id}" style="max-height:300px;"></canvas></div><script-placeholder data-chart-id="${id}" data-chart-config="${escapeHtml(block)}"></script-placeholder>`);
+      });
 
+      // Python blocks
+      pythonBlocks.forEach((block, i) => {
+        const id = `py-${Date.now()}-${i}`;
+        html = html.replace(`%%PYTHON_${i}%%`, `<div style="margin:8px 0;"><pre style="padding:14px;border-radius:12px 12px 0 0;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;margin:0;"><code>${escapeHtml(block)}</code></pre><div id="${id}" class="py-output" style="padding:10px 14px;border-radius:0 0 12px 12px;background:#0f172a;color:#86efac;font-size:13px;font-family:monospace;white-space:pre-wrap;min-height:24px;">⏳ Ejecutando...</div></div><script-placeholder data-py-id="${id}" data-py-code="${escapeHtml(block)}"></script-placeholder>`);
+      });
+      if (html.includes('%%PYTHON_PENDING%%')) {
+        html = html.replace('%%PYTHON_PENDING%%', `<div style="margin:8px 0;"><pre style="padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>${escapeHtml(pendingPython)}</code></pre><div style="padding:6px 14px;font-size:11px;color:var(--slate);">⏳ Escribiendo código...</div></div>`);
+      }
+
+      // Search blocks
+      searchBlocks.forEach((query, i) => {
+        const id = `search-${Date.now()}-${i}`;
+        html = html.replace(`%%SEARCH_${i}%%`, `<div id="${id}" style="margin:8px 0;padding:12px 16px;border-radius:12px;background:rgba(49,109,255,0.06);border:1px solid rgba(49,109,255,0.15);font-size:13px;"><strong style="color:var(--ocean);">🔍 Buscando:</strong> ${escapeHtml(query)}<div class="search-results" style="margin-top:8px;color:var(--slate);">Cargando resultados...</div></div><script-placeholder data-search-id="${id}" data-search-query="${escapeHtml(query)}"></script-placeholder>`);
+      });
+      if (html.includes('%%SEARCH_PENDING%%')) {
+        html = html.replace('%%SEARCH_PENDING%%', `<div style="margin:8px 0;padding:12px 16px;border-radius:12px;background:rgba(49,109,255,0.06);border:1px solid rgba(49,109,255,0.15);font-size:13px;"><strong style="color:var(--ocean);">🔍 Buscando:</strong> ${escapeHtml(pendingSearch)}...</div>`);
+      }
+
+      html = html.replace(/\n/g, '<br>');
       return html;
+    }
+
+    // --- Tool execution ---
+    let pyodideReady = false;
+    let pyodideInstance = null;
+
+    async function loadPyodide() {
+      if (pyodideInstance) return pyodideInstance;
+      if (!window.loadPyodide) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js';
+        document.head.appendChild(script);
+        await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; });
+      }
+      pyodideInstance = await window.loadPyodide();
+      await pyodideInstance.loadPackage(['numpy']);
+      pyodideReady = true;
+      return pyodideInstance;
+    }
+
+    async function executePython(code, outputId) {
+      const el = document.getElementById(outputId);
+      if (!el) return;
+      try {
+        const pyodide = await loadPyodide();
+        pyodide.runPython('import io, sys; sys.stdout = io.StringIO()');
+        await pyodide.runPythonAsync(code);
+        const output = pyodide.runPython('sys.stdout.getvalue()');
+        el.textContent = output || '(sin output)';
+        el.style.color = '#86efac';
+      } catch (err) {
+        el.textContent = 'Error: ' + err.message;
+        el.style.color = '#fca5a5';
+      }
+    }
+
+    function executeChart(canvasId, configStr) {
+      try {
+        const config = JSON.parse(configStr);
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        new Chart(canvas.getContext('2d'), config);
+      } catch (err) {
+        const canvas = document.getElementById(canvasId);
+        if (canvas) canvas.parentElement.innerHTML = `<div style="color:#ef4444;font-size:13px;">Error en gráfico: ${err.message}</div>`;
+      }
+    }
+
+    async function executeSearch(containerId, query) {
+      const el = document.getElementById(containerId);
+      if (!el) return null;
+      const resultsDiv = el.querySelector('.search-results');
+      try {
+        const res = await fetch(`${API_BASE}/api/tools`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: 'web_search', query }),
+        });
+        const data = await res.json();
+        if (!data.results?.length) {
+          resultsDiv.textContent = 'Sin resultados.';
+          return null;
+        }
+        resultsDiv.innerHTML = data.results.map(r =>
+          `<div style="margin-top:6px;"><a href="${r.url}" target="_blank" style="color:var(--ocean);font-weight:600;font-size:12px;">${escapeHtml(r.title || r.url)}</a><div style="font-size:12px;line-height:1.5;">${escapeHtml(r.snippet)}</div></div>`
+        ).join('');
+        return data.results;
+      } catch (err) {
+        resultsDiv.textContent = 'Error: ' + err.message;
+        return null;
+      }
+    }
+
+    function processToolPlaceholders(container) {
+      // Execute charts
+      container.querySelectorAll('script-placeholder[data-chart-id]').forEach(el => {
+        executeChart(el.dataset.chartId, el.dataset.chartConfig);
+        el.remove();
+      });
+      // Execute Python
+      container.querySelectorAll('script-placeholder[data-py-id]').forEach(el => {
+        executePython(el.dataset.pyCode, el.dataset.pyId);
+        el.remove();
+      });
+      // Execute searches
+      container.querySelectorAll('script-placeholder[data-search-id]').forEach(async el => {
+        const query = el.dataset.searchQuery;
+        const id = el.dataset.searchId;
+        el.remove();
+        const results = await executeSearch(id, query);
+        // If we have search results and a current chat, auto-send follow-up
+        if (results && results.length && currentChatId && !sending) {
+          const summary = results.map(r => `- ${r.title}: ${r.snippet}`).join('\n');
+          const chat = getChat(currentChatId);
+          if (chat) {
+            chat.messages.push({ role: 'assistant', content: `[Resultados de búsqueda para "${query}"]\n${summary}` });
+            // Don't auto-continue for now — the results are visible to the user
+            // A future improvement could auto-send these results back to the LLM
+            saveChats();
+          }
+        }
+      });
     }
 
     function renderMessages(items) {
@@ -736,6 +855,7 @@
       } else {
         const formatted = streaming ? escapeHtml(content) : formatAssistantHtml(content);
         row.innerHTML = `<div class="msg-assistant-row"><div class="msg-model-badge"></div><div class="msg-assistant-text">${formatted}</div></div>`;
+        if (!streaming) processToolPlaceholders(row);
       }
 
       messagesNode.appendChild(row);
@@ -822,7 +942,7 @@
     // --- Models ---
     async function loadModels() {
       try {
-        const res = await fetch(`${API_BASE}/api/demo-config`);
+        const res = await fetch(`${API_BASE}/api/demo-stream`);
         const data = await res.json();
         modelSelect.innerHTML = (data.models || []).map(m => `<option value="${m.id}">${m.label}</option>`).join('');
       } catch {
@@ -927,8 +1047,9 @@
           }
         }
 
-        // Apply formatting (collapsible think tags) after stream ends
+        // Apply final formatting and execute tools
         assistantDiv.innerHTML = formatAssistantHtml(fullText);
+        processToolPlaceholders(assistantDiv);
 
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
