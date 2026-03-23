@@ -8,138 +8,390 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            sky: "#bcecff",
-            mist: "#dff7f2",
-            cream: "#f7f6ef",
-            ink: "#112033",
-            slate: "#56708a",
-            ocean: "#316dff",
-            mint: "#89e0c8",
-          },
-          fontFamily: {
-            sans: ["Instrument Sans", "system-ui", "sans-serif"]
-          },
-        }
-      }
-    };
-  </script>
+  <link rel="stylesheet" href="styles.css">
   <style>
     body {
-      font-family: "Instrument Sans", system-ui, sans-serif;
       overflow: hidden;
       height: 100dvh;
+      display: flex;
+      margin: 0;
     }
 
     .chat-scroll::-webkit-scrollbar { width: 6px; }
     .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-    .chat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(86,112,138,0.2); border-radius: 3px; }
 
-    .msg-assistant { animation: fadeIn 0.2s ease-out; }
+    .msg-fade { animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-    textarea { field-sizing: content; }
+    /* Sidebar */
+    .chat-sidebar {
+      width: 280px;
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid rgba(255,255,255,0.75);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 50;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+      background: transparent;
+    }
+
+    .chat-header {
+      height: 60px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 20px 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .msg-row {
+      max-width: 780px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .msg-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .msg-user-bubble {
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.8);
+      box-shadow: var(--shadow-soft);
+      border-radius: 24px 24px 6px 24px;
+      padding: 14px 20px;
+      max-width: 85%;
+      font-size: 15px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg-assistant-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .msg-model-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--ocean), var(--mint));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: white;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .msg-assistant-text {
+      font-size: 15px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding-top: 4px;
+      min-width: 0;
+    }
+
+    /* Composer */
+    .composer-wrap {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 16px 20px 20px;
+      background: linear-gradient(to top, rgba(247,246,239,0.95) 60%, transparent);
+      z-index: 5;
+      display: flex;
+      justify-content: center;
+    }
+
+    .composer {
+      width: 100%;
+      max-width: 780px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.75);
+      background: rgba(255,255,255,0.7);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(10px);
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .composer-model-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 4px 2px;
+    }
+
+    .composer-model-row svg {
+      width: 14px;
+      height: 14px;
+      color: var(--slate);
+      opacity: 0.5;
+    }
+
+    .composer-model-row select {
+      background: transparent;
+      border: none;
+      padding: 4px 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      outline: none;
+      border-radius: 0;
+      width: auto;
+      flex: 1;
+    }
+
+    .composer-input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .composer-input-row textarea {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 8px 4px;
+      min-height: 40px;
+      max-height: 200px;
+      resize: none;
+      font-size: 15px;
+      outline: none;
+      color: var(--ink);
+      border-radius: 0;
+    }
+
+    .send-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: var(--ocean);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s;
+      flex-shrink: 0;
+    }
+
+    .send-btn:disabled {
+      background: rgba(86,112,138,0.2);
+      cursor: not-allowed;
+    }
+
+    .composer-hint {
+      padding: 2px 4px;
+      font-size: 10px;
+      color: var(--slate);
+      opacity: 0.4;
+      font-weight: 600;
+    }
+
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.2);
+      backdrop-filter: blur(4px);
+      z-index: 40;
+    }
+
+    /* Nav items in sidebar */
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      color: var(--slate);
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      text-decoration: none;
+      border: none;
+      background: none;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+    }
+
+    .sidebar-nav-item:hover {
+      background: rgba(255,255,255,0.6);
+      color: var(--ink);
+    }
+
+    .sidebar-nav-item svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .sidebar-history-item {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      color: var(--slate);
+      transition: all 0.15s;
+    }
+
+    .sidebar-history-item:hover {
+      background: rgba(255,255,255,0.6);
+      color: var(--ink);
+    }
+
+    .sidebar-history-item.active {
+      background: rgba(255,255,255,0.8);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      color: var(--ink);
+    }
+
+    .sidebar-history-title {
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-history-date {
+      font-size: 10px;
+      opacity: 0.5;
+      margin-top: 2px;
+    }
+
+    @media (max-width: 768px) {
+      .chat-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+      }
+      .chat-sidebar.open {
+        transform: translateX(0);
+      }
+      .sidebar-overlay.open {
+        display: block;
+      }
+    }
   </style>
 </head>
-<body class="bg-white text-ink flex h-[100dvh]">
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- Sidebar -->
-  <aside id="sidebar" class="w-72 bg-cream/60 border-r border-slate/10 flex flex-col transition-all duration-300 shrink-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:-translate-x-full" data-open="false">
-    <div class="p-5 border-b border-slate/10">
-      <div class="flex items-center justify-between">
-        <a href="/" class="text-lg font-extrabold tracking-tight text-ink">Modelos IA</a>
-        <button id="closeSidebar" class="md:hidden p-1.5 rounded-lg hover:bg-white/60 text-slate">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <button id="newChatBtn" class="mt-4 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-ocean text-white text-sm font-semibold shadow-sm hover:bg-ocean/90 transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  <aside class="chat-sidebar" id="sidebar">
+    <div style="padding: 20px 16px; border-bottom: 1px solid var(--line);">
+      <a href="/" style="font-size: 18px; font-weight: 800; color: var(--ink);">Modelos IA</a>
+      <button id="newChatBtn" style="margin-top: 14px; width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 14px; background: var(--ocean); color: white; border: none; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">
+        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         Nuevo chat
       </button>
     </div>
 
-    <nav class="p-3 flex flex-col gap-0.5">
-      <a href="/" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate hover:bg-white/60 hover:text-ink transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-        Inicio
-      </a>
-      <a href="/dashboard.html" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate hover:bg-white/60 hover:text-ink transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Mi panel
+    <nav style="padding: 10px 10px 0; display: flex; flex-direction: column; gap: 2px;">
+      <a href="/dashboard.html" class="sidebar-nav-item">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 12h8v8H4zM16 12h4v8h-4z"/></svg>
+        Uso y saldo
       </a>
     </nav>
 
-    <div class="flex-1 overflow-y-auto px-3 pb-3 chat-scroll">
-      <p class="px-3 mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate/60">Historial</p>
-      <div id="historyList" class="flex flex-col gap-0.5"></div>
+    <div style="flex: 1; overflow-y: auto; padding: 14px 10px;" class="chat-scroll">
+      <div style="padding: 0 14px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--slate); opacity: 0.5; font-weight: 700;">Historial</div>
+      <div id="historyList" style="display: flex; flex-direction: column; gap: 2px;"></div>
       <div id="sidebarStatus"></div>
     </div>
 
-    <div class="p-3 border-t border-slate/10">
-      <button data-logout class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+    <div style="padding: 10px; border-top: 1px solid var(--line);">
+      <button data-logout class="sidebar-nav-item" style="color: #ef4444;">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
         Cerrar sesión
       </button>
     </div>
   </aside>
 
-  <!-- Sidebar overlay (mobile) -->
-  <div id="sidebarOverlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 hidden"></div>
-
-  <!-- Main chat -->
-  <main class="flex-1 flex flex-col min-w-0 relative">
-    <!-- Header -->
-    <header class="h-14 px-4 flex items-center justify-between border-b border-slate/10 bg-white shrink-0">
-      <div class="flex items-center gap-3">
-        <button id="toggleSidebar" class="p-1.5 -ml-1 rounded-lg hover:bg-slate/5 text-slate">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  <main class="chat-main">
+    <header class="chat-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button id="toggleSidebar" style="padding: 6px; border-radius: 8px; border: none; background: none; cursor: pointer; color: var(--slate);">
+          <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <h1 id="chatTitle" class="text-sm font-bold truncate">Nuevo chat</h1>
+        <span id="chatTitle" style="font-size: 14px; font-weight: 800;">Nuevo chat</span>
       </div>
-      <div class="flex items-center gap-4">
-        <span id="quotaInfo" class="text-xs font-semibold text-ocean"></span>
-        <span id="connectionState" class="text-[10px] font-medium text-slate/50"></span>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span id="quotaInfo" style="font-size: 12px; font-weight: 700; color: var(--ocean);"></span>
+        <span id="connectionState" style="font-size: 10px; color: var(--slate); opacity: 0.5;"></span>
       </div>
     </header>
 
-    <!-- Messages -->
-    <div id="messages" class="flex-1 overflow-y-auto chat-scroll px-4 py-8 flex flex-col gap-6">
-      <div class="flex-1 flex items-center justify-center">
-        <div class="text-center opacity-40">
-          <p class="text-3xl font-extrabold tracking-tight">Hablar con IA</p>
-          <p class="mt-2 text-sm text-slate">Elegí un modelo abajo y empezá a chatear.</p>
+    <div class="chat-messages chat-scroll" id="messages">
+      <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center; opacity: 0.35;">
+          <div style="font-size: 32px; font-weight: 800;">Hablar con IA</div>
+          <p style="margin-top: 8px; font-size: 14px; color: var(--slate);">Elegí un modelo abajo y empezá a chatear.</p>
         </div>
       </div>
     </div>
 
-    <!-- Composer -->
-    <div class="px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white to-transparent">
-      <div id="chatStatus" class="mb-2"></div>
-      <div class="max-w-3xl mx-auto">
-        <div class="rounded-2xl border border-slate/15 bg-cream/30 shadow-sm focus-within:border-ocean/30 focus-within:ring-2 focus-within:ring-ocean/10 transition">
-          <!-- Model selector row -->
-          <div class="px-3 pt-2.5 flex items-center gap-2">
-            <svg class="w-4 h-4 text-slate/50 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
-            <select id="modelSelect" class="flex-1 bg-transparent text-xs font-semibold text-ink py-1.5 outline-none cursor-pointer appearance-none">
-              <option>Cargando modelos...</option>
-            </select>
-          </div>
-          <!-- Input row -->
-          <div class="flex items-end gap-2 px-3 pb-2.5 pt-1">
-            <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1" class="flex-1 bg-transparent text-[15px] text-ink placeholder:text-slate/35 outline-none resize-none min-h-[40px] max-h-[200px] py-1.5 leading-relaxed"></textarea>
-            <button id="sendBtn" class="w-8 h-8 rounded-full bg-ocean text-white flex items-center justify-center shrink-0 hover:bg-ocean/90 disabled:bg-slate/20 disabled:cursor-not-allowed transition mb-0.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-          <div class="px-3 pb-2 flex justify-between text-[10px] text-slate/40 font-medium">
-            <span>Enter para enviar · Shift+Enter nueva línea</span>
-          </div>
+    <div class="composer-wrap">
+      <div id="chatStatus" style="max-width: 780px; width: 100%; margin: 0 auto 8px;"></div>
+      <div class="composer">
+        <div class="composer-model-row">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
+          <select id="modelSelect">
+            <option>Cargando modelos...</option>
+          </select>
         </div>
+        <div class="composer-input-row">
+          <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1"></textarea>
+          <button class="send-btn" id="sendBtn">
+            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="composer-hint">Enter para enviar · Shift+Enter nueva línea</div>
       </div>
     </div>
   </main>
@@ -159,30 +411,27 @@
     const promptInput = document.getElementById('promptInput');
     const sendBtn = document.getElementById('sendBtn');
     const toggleSidebar = document.getElementById('toggleSidebar');
-    const closeSidebar = document.getElementById('closeSidebar');
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
 
-    let socket;
+    let socket = null;
     let currentChatId = null;
     let histories = [];
     let currentAssistantDiv = null;
 
-    function openSidebar() {
-      sidebar.classList.remove('max-md:-translate-x-full');
-      sidebarOverlay.classList.remove('hidden');
+    function openSidebarUI() {
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('open');
     }
-    function closeSidebarFn() {
-      sidebar.classList.add('max-md:-translate-x-full');
-      sidebarOverlay.classList.add('hidden');
+    function closeSidebarUI() {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('open');
     }
 
     toggleSidebar.addEventListener('click', () => {
-      if (sidebar.classList.contains('max-md:-translate-x-full')) openSidebar();
-      else closeSidebarFn();
+      sidebar.classList.contains('open') ? closeSidebarUI() : openSidebarUI();
     });
-    closeSidebar.addEventListener('click', closeSidebarFn);
-    sidebarOverlay.addEventListener('click', closeSidebarFn);
+    sidebarOverlay.addEventListener('click', closeSidebarUI);
 
     promptInput.addEventListener('input', () => {
       promptInput.style.height = 'auto';
@@ -196,14 +445,20 @@
       }
     });
 
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
     function renderMessages(items) {
       messagesNode.innerHTML = '';
       if (!items.length) {
         messagesNode.innerHTML = `
-          <div class="flex-1 flex items-center justify-center">
-            <div class="text-center opacity-40">
-              <p class="text-3xl font-extrabold tracking-tight">Hablar con IA</p>
-              <p class="mt-2 text-sm text-slate">Elegí un modelo abajo y empezá a chatear.</p>
+          <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
+            <div style="text-align: center; opacity: 0.35;">
+              <div style="font-size: 32px; font-weight: 800;">Hablar con IA</div>
+              <p style="margin-top: 8px; font-size: 14px; color: var(--slate);">Elegí un modelo abajo y empezá a chatear.</p>
             </div>
           </div>`;
         return;
@@ -213,24 +468,17 @@
     }
 
     function appendMessageToUI(role, content) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'max-w-3xl mx-auto w-full';
+      const row = document.createElement('div');
+      row.className = 'msg-row msg-fade';
 
       if (role === 'user') {
-        wrapper.innerHTML = `<div class="flex justify-end"><div class="bg-ocean/5 border border-ocean/10 text-ink rounded-2xl rounded-br-md px-5 py-3 text-[15px] leading-relaxed max-w-[85%] whitespace-pre-wrap">${escapeHtml(content)}</div></div>`;
+        row.innerHTML = `<div class="msg-user"><div class="msg-user-bubble">${escapeHtml(content)}</div></div>`;
       } else {
-        const badge = `<div class="w-7 h-7 rounded-lg bg-gradient-to-br from-ocean to-mint flex items-center justify-center text-white text-[10px] font-extrabold shrink-0">IA</div>`;
-        wrapper.innerHTML = `<div class="msg-assistant flex gap-3 items-start"><div>${badge}</div><div class="text-[15px] leading-relaxed text-ink whitespace-pre-wrap min-w-0">${escapeHtml(content)}</div></div>`;
+        row.innerHTML = `<div class="msg-assistant-row"><div class="msg-model-badge"></div><div class="msg-assistant-text">${escapeHtml(content)}</div></div>`;
       }
 
-      messagesNode.appendChild(wrapper);
-      return role === 'assistant' ? wrapper.querySelector('.whitespace-pre-wrap:last-child') : null;
-    }
-
-    function escapeHtml(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
+      messagesNode.appendChild(row);
+      return role === 'assistant' ? row.querySelector('.msg-assistant-text') : null;
     }
 
     function scrollToBottom() {
@@ -239,19 +487,18 @@
 
     function renderHistory() {
       historyList.innerHTML = histories.map(chat => `
-        <button type="button" class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition ${chat.chat_id === currentChatId ? 'bg-white shadow-sm font-semibold text-ink' : 'text-slate hover:bg-white/60 hover:text-ink'}" data-chat-id="${chat.chat_id}">
-          <div class="truncate">${chat.title || 'Nuevo chat'}</div>
-          <div class="text-[10px] mt-0.5 opacity-50">${AppBridge.formatDate(chat.updated_at)}</div>
+        <button type="button" class="sidebar-history-item ${chat.chat_id === currentChatId ? 'active' : ''}" data-chat-id="${chat.chat_id}">
+          <div class="sidebar-history-title">${chat.title || 'Nuevo chat'}</div>
+          <div class="sidebar-history-date">${AppBridge.formatDate(chat.updated_at)}</div>
         </button>
       `).join('');
 
       historyList.querySelectorAll('[data-chat-id]').forEach(node => {
         node.addEventListener('click', () => {
-          const chatId = node.getAttribute('data-chat-id');
           if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'open_chat', chat_id: chatId }));
+            socket.send(JSON.stringify({ type: 'open_chat', chat_id: node.getAttribute('data-chat-id') }));
           }
-          closeSidebarFn();
+          closeSidebarUI();
         });
       });
     }
@@ -264,10 +511,8 @@
     async function loadModels() {
       try {
         const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
-        modelSelect.innerHTML = data.models
-          .map(m => `<option value="${m.id}">${m.label}</option>`)
-          .join('');
-      } catch (error) {
+        modelSelect.innerHTML = data.models.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+      } catch {
         modelSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
       }
     }
@@ -279,17 +524,13 @@
           headers: {
             ...(localStorage.getItem('app_access_token') ? { 'X-Access-Token': localStorage.getItem('app_access_token') } : {}),
           },
-          body: JSON.stringify({
-            access_token: localStorage.getItem('app_access_token') || null,
-          }),
+          body: JSON.stringify({ access_token: localStorage.getItem('app_access_token') || null }),
         });
 
         socket = new WebSocket(`${response.ws_url}?token=${encodeURIComponent(response.token)}`);
         connectionState.textContent = 'Conectando...';
 
-        socket.addEventListener('open', () => {
-          connectionState.textContent = 'Conectado';
-        });
+        socket.addEventListener('open', () => { connectionState.textContent = 'Conectado'; });
 
         socket.addEventListener('message', (event) => {
           const data = JSON.parse(event.data);
@@ -297,10 +538,8 @@
           if (data.type === 'init') {
             histories = data.chats || [];
             renderHistory();
-            if (!histories.length) sidebarStatus.innerHTML = '<p class="px-3 text-xs text-slate/50">Sin historial.</p>';
             return;
           }
-
           if (data.type === 'chat_loaded') {
             currentChatId = data.chat.chat_id;
             chatTitle.textContent = data.chat.title || 'Chat';
@@ -308,13 +547,11 @@
             renderHistory();
             return;
           }
-
           if (data.type === 'assistant_thinking') {
             currentAssistantDiv = appendMessageToUI('assistant', '');
             scrollToBottom();
             return;
           }
-
           if (data.type === 'assistant_chunk') {
             if (currentAssistantDiv) {
               currentAssistantDiv.textContent += data.text;
@@ -322,7 +559,6 @@
             }
             return;
           }
-
           if (data.type === 'assistant_message_end') {
             currentChatId = data.chat_id || currentChatId;
             updateQuota(data.entitlement);
@@ -333,17 +569,14 @@
             }
             return;
           }
-
           if (data.type === 'error') {
-            chatStatus.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">${data.message}</div>`;
+            chatStatus.innerHTML = `<div class="status show error">${data.message}</div>`;
           }
         });
 
-        socket.addEventListener('close', () => {
-          connectionState.textContent = 'Desconectado';
-        });
+        socket.addEventListener('close', () => { connectionState.textContent = 'Desconectado'; });
       } catch (error) {
-        chatStatus.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">${error.message}</div>`;
+        chatStatus.innerHTML = `<div class="status show error">${error.message}</div>`;
         connectionState.textContent = 'Sin conexión';
       }
     }
@@ -352,7 +585,7 @@
       const content = promptInput.value.trim();
       if (!content) return;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
-        chatStatus.innerHTML = '<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">El chat no está conectado.</div>';
+        chatStatus.innerHTML = '<div class="status show error">El chat no está conectado.</div>';
         return;
       }
 
@@ -377,7 +610,7 @@
       chatTitle.textContent = 'Nuevo chat';
       renderMessages([]);
       renderHistory();
-      closeSidebarFn();
+      closeSidebarUI();
     });
 
     loadModels();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi panel</title>
+  <title>Uso y saldo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,13 +15,15 @@
     <nav class="nav">
       <div>
         <div class="brand-kicker">Cuenta</div>
-        <div class="brand-title">Mi panel</div>
+        <div class="brand-title">Uso y saldo</div>
       </div>
       <div class="nav-links">
         <a class="nav-link" href="/">Inicio</a>
-        <a class="nav-link" href="/demo.html">Demo</a>
-        <a class="nav-link" href="/admin.html">Admin</a>
-        <button class="nav-pill" type="button" data-logout>Salir</button>
+        <a class="nav-link" href="/chat.html">Chat</a>
+        <span id="navEmail" style="font-size: 13px; color: var(--slate); font-weight: 600;"></span>
+        <button data-logout style="background: none; border: none; cursor: pointer; color: var(--slate); padding: 6px; border-radius: 8px; display: flex; align-items: center; transition: color 0.15s;" title="Cerrar sesión" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--slate)'">
+          <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        </button>
       </div>
     </nav>
 
@@ -116,6 +118,7 @@
           return;
         }
         document.getElementById('emailValue').textContent = data.user.email;
+        document.getElementById('navEmail').textContent = data.user.email;
         document.getElementById('lastLoginValue').textContent = AppBridge.formatDate(data.user.last_login_at);
         document.getElementById('requestsValue').textContent = data.usage.requests || 0;
         document.getElementById('promptCharsValue').textContent = data.usage.prompt_chars || 0;
