@@ -663,8 +663,33 @@
     let chartCounter = 0;
     const pendingChartConfigs = {};
     const pendingPyCode = {};
+    const FIREBASE_RTDB = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
+    const TOOL_LOGS_PATH = 'mercadopago-bridge/tool-logs';
+
+    function logToolAttempt(tool, input, result, error) {
+      const entry = {
+        tool,
+        input: typeof input === 'string' ? input.slice(0, 2000) : input,
+        result: result ? (typeof result === 'string' ? result.slice(0, 2000) : result) : null,
+        error: error || null,
+        ok: !error,
+        ts: Date.now(),
+        chat_id: currentChatId || 'none',
+        model: modelSelect?.value || 'unknown',
+      };
+      // Fire and forget — don't block on logging
+      fetch(`${FIREBASE_RTDB}/${TOOL_LOGS_PATH}.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+    }
 
     function formatAssistantHtml(text) {
+      try { return _formatAssistantHtml(text); } catch { return escapeHtml(text); }
+    }
+
+    function _formatAssistantHtml(text) {
       // Extract special blocks before escaping
       let thinkBlocks = [], chartBlocks = [], pythonBlocks = [], searchBlocks = [];
 
@@ -700,14 +725,15 @@
       html = html.replace(/```(\w*)\n([\s\S]*)$/, '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
       html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
 
-      // Markdown
-      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-      html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-      html = html.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:12px 0 4px;">$1</div>');
-      html = html.replace(/^## (.+)$/gm, '<div style="font-size:17px;font-weight:800;margin:14px 0 6px;">$1</div>');
-      html = html.replace(/^# (.+)$/gm, '<div style="font-size:20px;font-weight:800;margin:16px 0 8px;">$1</div>');
-      html = html.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:16px;">• $1</div>');
-      html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:16px;">$1. $2</div>');
+      // Markdown — simple, non-catastrophic patterns
+      try {
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:12px 0 4px;">$1</div>');
+        html = html.replace(/^## (.+)$/gm, '<div style="font-size:17px;font-weight:800;margin:14px 0 6px;">$1</div>');
+        html = html.replace(/^# (.+)$/gm, '<div style="font-size:20px;font-weight:800;margin:16px 0 8px;">$1</div>');
+        html = html.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:16px;">• $1</div>');
+        html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:16px;">$1. $2</div>');
+      } catch {}
 
       // Restore think blocks
       const detailStyle = 'margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);';
@@ -784,34 +810,35 @@
         const output = pyodide.runPython('sys.stdout.getvalue()');
         el.textContent = output || '(sin output)';
         el.style.color = '#86efac';
+        logToolAttempt('python', code, output, null);
         return null;
       } catch (err) {
         el.textContent = 'Error: ' + err.message;
         el.style.color = '#fca5a5';
+        logToolAttempt('python', code, null, err.message);
         return { tool: 'python', error: err.message };
       }
     }
 
     function executeChart(canvasId, configStr) {
       try {
-        // Clean the config string — trim, strip markdown fences if present
         let clean = configStr.trim();
         if (clean.startsWith('```')) clean = clean.replace(/^```\w*\n?/, '').replace(/```$/, '').trim();
         const config = JSON.parse(clean);
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
-          console.warn('Chart canvas not found:', canvasId);
-          return null; // Not an error worth retrying
+          logToolAttempt('chart', configStr, null, 'Canvas not found: ' + canvasId);
+          return null;
         }
         new Chart(canvas.getContext('2d'), config);
+        logToolAttempt('chart', configStr, 'rendered ok', null);
         return null;
       } catch (err) {
-        console.error('Chart error:', err.message, 'Config:', configStr.slice(0, 200));
+        logToolAttempt('chart', configStr, null, err.message);
         const canvas = document.getElementById(canvasId);
         if (canvas) {
           canvas.parentElement.innerHTML = `<div style="color:var(--slate);font-size:12px;padding:12px;background:rgba(0,0,0,0.03);border-radius:12px;">⚠️ No se pudo renderizar el gráfico: ${escapeHtml(err.message)}</div>`;
         }
-        // Don't retry charts — if the JSON is bad, retrying won't help
         return null;
       }
     }
@@ -829,11 +856,13 @@
         const data = await res.json();
         if (!data.results?.length) {
           resultsDiv.textContent = 'Sin resultados.';
+          logToolAttempt('web_search', query, '0 results', null);
           return null;
         }
         resultsDiv.innerHTML = data.results.map(r =>
           `<div style="margin-top:6px;"><a href="${r.url}" target="_blank" style="color:var(--ocean);font-weight:600;font-size:12px;">${escapeHtml(r.title || r.url)}</a><div style="font-size:12px;line-height:1.5;">${escapeHtml(r.snippet)}</div></div>`
         ).join('');
+        logToolAttempt('web_search', query, `${data.results.length} results`, null);
         return data.results;
       } catch (err) {
         resultsDiv.textContent = 'Error: ' + err.message;
