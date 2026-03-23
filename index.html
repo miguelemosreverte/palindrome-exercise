@@ -232,9 +232,7 @@
               <div class="mt-4">
                 <label class="block text-xs font-semibold uppercase tracking-widest text-slate/70 mb-2">Modelo</label>
                 <select id="demoModel" class="w-full rounded-xl border border-slate/15 bg-white/80 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-ocean/30">
-                  <option value="deepseek-ai/DeepSeek-V3-0324">DeepSeek V3</option>
-                  <option value="Qwen/Qwen2.5-72B-Instruct">Qwen 2.5 72B</option>
-                  <option value="mistralai/Mistral-Small-24B-Instruct-2501">Mistral Small 24B</option>
+                  <option value="">Cargando modelos...</option>
                 </select>
               </div>
               <div class="mt-4">
@@ -375,6 +373,24 @@
     if (params.get("status") === "failure") {
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
     }
+
+    // Load models from ChutesAI
+    (async function loadModels() {
+      const select = document.getElementById("demoModel");
+      try {
+        const res = await fetch(`${API_BASE}/api/demo-config`);
+        const data = await res.json();
+        select.innerHTML = "";
+        (data.models || []).forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.label;
+          select.appendChild(opt);
+        });
+      } catch {
+        select.innerHTML = '<option value="deepseek-ai/DeepSeek-V3.2-TEE">DeepSeek V3.2</option>';
+      }
+    })();
 
     function getDemoSessionId() {
       let id = localStorage.getItem("demo_session_id");
