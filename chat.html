@@ -132,9 +132,11 @@
       flex-direction: column;
       background: white;
       position: relative;
+      align-items: center; /* Center content */
     }
 
     .chat-header {
+      width: 100%;
       height: 64px;
       padding: 0 20px;
       display: flex;
@@ -142,34 +144,15 @@
       justify-content: space-between;
       border-bottom: 1px solid var(--line);
       background: white;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .toggle-sidebar {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 8px;
-      color: var(--slate);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .toggle-sidebar:hover {
-      background: #f1f5f9;
+      z-index: 10;
     }
 
     .chat-messages {
+      width: 100%;
+      max-width: 800px; /* Limit width like ChatGPT */
       flex: 1;
       overflow-y: auto;
-      padding: 40px 20px;
+      padding: 40px 20px 120px; /* Space for composer */
       display: flex;
       flex-direction: column;
       gap: 32px;
@@ -179,13 +162,11 @@
       display: flex;
       flex-direction: column;
       width: 100%;
-      max-width: 720px;
-      margin: 0 auto;
     }
 
     .message {
-      max-width: 90%;
-      font-size: 15px;
+      max-width: 85%;
+      font-size: 16px;
       line-height: 1.6;
       word-wrap: break-word;
       white-space: pre-wrap;
@@ -195,42 +176,58 @@
       align-self: flex-end;
       background: #f1f5f9;
       padding: 12px 20px;
-      border-radius: 20px;
+      border-radius: 24px;
       color: var(--ink);
     }
 
     .message.assistant {
       align-self: flex-start;
-      padding: 0;
+      padding: 0 4px;
       color: var(--ink);
+      width: 100%;
+      position: relative;
     }
 
     .message.assistant::before {
       content: "IA";
-      display: block;
-      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--ocean);
+      color: white;
+      border-radius: 8px;
+      font-size: 10px;
       font-weight: 800;
-      color: var(--ocean);
-      margin-bottom: 8px;
+      margin-bottom: 12px;
       letter-spacing: 0.05em;
     }
 
     /* Composer */
     .composer-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
       padding: 20px;
-      width: 100%;
-      max-width: 760px;
-      margin: 0 auto;
+      background: linear-gradient(to top, white 80%, transparent);
+      display: flex;
+      justify-content: center;
+      z-index: 5;
     }
 
     .composer {
+      width: 100%;
+      max-width: 760px;
       background: #f8fafc;
       border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 8px 12px;
+      border-radius: 24px;
+      padding: 10px 14px;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
     }
 
     .composer-row {
@@ -330,9 +327,17 @@
             <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Mi panel
           </a>
+          <a href="/admin.html" class="nav-item" data-admin-only>
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.14a10.503 10.503 0 01-4.907-8.727c0-5.8 4.7-10.5 10.5-10.5s10.5 4.7 10.5 10.5c0 2.47-.858 4.738-2.292 6.53L12 11z"/><path d="M9 11h.01M15 11h.01M12 15h.01"/></svg>
+            Admin
+          </a>
           <button class="nav-item" id="newChatBtn" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
             <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             Nuevo chat
+          </button>
+          <button class="nav-item" data-logout style="width: 100%; border: none; background: none; cursor: pointer; text-align: left; color: #ef4444;">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Cerrar sesión
           </button>
         </nav>
       </div>
@@ -430,20 +435,31 @@
     function renderMessages(items) {
       messagesNode.innerHTML = '';
       if (!items.length) {
-        messagesNode.innerHTML = '<div class="message-wrapper"><div class="message assistant">Escribí abajo para iniciar la conversación.</div></div>';
+        messagesNode.innerHTML = `
+          <div class="message-wrapper" style="height: 60vh; display: flex; align-items: center; justify-content: center; opacity: 0.5;">
+            <div style="text-align: center;">
+              <div class="brand-title" style="font-size: 32px; margin-bottom: 8px;">Hablar con IA</div>
+              <p>Elegí un modelo y empezá a chatear.</p>
+            </div>
+          </div>`;
         return;
       }
 
       for (const item of items) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'message-wrapper';
-        const div = document.createElement('div');
-        div.className = `message ${item.role === 'user' ? 'user' : 'assistant'}`;
-        div.textContent = item.content;
-        wrapper.appendChild(div);
-        messagesNode.appendChild(wrapper);
+        appendMessageToUI(item.role, item.content);
       }
       scrollToBottom();
+    }
+
+    function appendMessageToUI(role, content) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message-wrapper';
+      const div = document.createElement('div');
+      div.className = `message ${role === 'user' ? 'user' : 'assistant'}`;
+      div.textContent = content;
+      wrapper.appendChild(div);
+      messagesNode.appendChild(wrapper);
+      return div;
     }
 
     function scrollToBottom() {
@@ -490,6 +506,11 @@
       }
     }
 
+    let socket;
+    let currentChatId = null;
+    let histories = [];
+    let currentAssistantDiv = null;
+
     async function openSocket() {
       try {
         const response = await AppBridge.apiFetch('/api/chat-token', {
@@ -532,19 +553,24 @@
 
           if (data.type === 'assistant_thinking') {
             AppBridge.setStatus(chatStatus, 'pending', 'IA pensando...');
+            currentAssistantDiv = appendMessageToUI('assistant', '');
+            scrollToBottom();
             return;
           }
 
-          if (data.type === 'assistant_message') {
-            const items = Array.from(messagesNode.querySelectorAll('.message')).map((node) => ({
-              role: node.classList.contains('user') ? 'user' : 'assistant',
-              content: node.textContent,
-            }));
-            items.push(data.message);
-            renderMessages(items);
+          if (data.type === 'assistant_chunk') {
+            if (currentAssistantDiv) {
+              currentAssistantDiv.textContent += data.text;
+              scrollToBottom();
+            }
+            return;
+          }
+
+          if (data.type === 'assistant_message_end') {
             currentChatId = data.chat_id || currentChatId;
             updateQuota(data.entitlement);
             chatStatus.className = 'status'; // hide
+            currentAssistantDiv = null;
             
             if (currentChatId && !histories.find((chat) => chat.chat_id === currentChatId)) {
                histories.unshift({ chat_id: currentChatId, title: data.chat_title || 'Chat', updated_at: Date.now() });

@@ -13,37 +13,6 @@ function send(ws, type, payload) {
   ws.send(JSON.stringify({ type, ...payload }));
 }
 
-async function providerChat({ model, messages }) {
-  const response = await fetch(`${DEMO_API_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 600,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Proveedor: ${text}`);
-  }
-
-  const data = await response.json();
-  return {
-    raw: data,
-    text:
-      data.choices?.[0]?.message?.content ||
-      data.output_text ||
-      data.response ||
-      '',
-  };
-}
-
 async function handleInit(ws, session) {
   if (!session.sub && !session.access_token) {
     return send(ws, 'error', { message: 'Sesion invalida para chat.' });
@@ -80,7 +49,6 @@ async function handleUserMessage(ws, session, payload) {
     return send(ws, 'error', { message: 'Faltan modelo o mensaje.' });
   }
 
-  const seedMessages = [{ role: 'user', content: userText }];
   const reserveUsd = estimateCostUsd(userText, 'x'.repeat(1600));
   const entitlement = await consumePaidAccess(
     {
@@ -125,11 +93,63 @@ async function handleUserMessage(ws, session, payload) {
   ];
 
   send(ws, 'assistant_thinking', { chat_id: chatId, model });
-  const result = await providerChat({ model, messages: providerMessages });
+
+  // Use fetch with streaming
+  const response = await fetch(`${DEMO_API_BASE}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: providerMessages,
+      temperature: 0.7,
+      max_tokens: 800,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return send(ws, 'error', { message: `Proveedor: ${text}` });
+  }
+
+  let fullText = '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6).trim();
+        if (dataStr === '[DONE]') break;
+        try {
+          const data = JSON.parse(dataStr);
+          const text = data.choices?.[0]?.delta?.content || '';
+          if (text) {
+            fullText += text;
+            send(ws, 'assistant_chunk', {
+              chat_id: chatId,
+              text,
+            });
+          }
+        } catch (e) {
+          // Ignore parse errors for partial chunks
+        }
+      }
+    }
+  }
 
   const savedMessages = [
     { role: 'user', content: userText, created_at: Date.now(), model },
-    { role: 'assistant', content: result.text, created_at: Date.now(), model },
+    { role: 'assistant', content: fullText, created_at: Date.now(), model },
   ];
 
   if (chatId) {
@@ -141,14 +161,13 @@ async function handleUserMessage(ws, session, payload) {
     email: session.email || null,
     model,
     prompt: userText,
-    response: result.text,
+    response: fullText,
     source: 'chat',
   });
 
-  send(ws, 'assistant_message', {
+  send(ws, 'assistant_message_end', {
     chat_id: chatId,
     chat_title: title,
-    model,
     message: savedMessages[1],
     usage,
     entitlement: entitlement.summary,
