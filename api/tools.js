@@ -1,30 +1,67 @@
 const { readJsonBody } = require('../lib/http');
 
 async function webSearch(query) {
-  const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-  const response = await fetch(ddgUrl, {
+  // Try DuckDuckGo instant answer API first (JSON, no scraping)
+  const ddgApi = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  const apiRes = await fetch(ddgApi, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
   });
 
-  if (!response.ok) throw new Error(`Search failed: ${response.status}`);
-  const html = await response.text();
-
   const results = [];
-  const resultRegex = /<a rel="nofollow" class="result__a" href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-  let match;
-  while ((match = resultRegex.exec(html)) !== null && results.length < 5) {
-    results.push({
-      url: match[1],
-      title: match[2].replace(/<[^>]*>/g, '').trim(),
-      snippet: match[3].replace(/<[^>]*>/g, '').trim(),
-    });
+
+  if (apiRes.ok) {
+    const data = await apiRes.json();
+
+    // Abstract (main answer)
+    if (data.Abstract) {
+      results.push({ title: data.Heading || 'Resultado', url: data.AbstractURL || '', snippet: data.Abstract });
+    }
+
+    // Related topics
+    if (data.RelatedTopics) {
+      for (const topic of data.RelatedTopics.slice(0, 5)) {
+        if (topic.Text) {
+          results.push({ title: topic.Text.slice(0, 80), url: topic.FirstURL || '', snippet: topic.Text });
+        }
+      }
+    }
+
+    // Answer
+    if (data.Answer && !results.length) {
+      results.push({ title: 'Respuesta', url: '', snippet: data.Answer });
+    }
   }
 
+  // Fallback: use SearXNG public instance
   if (!results.length) {
-    const simpleRegex = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-    while ((match = simpleRegex.exec(html)) !== null && results.length < 5) {
-      results.push({ title: '', url: '', snippet: match[1].replace(/<[^>]*>/g, '').trim() });
-    }
+    try {
+      const searxUrl = `https://search.ononoki.org/search?q=${encodeURIComponent(query)}&format=json&engines=google,bing,duckduckgo`;
+      const searxRes = await fetch(searxUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
+      });
+      if (searxRes.ok) {
+        const searxData = await searxRes.json();
+        for (const r of (searxData.results || []).slice(0, 5)) {
+          results.push({ title: r.title || '', url: r.url || '', snippet: r.content || '' });
+        }
+      }
+    } catch {}
+  }
+
+  // Second fallback: another SearXNG instance
+  if (!results.length) {
+    try {
+      const searxUrl2 = `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`;
+      const searxRes2 = await fetch(searxUrl2, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
+      });
+      if (searxRes2.ok) {
+        const searxData2 = await searxRes2.json();
+        for (const r of (searxData2.results || []).slice(0, 5)) {
+          results.push({ title: r.title || '', url: r.url || '', snippet: r.content || '' });
+        }
+      }
+    } catch {}
   }
 
   return results;
