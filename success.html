@@ -50,9 +50,9 @@
       <section class="glass-panel stack">
         <div id="loading" class="status show pending">Confirmando pago...</div>
         <div id="successBox" style="display:none" class="stack">
-          <div class="section-kicker">Clave lista</div>
-          <pre class="output" id="apiKey"></pre>
-          <div class="helper">Guardá esta clave. Esta es la pantalla donde se entrega una vez confirmada la compra.</div>
+          <div class="section-kicker">Acceso listo</div>
+          <pre class="output" id="accessToken"></pre>
+          <div class="helper">Guardá esta clave de acceso. No entregamos la API key global del proveedor al usuario final.</div>
         </div>
         <div id="error" class="status error"></div>
       </section>
@@ -82,9 +82,9 @@
           const res = await fetch(`${FIREBASE_RTDB}/${NAMESPACE}/${paymentRef}.json`);
           const data = await res.json();
 
-          if (data && data.status === 'approved' && data.api_key) {
+          if (data && data.status === 'approved' && data.access_token) {
             clearInterval(interval);
-            showSuccess(data.api_key);
+            showSuccess(data.access_token);
           } else if (attempts >= maxAttempts) {
             clearInterval(interval);
             showError('La confirmación está demorando más de lo esperado. Si ya pagaste, volvé a intentar en unos minutos.');
@@ -96,11 +96,12 @@
       }, 2000);
     }
 
-    function showSuccess(apiKey) {
+    function showSuccess(accessToken) {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('successBox').style.display = 'grid';
-      document.getElementById('apiKey').textContent = apiKey;
+      document.getElementById('accessToken').textContent = accessToken;
       document.getElementById('stateValue').textContent = 'Aprobado';
+      localStorage.setItem('app_access_token', accessToken);
       localStorage.removeItem('payment_ref');
     }
 

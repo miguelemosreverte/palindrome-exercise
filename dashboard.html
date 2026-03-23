@@ -50,6 +50,10 @@
             <div class="stat-label">Gasto estimado</div>
             <div class="stat-value" id="costValue">USD 0</div>
           </div>
+          <div class="card stat-card">
+            <div class="stat-label">Saldo disponible</div>
+            <div class="stat-value" id="creditValue">USD 0</div>
+          </div>
         </div>
       </section>
 
@@ -90,6 +94,7 @@
         document.getElementById('requestsValue').textContent = data.usage.requests || 0;
         document.getElementById('promptCharsValue').textContent = data.usage.prompt_chars || 0;
         document.getElementById('costValue').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
+        document.getElementById('creditValue').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
         document.getElementById('lastUsedValue').textContent = AppBridge.formatDate(data.usage.last_used_at);
 
         if (data.role === 'admin') {

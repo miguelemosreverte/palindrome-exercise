@@ -1,4 +1,5 @@
 const { authFromRequest, publicUser, readUserByEmail } = require('../../lib/auth');
+const { findApprovedPayments, summarizePaidAccess } = require('../../lib/access');
 const { readUserUsage } = require('../../lib/usage');
 
 module.exports = async function handler(req, res) {
@@ -17,9 +18,16 @@ module.exports = async function handler(req, res) {
   }
 
   const usage = await readUserUsage(auth.sub);
+  const access = summarizePaidAccess(
+    await findApprovedPayments({
+      userId: auth.sub,
+      email: auth.email,
+    })
+  );
   return res.status(200).json({
     user: publicUser(user),
     usage,
+    access,
     role: auth.role || 'user',
   });
 };

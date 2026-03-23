@@ -1,6 +1,7 @@
 const { authFromRequest } = require('../lib/auth');
+const { consumeAnonymousAccess, consumePaidAccess } = require('../lib/access');
 const { readJsonBody } = require('../lib/http');
-const { recordUsage } = require('../lib/usage');
+const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,6 +13,8 @@ module.exports = async function handler(req, res) {
     const prompt = String(body.prompt || '').trim();
     const model = String(body.model || '').trim();
     const auth = authFromRequest(req);
+    const accessToken = req.headers['x-access-token'] || body.access_token || null;
+    const anonymousId = req.headers['x-demo-session'] || body.anonymous_id || null;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt vacio' });
@@ -19,6 +22,29 @@ module.exports = async function handler(req, res) {
 
     if (!model) {
       return res.status(400).json({ error: 'Modelo vacio' });
+    }
+
+    const estimatedCostBeforeRequest = estimateCostUsd(prompt, 'x'.repeat(1200));
+    let entitlement;
+
+    if (auth || accessToken) {
+      entitlement = await consumePaidAccess(
+        {
+          userId: auth?.sub || null,
+          email: auth?.email || null,
+          accessToken,
+        },
+        estimatedCostBeforeRequest
+      );
+    } else {
+      entitlement = await consumeAnonymousAccess(anonymousId, estimatedCostBeforeRequest);
+    }
+
+    if (!entitlement?.ok) {
+      return res.status(402).json({
+        error:
+          'No hay saldo suficiente para esta demo. Iniciá sesión con una cuenta con compra aprobada o realizá una compra nueva.',
+      });
     }
 
     const demoBase = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
@@ -41,6 +67,7 @@ module.exports = async function handler(req, res) {
           },
         ],
         temperature: 0.7,
+        max_tokens: 400,
       }),
     });
 
@@ -69,6 +96,7 @@ module.exports = async function handler(req, res) {
       model,
       text,
       usage,
+      entitlement: entitlement.summary,
     });
   } catch (error) {
     return res.status(500).json({ error: error.message || 'No se pudo ejecutar la demo' });

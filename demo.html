@@ -20,7 +20,6 @@
       <div class="nav-links">
         <a class="nav-link" href="/">Inicio</a>
         <a class="nav-link" href="/auth.html" data-auth-link>Ingresar</a>
-        <a class="nav-link" href="/dashboard.html">Mi panel</a>
       </div>
     </nav>
 
@@ -77,22 +76,33 @@
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const button = event.currentTarget.querySelector('button');
+      const anonymousId =
+        localStorage.getItem('demo_anon_id') ||
+        `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+      localStorage.setItem('demo_anon_id', anonymousId);
       button.disabled = true;
       AppBridge.setStatus(statusNode, 'pending', 'Ejecutando demo...');
 
       try {
         const data = await AppBridge.apiFetch('/api/demo', {
           method: 'POST',
+          headers: {
+            ...(localStorage.getItem('app_access_token')
+              ? { 'X-Access-Token': localStorage.getItem('app_access_token') }
+              : {}),
+            'X-Demo-Session': anonymousId,
+          },
           body: JSON.stringify({
             model: form.get('model'),
             prompt: form.get('prompt'),
+            anonymous_id: anonymousId,
           }),
         });
 
         document.getElementById('resultBox').textContent = data.text || 'Sin respuesta del modelo.';
         document.getElementById('usageCost').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
         document.getElementById('usageCopy').textContent =
-          `Requests acumulados para esta identidad: ${data.usage.requests || 0}.`;
+          `Requests acumulados para esta identidad: ${data.usage.requests || 0}. Saldo estimado restante: ${AppBridge.formatUsd(data.entitlement?.remaining_usd || 0)}.`;
         AppBridge.setStatus(statusNode, 'success', 'Demo ejecutada.');
       } catch (error) {
         AppBridge.setStatus(statusNode, 'error', error.message);

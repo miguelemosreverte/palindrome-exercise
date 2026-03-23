@@ -1,4 +1,5 @@
 const { patchPayment, readPayment, writePayment } = require('../lib/firebase');
+const { ensureApprovedPaymentAccess } = require('../lib/access');
 
 module.exports = async function handler(req, res) {
   // Handle CORS preflight
@@ -45,13 +46,13 @@ module.exports = async function handler(req, res) {
       const payload = {
         ...(existingPayment || {}),
         status: 'approved',
-        api_key: process.env.CHUTESAI_API_KEY,
         paid_amount: payment.transaction_amount,
         currency: payment.currency_id,
         paid_at: Date.now(),
         payment_id: paymentId,
       };
       await writePayment(externalReference, payload);
+      await ensureApprovedPaymentAccess(externalReference, payload);
     } else {
       await patchPayment(externalReference, {
         status: payment.status,
