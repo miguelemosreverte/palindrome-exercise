@@ -416,10 +416,10 @@
       btn.disabled = true;
       btn.textContent = "Pensando...";
       result.classList.remove("hidden");
-      result.textContent = "...";
+      result.textContent = "";
 
       try {
-        const res = await fetch(`${API_BASE}/api/demo`, {
+        const res = await fetch(`${API_BASE}/api/demo-stream`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -428,11 +428,33 @@
           body: JSON.stringify({ prompt, model, anonymous_id: getDemoSessionId() })
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Error en la demo");
-        result.textContent = data.text;
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Error en la demo");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.text) result.textContent += parsed.text;
+            } catch {}
+          }
+        }
       } catch (err) {
-        result.textContent = "Error: " + err.message;
+        result.textContent = result.textContent || ("Error: " + err.message);
       } finally {
         btn.disabled = false;
         btn.textContent = "Probar";
