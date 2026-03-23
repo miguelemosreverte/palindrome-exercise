@@ -97,7 +97,7 @@ function bindAuthLinks() {
   for (const link of authLinks) {
     if (user) {
       link.textContent = user.email;
-      link.href = role === 'admin' ? '/admin.html' : '/chat.html';
+      link.href = role === 'admin' ? '/admin.html' : '/dashboard.html';
     }
   }
 
@@ -124,7 +124,16 @@ function checkAutoRedirect() {
   const role = getUserRole();
   const path = window.location.pathname;
   if (user && (path === '/' || path === '/index.html' || path === '/auth.html')) {
-    window.location.href = role === 'admin' ? '/admin.html' : '/chat.html';
+    window.location.replace(role === 'admin' ? '/admin.html' : '/dashboard.html');
+  }
+}
+
+function headCheck() {
+  const user = localStorage.getItem('auth_user');
+  const role = localStorage.getItem('auth_role') || 'user';
+  const path = window.location.pathname;
+  if (user && (path === '/' || path === '/index.html' || path === '/auth.html')) {
+    window.location.replace(role === 'admin' ? '/admin.html' : '/dashboard.html');
   }
 }
 

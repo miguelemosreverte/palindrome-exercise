@@ -104,7 +104,7 @@
         AppBridge.setUserRole(data.role);
         AppBridge.setStatus(statusNode, 'success', 'Cuenta lista. Redirigiendo...');
         setTimeout(() => {
-          window.location.href = data.role === 'admin' ? '/admin.html' : '/chat.html';
+          window.location.href = data.role === 'admin' ? '/admin.html' : '/dashboard.html';
         }, 500);
       } catch (error) {
         AppBridge.setStatus(statusNode, 'error', error.message);

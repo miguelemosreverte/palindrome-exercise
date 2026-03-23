@@ -224,6 +224,10 @@
       font-weight: 600;
     }
 
+    .composer.locked {
+      opacity: 0.55;
+    }
+
     .sidebar-overlay {
       display: none;
       position: fixed;
@@ -333,10 +337,14 @@
     </div>
 
     <nav style="padding: 10px 10px 0; display: flex; flex-direction: column; gap: 2px;">
-      <a href="/dashboard.html" class="sidebar-nav-item">
+      <button class="sidebar-nav-item" data-view="chat" onclick="switchView('chat')">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Chat
+      </button>
+      <button class="sidebar-nav-item" data-view="usage" onclick="switchView('usage')">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 12h8v8H4zM16 12h4v8h-4z"/></svg>
         Uso y saldo
-      </a>
+      </button>
     </nav>
 
     <div style="flex: 1; overflow-y: auto; padding: 14px 10px;" class="chat-scroll">
@@ -360,47 +368,106 @@
   </aside>
 
   <main class="chat-main">
+    <!-- Shared header -->
     <header class="chat-header">
       <div style="display: flex; align-items: center; gap: 12px;">
         <button id="toggleSidebar" style="padding: 6px; border-radius: 8px; border: none; background: none; cursor: pointer; color: var(--slate);">
           <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <span id="chatTitle" style="font-size: 14px; font-weight: 800; cursor: pointer;" title="Click para editar título" onclick="editTitle()">Nuevo chat</span>
-        <button id="editTitleBtn" onclick="editTitle()" style="padding: 4px; border: none; background: none; cursor: pointer; color: var(--slate); opacity: 0.4;" title="Editar título">
-          <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
-        </button>
+        <span id="headerTitle" style="font-size: 14px; font-weight: 800;">Nuevo chat</span>
+        <span id="chatTitleWrap">
+          <span id="chatTitle" style="display:none; font-size: 14px; font-weight: 800; cursor: pointer;" title="Click para editar título" onclick="editTitle()"></span>
+          <button id="editTitleBtn" style="display:none; padding: 4px; border: none; background: none; cursor: pointer; color: var(--slate); opacity: 0.4;" onclick="editTitle()" title="Editar título">
+            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+          </button>
+        </span>
       </div>
       <div style="display: flex; align-items: center; gap: 14px;">
         <span id="quotaInfo" style="font-size: 12px; font-weight: 700; color: var(--ocean);"></span>
       </div>
     </header>
 
-    <div class="chat-messages chat-scroll" id="messages">
-      <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
-        <div style="text-align: center; opacity: 0.5;">
-          <div class="skeleton-circle skeleton" style="width: 48px; height: 48px; margin: 0 auto 16px;"></div>
-          <div class="skeleton-text skeleton" style="width: 160px; height: 20px; margin: 0 auto 8px;"></div>
-          <div class="skeleton-text skeleton" style="width: 120px; height: 14px; margin: 0 auto;"></div>
+    <!-- VIEW: Chat -->
+    <div id="viewChat" class="view-panel" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div class="chat-messages chat-scroll" id="messages">
+        <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
+          <div style="text-align: center; opacity: 0.35;">
+            <div style="font-size: 32px; font-weight: 800;">Empezá un chat</div>
+            <p style="margin-top: 8px; font-size: 14px; color: var(--slate);">Elegí un modelo y escribí un mensaje.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div id="chatStatus" style="max-width: 780px; width: 100%; margin: 0 auto 8px;"></div>
+        <div class="composer">
+          <div class="composer-model-row">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
+            <select id="modelSelect">
+              <option>Cargando modelos...</option>
+            </select>
+          </div>
+          <div class="composer-input-row">
+            <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1"></textarea>
+            <button class="send-btn" id="sendBtn">
+              <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <div class="composer-hint">Enter para enviar · Shift+Enter nueva línea</div>
         </div>
       </div>
     </div>
 
-    <div class="composer-wrap">
-      <div id="chatStatus" style="max-width: 780px; width: 100%; margin: 0 auto 8px;"></div>
-      <div class="composer">
-        <div class="composer-model-row">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
-          <select id="modelSelect">
-            <option>Cargando modelos...</option>
-          </select>
+    <!-- VIEW: Usage & Balance -->
+    <div id="viewUsage" class="view-panel" style="display: none; flex: 1; overflow-y: auto; padding: 28px 20px;">
+      <div style="max-width: 780px; margin: 0 auto;">
+        <div style="border-radius: 24px; border: 1px solid rgba(255,255,255,0.75); background: linear-gradient(135deg,rgba(255,255,255,0.52),rgba(255,255,255,0.22)); backdrop-filter: blur(10px); box-shadow: var(--shadow); padding: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: start; padding-bottom: 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Usuario</div>
+              <div id="usageEmail" style="margin-top:8px; font-size:28px; font-weight:800; line-height:1;">Cargando...</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Ultimo acceso</div>
+              <div id="usageLastLogin" style="margin-top:8px; font-size:22px; font-weight:800;">-</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-top:20px;">
+            <div style="border-radius:18px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.5); padding:18px;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.2em; color:var(--slate); font-weight:700;">Disponible</div>
+              <div id="usageLimit" style="margin-top:10px; font-size:26px; font-weight:800;">USD 0</div>
+            </div>
+            <div style="border-radius:18px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.5); padding:18px;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.2em; color:var(--slate); font-weight:700;">Consumido</div>
+              <div id="usageSpent" style="margin-top:10px; font-size:26px; font-weight:800;">USD 0</div>
+            </div>
+            <div style="border-radius:18px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.5); padding:18px;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.2em; color:var(--slate); font-weight:700;">Restante</div>
+              <div id="usageRemaining" style="margin-top:10px; font-size:26px; font-weight:800; color:var(--ocean);">USD 0</div>
+            </div>
+            <div style="border-radius:18px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.5); padding:18px;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.2em; color:var(--slate); font-weight:700;">Requests</div>
+              <div id="usageRequests" style="margin-top:10px; font-size:26px; font-weight:800;">0</div>
+            </div>
+          </div>
         </div>
-        <div class="composer-input-row">
-          <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1"></textarea>
-          <button class="send-btn" id="sendBtn">
-            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
+
+        <div style="margin-top:18px; border-radius:24px; border:1px solid rgba(255,255,255,0.75); background:linear-gradient(135deg,rgba(255,255,255,0.52),rgba(255,255,255,0.22)); backdrop-filter:blur(10px); box-shadow:var(--shadow); padding:24px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Uso programático</div>
+          <div style="margin-top:8px; color:var(--slate); font-size:13px; line-height:1.6;">Si ya tenés una compra aprobada, podés usar el endpoint seguro. El consumo se controla del lado del servidor.</div>
+          <pre id="usageSnippet" style="margin-top:14px; white-space:pre-wrap; word-break:break-word; padding:16px; border-radius:16px; background:rgba(255,255,255,0.6); border:1px solid var(--line); font-size:12px; line-height:1.6;">Todavía no hay acceso habilitado.</pre>
         </div>
-        <div class="composer-hint">Enter para enviar · Shift+Enter nueva línea</div>
+
+        <div style="margin-top:18px; border-radius:24px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.56); box-shadow:var(--shadow-soft); padding:24px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Facturación</div>
+          <div id="billingCopy" style="margin-top:8px; color:var(--slate); font-size:14px; line-height:1.7;">Podés activar o ampliar tu saldo cuando quieras.</div>
+          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px;">
+            <a href="/" class="button">Configurar saldo</a>
+            <a href="/demo.html" class="button secondary">Probar demo gratis</a>
+          </div>
+        </div>
+
+        <div id="usageStatus" style="margin-top:14px;"></div>
       </div>
     </div>
   </main>
@@ -408,6 +475,90 @@
   <script src="app.js"></script>
   <script>
     AppBridge.bindAuthLinks();
+
+    // --- View switching ---
+    let currentView = 'chat';
+    let usageLoaded = false;
+    let hasPaidAccess = false;
+
+    function switchView(view) {
+      if (view === 'chat' && !hasPaidAccess) {
+        view = 'usage';
+      }
+      currentView = view;
+      document.getElementById('viewChat').style.display = view === 'chat' ? 'flex' : 'none';
+      document.getElementById('viewUsage').style.display = view === 'usage' ? 'flex' : 'none';
+
+      // Update header
+      const headerTitle = document.getElementById('headerTitle');
+      const chatTitleEl = document.getElementById('chatTitle');
+      const editBtn = document.getElementById('editTitleBtn');
+
+      if (view === 'chat') {
+        headerTitle.style.display = 'none';
+        chatTitleEl.style.display = 'inline';
+        editBtn.style.display = 'inline';
+      } else {
+        headerTitle.style.display = 'inline';
+        headerTitle.textContent = 'Uso y saldo';
+        chatTitleEl.style.display = 'none';
+        editBtn.style.display = 'none';
+      }
+
+      // Highlight active nav
+      document.querySelectorAll('[data-view]').forEach(el => {
+        el.style.background = el.dataset.view === view ? 'rgba(255,255,255,0.6)' : '';
+        el.style.color = el.dataset.view === view ? 'var(--ink)' : '';
+      });
+
+      if (view === 'usage' && !usageLoaded) loadUsageData();
+      closeSidebarUI();
+    }
+
+    async function loadUsageData() {
+      try {
+        const data = await AppBridge.apiFetch('/api/auth/me');
+        document.getElementById('usageEmail').textContent = data.user.email;
+        document.getElementById('usageLastLogin').textContent = AppBridge.formatDate(data.user.last_login_at);
+        document.getElementById('usageRequests').textContent = data.usage.requests || 0;
+        document.getElementById('usageLimit').textContent = AppBridge.formatUsd(data.access.credit_limit_usd || 0);
+        document.getElementById('usageSpent').textContent = AppBridge.formatUsd(data.access.spent_estimated_usd || 0);
+        document.getElementById('usageRemaining').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
+        hasPaidAccess = Number(data.access.remaining_usd || 0) > 0 || Number(data.access.credit_limit_usd || 0) > 0 || Boolean(data.access.tokens?.length);
+        if (hasPaidAccess) {
+          document.getElementById('billingCopy').textContent = 'Tu cuenta ya tiene acceso habilitado. Si querés, podés sumar más saldo desde la portada.';
+          document.querySelector('.composer').classList.remove('locked');
+          promptInput.disabled = false;
+          sendBtn.disabled = false;
+          promptInput.placeholder = 'Escribí un mensaje...';
+          quotaInfo.textContent = `Saldo restante: ${AppBridge.formatUsd(data.access.remaining_usd || 0)}`;
+        } else {
+          document.getElementById('billingCopy').textContent = 'Tu cuenta todavía no tiene saldo configurado. Activá billing para usar el chat completo, o seguí con la demo gratis.';
+          document.querySelector('.composer').classList.add('locked');
+          promptInput.disabled = true;
+          sendBtn.disabled = true;
+          promptInput.placeholder = 'Activá saldo para desbloquear el chat';
+          quotaInfo.textContent = 'Configurá saldo para usar el chat';
+        }
+        const firstToken = data.access.tokens?.[0];
+        if (firstToken) {
+          document.getElementById('usageSnippet').textContent =
+`curl -X POST "${window.location.origin}/api/infer" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Access-Token: ${firstToken}" \\
+  -d '{"model":"Qwen/Qwen3-32B-TEE","messages":[{"role":"user","content":"Hola"}]}'`;
+        }
+        usageLoaded = true;
+      } catch (err) {
+        hasPaidAccess = false;
+        document.querySelector('.composer').classList.add('locked');
+        promptInput.disabled = true;
+        sendBtn.disabled = true;
+        promptInput.placeholder = 'Iniciá sesión o configurá saldo para usar el chat';
+        quotaInfo.textContent = 'Completá tu acceso para usar el chat';
+        document.getElementById('usageStatus').innerHTML = `<div class="status show error">No se pudo cargar los datos: ${err.message}</div>`;
+      }
+    }
 
     const historyList = document.getElementById('historyList');
     const messagesNode = document.getElementById('messages');
@@ -466,7 +617,7 @@
         messagesNode.innerHTML = `
           <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
             <div style="text-align: center; opacity: 0.35;">
-              <div style="font-size: 32px; font-weight: 800;">Hablar con IA</div>
+              <div style="font-size: 32px; font-weight: 800;">Empezá un chat</div>
               <p style="margin-top: 8px; font-size: 14px; color: var(--slate);">Elegí un modelo abajo y empezá a chatear.</p>
             </div>
           </div>`;
@@ -528,6 +679,7 @@
       chatTitle.textContent = chat.title || 'Nuevo chat';
       renderMessages(chat.messages || []);
       renderHistory();
+      switchView('chat');
     }
 
     // --- Editable title ---
@@ -573,6 +725,12 @@
 
     // --- Send via HTTP streaming ---
     async function sendMessage() {
+      if (!hasPaidAccess) {
+        switchView('usage');
+        document.getElementById('usageStatus').innerHTML = '<div class="status show pending">Necesitás configurar saldo para usar el chat completo. Podés hacerlo desde la portada, o seguir usando la demo gratis.</div>';
+        return;
+      }
+
       const content = promptInput.value.trim();
       if (!content || sending) return;
       sending = true;
@@ -660,6 +818,13 @@
 
     // --- Init ---
     loadModels();
+    loadUsageData().then(() => {
+      if (hasPaidAccess) {
+        switchView('chat');
+      } else {
+        switchView('usage');
+      }
+    });
     renderHistory();
     if (chats.length) {
       const latest = [...chats].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))[0];
