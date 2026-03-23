@@ -53,6 +53,8 @@
           <div class="section-kicker">Acceso listo</div>
           <pre class="output" id="accessToken"></pre>
           <div class="helper">Guardá esta clave de acceso. No entregamos la API key global del proveedor al usuario final.</div>
+          <div class="section-kicker">Endpoint seguro</div>
+          <pre class="output" id="proxySnippet"></pre>
         </div>
         <div id="error" class="status error"></div>
       </section>
@@ -100,6 +102,19 @@
       document.getElementById('loading').style.display = 'none';
       document.getElementById('successBox').style.display = 'grid';
       document.getElementById('accessToken').textContent = accessToken;
+      document.getElementById('proxySnippet').textContent =
+`POST ${window.location.origin}/api/infer
+Headers:
+  Content-Type: application/json
+  X-Access-Token: ${accessToken}
+
+Body:
+{
+  "model": "Qwen/Qwen3-32B-TEE",
+  "messages": [
+    { "role": "user", "content": "Hola, decime que puedo hacer con este acceso." }
+  ]
+}`;
       document.getElementById('stateValue').textContent = 'Aprobado';
       localStorage.setItem('app_access_token', accessToken);
       localStorage.removeItem('payment_ref');

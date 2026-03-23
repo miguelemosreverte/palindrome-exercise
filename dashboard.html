@@ -77,6 +77,14 @@
         </article>
       </section>
 
+      <section class="glass-panel stack">
+        <div class="section-kicker">Uso programatico</div>
+        <div class="helper">
+          Si ya tenés una compra aprobada, podés usar el endpoint seguro de este proyecto. El consumo se controla del lado del servidor.
+        </div>
+        <pre class="output" id="inferSnippet">Todavia no hay acceso habilitado para esta cuenta.</pre>
+      </section>
+
       <div id="status" class="status"></div>
     </main>
   </div>
@@ -96,6 +104,19 @@
         document.getElementById('costValue').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
         document.getElementById('creditValue').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
         document.getElementById('lastUsedValue').textContent = AppBridge.formatDate(data.usage.last_used_at);
+        const firstToken = data.access.tokens?.[0];
+        if (firstToken) {
+          document.getElementById('inferSnippet').textContent =
+`curl -X POST "${window.location.origin}/api/infer" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Access-Token: ${firstToken}" \\
+  -d '{
+    "model": "Qwen/Qwen3-32B-TEE",
+    "messages": [
+      { "role": "user", "content": "Hola" }
+    ]
+  }'`;
+        }
 
         if (data.role === 'admin') {
           document.getElementById('adminCard').style.display = 'block';
