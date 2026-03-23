@@ -320,7 +320,7 @@
     }
   </style>
 </head>
-<body>
+<body class="fade-in">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
   <aside class="chat-sidebar" id="sidebar">
@@ -341,7 +341,13 @@
 
     <div style="flex: 1; overflow-y: auto; padding: 14px 10px;" class="chat-scroll">
       <div style="padding: 0 14px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--slate); opacity: 0.5; font-weight: 700;">Historial</div>
-      <div id="historyList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+      <div id="historyList" style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="padding: 0 10px;">
+          <div class="skeleton-text skeleton" style="height: 32px; border-radius: 10px; margin-bottom: 6px;"></div>
+          <div class="skeleton-text skeleton" style="height: 32px; border-radius: 10px; margin-bottom: 6px; opacity: 0.6;"></div>
+          <div class="skeleton-text skeleton" style="height: 32px; border-radius: 10px; margin-bottom: 6px; opacity: 0.3;"></div>
+        </div>
+      </div>
       <div id="sidebarStatus"></div>
     </div>
 
@@ -359,19 +365,22 @@
         <button id="toggleSidebar" style="padding: 6px; border-radius: 8px; border: none; background: none; cursor: pointer; color: var(--slate);">
           <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <span id="chatTitle" style="font-size: 14px; font-weight: 800;">Nuevo chat</span>
+        <span id="chatTitle" style="font-size: 14px; font-weight: 800; cursor: pointer;" title="Click para editar título" onclick="editTitle()">Nuevo chat</span>
+        <button id="editTitleBtn" onclick="editTitle()" style="padding: 4px; border: none; background: none; cursor: pointer; color: var(--slate); opacity: 0.4;" title="Editar título">
+          <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+        </button>
       </div>
       <div style="display: flex; align-items: center; gap: 14px;">
         <span id="quotaInfo" style="font-size: 12px; font-weight: 700; color: var(--ocean);"></span>
-        <span id="connectionState" style="font-size: 10px; color: var(--slate); opacity: 0.5;"></span>
       </div>
     </header>
 
     <div class="chat-messages chat-scroll" id="messages">
       <div class="msg-row" style="flex: 1; display: flex; align-items: center; justify-content: center;">
-        <div style="text-align: center; opacity: 0.35;">
-          <div style="font-size: 32px; font-weight: 800;">Hablar con IA</div>
-          <p style="margin-top: 8px; font-size: 14px; color: var(--slate);">Elegí un modelo abajo y empezá a chatear.</p>
+        <div style="text-align: center; opacity: 0.5;">
+          <div class="skeleton-circle skeleton" style="width: 48px; height: 48px; margin: 0 auto 16px;"></div>
+          <div class="skeleton-text skeleton" style="width: 160px; height: 20px; margin: 0 auto 8px;"></div>
+          <div class="skeleton-text skeleton" style="width: 120px; height: 14px; margin: 0 auto;"></div>
         </div>
       </div>
     </div>
@@ -405,7 +414,6 @@
     const chatTitle = document.getElementById('chatTitle');
     const chatStatus = document.getElementById('chatStatus');
     const sidebarStatus = document.getElementById('sidebarStatus');
-    const connectionState = document.getElementById('connectionState');
     const quotaInfo = document.getElementById('quotaInfo');
     const modelSelect = document.getElementById('modelSelect');
     const promptInput = document.getElementById('promptInput');
@@ -414,10 +422,11 @@
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
 
-    let socket = null;
+    // --- Local chat storage ---
+    const STORAGE_KEY = 'chat_histories';
     let currentChatId = null;
-    let histories = [];
-    let currentAssistantDiv = null;
+    let chats = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let sending = false;
 
     function openSidebarUI() {
       sidebar.classList.add('open');
@@ -485,122 +494,158 @@
       messagesNode.scrollTop = messagesNode.scrollHeight;
     }
 
+    function saveChats() { localStorage.setItem(STORAGE_KEY, JSON.stringify(chats)); }
+    function getChat(id) { return chats.find(c => c.id === id); }
+
+    function getDemoSessionId() {
+      let id = localStorage.getItem('demo_session_id');
+      if (!id) { id = crypto.randomUUID(); localStorage.setItem('demo_session_id', id); }
+      return id;
+    }
+
+    // --- History sidebar ---
     function renderHistory() {
-      historyList.innerHTML = histories.map(chat => `
-        <button type="button" class="sidebar-history-item ${chat.chat_id === currentChatId ? 'active' : ''}" data-chat-id="${chat.chat_id}">
-          <div class="sidebar-history-title">${chat.title || 'Nuevo chat'}</div>
-          <div class="sidebar-history-date">${AppBridge.formatDate(chat.updated_at)}</div>
+      const sorted = [...chats].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
+      historyList.innerHTML = sorted.map(chat => `
+        <button type="button" class="sidebar-history-item ${chat.id === currentChatId ? 'active' : ''}" data-chat-id="${chat.id}">
+          <div class="sidebar-history-title">${escapeHtml(chat.title || 'Nuevo chat')}</div>
+          <div class="sidebar-history-date">${new Date(chat.updated_at || Date.now()).toLocaleDateString()}</div>
         </button>
       `).join('');
 
       historyList.querySelectorAll('[data-chat-id]').forEach(node => {
         node.addEventListener('click', () => {
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'open_chat', chat_id: node.getAttribute('data-chat-id') }));
-          }
+          loadChat(node.getAttribute('data-chat-id'));
           closeSidebarUI();
         });
       });
     }
 
-    function updateQuota(summary) {
-      if (!summary) return;
-      quotaInfo.textContent = `Saldo: ${AppBridge.formatUsd(summary.remaining_usd || 0)}`;
+    function loadChat(id) {
+      const chat = getChat(id);
+      if (!chat) return;
+      currentChatId = id;
+      chatTitle.textContent = chat.title || 'Nuevo chat';
+      renderMessages(chat.messages || []);
+      renderHistory();
     }
 
+    // --- Editable title ---
+    function editTitle() {
+      const titleEl = document.getElementById('chatTitle');
+      const current = titleEl.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = current;
+      input.style.cssText = 'font-size:14px;font-weight:800;border:none;background:rgba(255,255,255,0.6);border-radius:8px;padding:4px 8px;outline:none;width:200px;color:var(--ink);';
+      titleEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      function commit() {
+        const val = input.value.trim() || 'Nuevo chat';
+        const span = document.createElement('span');
+        span.id = 'chatTitle';
+        span.style.cssText = 'font-size:14px;font-weight:800;cursor:pointer;';
+        span.title = 'Click para editar título';
+        span.textContent = val;
+        span.onclick = editTitle;
+        input.replaceWith(span);
+        if (currentChatId) {
+          const chat = getChat(currentChatId);
+          if (chat) { chat.title = val; saveChats(); renderHistory(); }
+        }
+      }
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'Escape') { input.value = current; commit(); } });
+    }
+
+    // --- Models ---
     async function loadModels() {
       try {
-        const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
-        modelSelect.innerHTML = data.models.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+        const res = await fetch(`${API_BASE}/api/demo-config`);
+        const data = await res.json();
+        modelSelect.innerHTML = (data.models || []).map(m => `<option value="${m.id}">${m.label}</option>`).join('');
       } catch {
         modelSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
       }
     }
 
-    async function openSocket() {
-      try {
-        const response = await AppBridge.apiFetch('/api/chat-token', {
-          method: 'POST',
-          headers: {
-            ...(localStorage.getItem('app_access_token') ? { 'X-Access-Token': localStorage.getItem('app_access_token') } : {}),
-          },
-          body: JSON.stringify({ access_token: localStorage.getItem('app_access_token') || null }),
-        });
-
-        socket = new WebSocket(`${response.ws_url}?token=${encodeURIComponent(response.token)}`);
-        connectionState.textContent = 'Conectando...';
-
-        socket.addEventListener('open', () => { connectionState.textContent = 'Conectado'; });
-
-        socket.addEventListener('message', (event) => {
-          const data = JSON.parse(event.data);
-
-          if (data.type === 'init') {
-            histories = data.chats || [];
-            renderHistory();
-            return;
-          }
-          if (data.type === 'chat_loaded') {
-            currentChatId = data.chat.chat_id;
-            chatTitle.textContent = data.chat.title || 'Chat';
-            renderMessages(data.chat.messages || []);
-            renderHistory();
-            return;
-          }
-          if (data.type === 'assistant_thinking') {
-            currentAssistantDiv = appendMessageToUI('assistant', '');
-            scrollToBottom();
-            return;
-          }
-          if (data.type === 'assistant_chunk') {
-            if (currentAssistantDiv) {
-              currentAssistantDiv.textContent += data.text;
-              scrollToBottom();
-            }
-            return;
-          }
-          if (data.type === 'assistant_message_end') {
-            currentChatId = data.chat_id || currentChatId;
-            updateQuota(data.entitlement);
-            currentAssistantDiv = null;
-            if (currentChatId && !histories.find(c => c.chat_id === currentChatId)) {
-              histories.unshift({ chat_id: currentChatId, title: data.chat_title || 'Chat', updated_at: Date.now() });
-              renderHistory();
-            }
-            return;
-          }
-          if (data.type === 'error') {
-            chatStatus.innerHTML = `<div class="status show error">${data.message}</div>`;
-          }
-        });
-
-        socket.addEventListener('close', () => { connectionState.textContent = 'Desconectado'; });
-      } catch (error) {
-        chatStatus.innerHTML = `<div class="status show error">${error.message}</div>`;
-        connectionState.textContent = 'Sin conexión';
-      }
-    }
-
-    function sendMessage() {
+    // --- Send via HTTP streaming ---
+    async function sendMessage() {
       const content = promptInput.value.trim();
-      if (!content) return;
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        chatStatus.innerHTML = '<div class="status show error">El chat no está conectado.</div>';
-        return;
+      if (!content || sending) return;
+      sending = true;
+      sendBtn.disabled = true;
+
+      // Create or get chat
+      if (!currentChatId) {
+        currentChatId = crypto.randomUUID();
+        const title = content.slice(0, 40) + (content.length > 40 ? '...' : '');
+        chats.push({ id: currentChatId, title, messages: [], updated_at: Date.now() });
+        chatTitle.textContent = title;
+        messagesNode.innerHTML = '';
       }
+
+      const chat = getChat(currentChatId);
+      chat.messages.push({ role: 'user', content });
+      chat.updated_at = Date.now();
+      saveChats();
 
       appendMessageToUI('user', content);
       scrollToBottom();
-
-      socket.send(JSON.stringify({
-        type: 'user_message',
-        chat_id: currentChatId,
-        model: modelSelect.value,
-        content,
-      }));
-
       promptInput.value = '';
       promptInput.style.height = 'auto';
+
+      const assistantDiv = appendMessageToUI('assistant', '');
+      scrollToBottom();
+      let fullText = '';
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_BASE}/api/demo-stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Demo-Session': getDemoSessionId(),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: getDemoSessionId() }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Error al enviar mensaje');
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6).trim();
+            if (payload === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.text) { fullText += parsed.text; assistantDiv.textContent = fullText; scrollToBottom(); }
+            } catch {}
+          }
+        }
+
+        chat.messages.push({ role: 'assistant', content: fullText });
+        chat.updated_at = Date.now();
+        saveChats();
+        renderHistory();
+      } catch (err) {
+        assistantDiv.textContent = 'Error: ' + err.message;
+        assistantDiv.style.color = '#ef4444';
+      } finally {
+        sending = false;
+        sendBtn.disabled = false;
+      }
     }
 
     sendBtn.addEventListener('click', sendMessage);
@@ -613,8 +658,13 @@
       closeSidebarUI();
     });
 
+    // --- Init ---
     loadModels();
-    openSocket();
+    renderHistory();
+    if (chats.length) {
+      const latest = [...chats].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))[0];
+      if (latest) loadChat(latest.id);
+    }
   </script>
 </body>
 </html>
