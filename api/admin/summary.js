@@ -33,6 +33,9 @@ module.exports = async function handler(req, res) {
       last_login_at: user.last_login_at,
       credit_limit_usd: 0,
       credit_spent_usd: 0,
+      access_tokens: [],
+      payments_count: 0,
+      chats_count: 0,
       ...usage,
     };
   });
@@ -44,6 +47,20 @@ module.exports = async function handler(req, res) {
     if (!row) continue;
     row.credit_limit_usd += Number(payment.credit_limit_usd || 0);
     row.credit_spent_usd += Number(payment.spent_estimated_usd || 0);
+    row.payments_count += 1;
+    if (payment.access_token) row.access_tokens.push(payment.access_token);
+  }
+
+  const chats = root.chats || {};
+  for (const chat of Object.values(chats)) {
+    if (!chat.owner_id) continue;
+    const row = rows.find((entry) => entry.user_id === chat.owner_id);
+    if (!row) continue;
+    row.chats_count += 1;
+  }
+
+  for (const row of rows) {
+    row.credit_remaining_usd = Number((row.credit_limit_usd - row.credit_spent_usd).toFixed(6));
   }
 
   const totals = rows.reduce(
