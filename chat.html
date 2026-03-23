@@ -459,12 +459,17 @@
         </div>
 
         <div style="margin-top:18px; border-radius:24px; border:1px solid rgba(255,255,255,0.75); background:rgba(255,255,255,0.56); box-shadow:var(--shadow-soft); padding:24px;">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Facturación</div>
-          <div id="billingCopy" style="margin-top:8px; color:var(--slate); font-size:14px; line-height:1.7;">Podés activar o ampliar tu saldo cuando quieras.</div>
-          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px;">
-            <a href="/" class="button">Configurar saldo</a>
-            <a href="/demo.html" class="button secondary">Probar demo gratis</a>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.24em; color:var(--slate); font-weight:700;">Canjear código</div>
+          <div style="margin-top:8px; color:var(--slate); font-size:13px; line-height:1.6;">Si tenés un código promocional, ingresalo acá para sumar saldo a tu cuenta.</div>
+          <div style="margin-top:14px; display:flex; gap:8px; align-items:stretch;">
+            <input id="couponInput" type="text" placeholder="Ej: BIENVENIDO" style="flex:1; border-radius:14px; border:1px solid var(--line); background:rgba(255,255,255,0.7); padding:12px 16px; font:inherit; font-size:14px; color:var(--ink); outline:none;">
+            <button id="couponBtn" onclick="redeemCoupon()" style="border-radius:14px; background:var(--ocean); color:white; border:none; padding:12px 20px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;">Canjear</button>
           </div>
+          <div id="couponStatus" style="margin-top:10px;"></div>
+        </div>
+
+        <div style="margin-top:18px; text-align:center;">
+          <a href="/" style="font-size:13px; font-weight:600; color:var(--ocean); text-decoration:none;">Comprar más saldo con MercadoPago →</a>
         </div>
 
         <div id="usageStatus" style="margin-top:14px;"></div>
@@ -557,6 +562,43 @@
         promptInput.placeholder = 'Iniciá sesión o configurá saldo para usar el chat';
         quotaInfo.textContent = 'Completá tu acceso para usar el chat';
         document.getElementById('usageStatus').innerHTML = `<div class="status show error">No se pudo cargar los datos: ${err.message}</div>`;
+      }
+    }
+
+    async function redeemCoupon() {
+      const input = document.getElementById('couponInput');
+      const btn = document.getElementById('couponBtn');
+      const status = document.getElementById('couponStatus');
+      const code = input.value.trim();
+      if (!code) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Canjeando...';
+      status.innerHTML = '';
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`${API_BASE}/api/coupon/redeem`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al canjear');
+
+        status.innerHTML = `<div class="status show success">${data.message}</div>`;
+        input.value = '';
+        // Refresh usage data
+        usageLoaded = false;
+        loadUsageData();
+      } catch (err) {
+        status.innerHTML = `<div class="status show error">${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Canjear';
       }
     }
 
