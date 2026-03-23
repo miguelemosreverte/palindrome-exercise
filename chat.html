@@ -3,389 +3,146 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat</title>
+  <title>Chat — Acceso a Modelos</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32'%3E%3Cstop offset='0%25' stop-color='%23316dff'/%3E%3Cstop offset='100%25' stop-color='%2389e0c8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 21V11l4 4 4-4 4 4 4-4v10' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sky: "#bcecff",
+            mist: "#dff7f2",
+            cream: "#f7f6ef",
+            ink: "#112033",
+            slate: "#56708a",
+            ocean: "#316dff",
+            mint: "#89e0c8",
+          },
+          fontFamily: {
+            sans: ["Instrument Sans", "system-ui", "sans-serif"]
+          },
+        }
+      }
+    };
+  </script>
   <style>
-    :root {
-      --sidebar-width: 280px;
-    }
-
     body {
+      font-family: "Instrument Sans", system-ui, sans-serif;
       overflow: hidden;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      margin: 0;
-      background: #f8fafc;
+      height: 100dvh;
     }
 
-    .chat-container {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-      height: 100vh;
-    }
+    .chat-scroll::-webkit-scrollbar { width: 6px; }
+    .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
-    /* Sidebar */
-    .chat-sidebar {
-      width: var(--sidebar-width);
-      background: white;
-      border-right: 1px solid var(--line);
-      display: flex;
-      flex-direction: column;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 100;
-    }
+    .msg-assistant { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-    .chat-sidebar.collapsed {
-      width: 0;
-      transform: translateX(-100%);
-    }
-
-    .sidebar-header {
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .sidebar-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 0 16px;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      color: var(--slate);
-      font-size: 14px;
-      font-weight: 600;
-      transition: all 0.2s;
-      text-decoration: none;
-    }
-
-    .nav-item:hover {
-      background: #f1f5f9;
-      color: var(--ink);
-    }
-
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 16px;
-    }
-
-    .chat-history {
-      display: grid;
-      gap: 4px;
-    }
-
-    .history-item {
-      width: 100%;
-      text-align: left;
-      padding: 12px;
-      border-radius: 12px;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .history-item:hover {
-      background: #f1f5f9;
-    }
-
-    .history-item.active {
-      background: #e2e8f0;
-    }
-
-    .history-item .title {
-      font-weight: 600;
-      font-size: 13px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--ink);
-    }
-
-    .history-item .date {
-      font-size: 11px;
-      color: var(--slate);
-    }
-
-    /* Main Chat Area */
-    .chat-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: white;
-      position: relative;
-      align-items: center; /* Center content */
-    }
-
-    .chat-header {
-      width: 100%;
-      height: 64px;
-      padding: 0 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--line);
-      background: white;
-      z-index: 10;
-    }
-
-    .chat-messages {
-      width: 100%;
-      max-width: 800px; /* Limit width like ChatGPT */
-      flex: 1;
-      overflow-y: auto;
-      padding: 40px 20px 120px; /* Space for composer */
-      display: flex;
-      flex-direction: column;
-      gap: 32px;
-    }
-
-    .message-wrapper {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-    }
-
-    .message {
-      max-width: 85%;
-      font-size: 16px;
-      line-height: 1.6;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-
-    .message.user {
-      align-self: flex-end;
-      background: #f1f5f9;
-      padding: 12px 20px;
-      border-radius: 24px;
-      color: var(--ink);
-    }
-
-    .message.assistant {
-      align-self: flex-start;
-      padding: 0 4px;
-      color: var(--ink);
-      width: 100%;
-      position: relative;
-    }
-
-    .message.assistant::before {
-      content: "IA";
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      background: var(--ocean);
-      color: white;
-      border-radius: 8px;
-      font-size: 10px;
-      font-weight: 800;
-      margin-bottom: 12px;
-      letter-spacing: 0.05em;
-    }
-
-    /* Composer */
-    .composer-container {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 20px;
-      background: linear-gradient(to top, white 80%, transparent);
-      display: flex;
-      justify-content: center;
-      z-index: 5;
-    }
-
-    .composer {
-      width: 100%;
-      max-width: 760px;
-      background: #f8fafc;
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-    }
-
-    .composer-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 8px;
-    }
-
-    .composer textarea {
-      flex: 1;
-      border: none;
-      background: transparent;
-      padding: 8px 4px;
-      min-height: 40px;
-      max-height: 200px;
-      resize: none;
-      font-size: 15px;
-      outline: none;
-      color: var(--ink);
-    }
-
-    .composer-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px;
-    }
-
-    .send-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--ocean);
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.2s;
-    }
-
-    .send-btn:disabled {
-      background: #cbd5e1;
-      cursor: not-allowed;
-    }
-
-    .overlay {
-      display: none;
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.3);
-      backdrop-filter: blur(4px);
-      z-index: 90;
-    }
-
-    .icon {
-      width: 18px;
-      height: 18px;
-      stroke-width: 2.5;
-      stroke: currentColor;
-      fill: none;
-    }
-
-    @media (max-width: 768px) {
-      .chat-sidebar {
-        position: absolute;
-        height: 100%;
-        transform: translateX(-100%);
-      }
-      .chat-container.sidebar-open .chat-sidebar {
-        transform: translateX(0);
-        width: 85%;
-      }
-      .chat-container.sidebar-open .overlay {
-        display: block;
-      }
-      .composer-container {
-        padding: 12px;
-      }
-    }
+    textarea { field-sizing: content; }
   </style>
 </head>
-<body>
-  <div class="chat-container" id="chatContainer">
-    <div class="overlay" id="sidebarOverlay"></div>
-    
-    <aside class="chat-sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-title" style="font-size: 20px; margin-left: 16px;">Chat</div>
-        <nav class="sidebar-nav">
-          <a href="/" class="nav-item">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
-            Inicio
-          </a>
-          <a href="/dashboard.html" class="nav-item">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Mi panel
-          </a>
-          <a href="/admin.html" class="nav-item" data-admin-only>
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.14a10.503 10.503 0 01-4.907-8.727c0-5.8 4.7-10.5 10.5-10.5s10.5 4.7 10.5 10.5c0 2.47-.858 4.738-2.292 6.53L12 11z"/><path d="M9 11h.01M15 11h.01M12 15h.01"/></svg>
-            Admin
-          </a>
-          <button class="nav-item" id="newChatBtn" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            Nuevo chat
-          </button>
-          <button class="nav-item" data-logout style="width: 100%; border: none; background: none; cursor: pointer; text-align: left; color: #ef4444;">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-            Cerrar sesión
-          </button>
-        </nav>
-      </div>
-      
-      <div class="sidebar-content">
-        <div class="section-kicker" style="margin: 0 12px 12px; font-size: 11px;">Historial</div>
-        <div class="chat-history" id="historyList"></div>
-        <div id="sidebarStatus" class="status" style="margin: 12px;"></div>
-      </div>
-    </aside>
+<body class="bg-white text-ink flex h-[100dvh]">
 
-    <main class="chat-main">
-      <header class="chat-header">
-        <div class="header-left">
-          <button class="toggle-sidebar" id="toggleSidebar">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-          </button>
-          <div class="small-title" id="chatTitle" style="font-size: 14px; font-weight: 700; margin: 0;">Nuevo chat</div>
-        </div>
-        <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
-          <div class="helper" id="quotaInfo" style="font-size: 12px; font-weight: 600; color: var(--ocean);">...</div>
-          <div class="helper" id="connectionState" style="font-size: 10px; opacity: 0.6;">...</div>
-        </div>
-      </header>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="w-72 bg-cream/60 border-r border-slate/10 flex flex-col transition-all duration-300 shrink-0 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:-translate-x-full" data-open="false">
+    <div class="p-5 border-b border-slate/10">
+      <div class="flex items-center justify-between">
+        <a href="/" class="text-lg font-extrabold tracking-tight text-ink">Modelos IA</a>
+        <button id="closeSidebar" class="md:hidden p-1.5 rounded-lg hover:bg-white/60 text-slate">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <button id="newChatBtn" class="mt-4 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-ocean text-white text-sm font-semibold shadow-sm hover:bg-ocean/90 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Nuevo chat
+      </button>
+    </div>
 
-      <div class="chat-messages" id="messages">
-        <div class="message-wrapper">
-          <div class="message assistant">¿En qué puedo ayudarte hoy?</div>
+    <nav class="p-3 flex flex-col gap-0.5">
+      <a href="/" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate hover:bg-white/60 hover:text-ink transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Inicio
+      </a>
+      <a href="/dashboard.html" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate hover:bg-white/60 hover:text-ink transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Mi panel
+      </a>
+    </nav>
+
+    <div class="flex-1 overflow-y-auto px-3 pb-3 chat-scroll">
+      <p class="px-3 mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate/60">Historial</p>
+      <div id="historyList" class="flex flex-col gap-0.5"></div>
+      <div id="sidebarStatus"></div>
+    </div>
+
+    <div class="p-3 border-t border-slate/10">
+      <button data-logout class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 hidden"></div>
+
+  <!-- Main chat -->
+  <main class="flex-1 flex flex-col min-w-0 relative">
+    <!-- Header -->
+    <header class="h-14 px-4 flex items-center justify-between border-b border-slate/10 bg-white shrink-0">
+      <div class="flex items-center gap-3">
+        <button id="toggleSidebar" class="p-1.5 -ml-1 rounded-lg hover:bg-slate/5 text-slate">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1 id="chatTitle" class="text-sm font-bold truncate">Nuevo chat</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="quotaInfo" class="text-xs font-semibold text-ocean"></span>
+        <span id="connectionState" class="text-[10px] font-medium text-slate/50"></span>
+      </div>
+    </header>
+
+    <!-- Messages -->
+    <div id="messages" class="flex-1 overflow-y-auto chat-scroll px-4 py-8 flex flex-col gap-6">
+      <div class="flex-1 flex items-center justify-center">
+        <div class="text-center opacity-40">
+          <p class="text-3xl font-extrabold tracking-tight">Hablar con IA</p>
+          <p class="mt-2 text-sm text-slate">Elegí un modelo abajo y empezá a chatear.</p>
         </div>
       </div>
+    </div>
 
-      <div class="composer-container">
-        <div id="chatStatus" class="status" style="margin-bottom: 8px;"></div>
-        <div class="composer">
-          <div class="composer-row">
-            <textarea id="promptInput" placeholder="Mensaje..." rows="1"></textarea>
-            <button class="send-btn" id="sendBtn">
-              <svg class="icon" viewBox="0 0 24 24" style="color: white; transform: rotate(90deg); width: 16px; height: 16px;"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    <!-- Composer -->
+    <div class="px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white to-transparent">
+      <div id="chatStatus" class="mb-2"></div>
+      <div class="max-w-3xl mx-auto">
+        <div class="rounded-2xl border border-slate/15 bg-cream/30 shadow-sm focus-within:border-ocean/30 focus-within:ring-2 focus-within:ring-ocean/10 transition">
+          <!-- Model selector row -->
+          <div class="px-3 pt-2.5 flex items-center gap-2">
+            <svg class="w-4 h-4 text-slate/50 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
+            <select id="modelSelect" class="flex-1 bg-transparent text-xs font-semibold text-ink py-1.5 outline-none cursor-pointer appearance-none">
+              <option>Cargando modelos...</option>
+            </select>
+          </div>
+          <!-- Input row -->
+          <div class="flex items-end gap-2 px-3 pb-2.5 pt-1">
+            <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1" class="flex-1 bg-transparent text-[15px] text-ink placeholder:text-slate/35 outline-none resize-none min-h-[40px] max-h-[200px] py-1.5 leading-relaxed"></textarea>
+            <button id="sendBtn" class="w-8 h-8 rounded-full bg-ocean text-white flex items-center justify-center shrink-0 hover:bg-ocean/90 disabled:bg-slate/20 disabled:cursor-not-allowed transition mb-0.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </button>
           </div>
-          <div class="composer-footer">
-            <select id="modelSelect" style="background: transparent; border: none; font-size: 11px; color: var(--slate); font-weight: 600; cursor: pointer; padding: 0; width: auto;"></select>
-            <div class="helper" style="font-size: 10px; opacity: 0.5;">Enter para enviar</div>
+          <div class="px-3 pb-2 flex justify-between text-[10px] text-slate/40 font-medium">
+            <span>Enter para enviar · Shift+Enter nueva línea</span>
           </div>
         </div>
       </div>
-    </main>
-  </div>
+    </div>
+  </main>
 
   <script src="app.js"></script>
   <script>
@@ -402,27 +159,34 @@
     const promptInput = document.getElementById('promptInput');
     const sendBtn = document.getElementById('sendBtn');
     const toggleSidebar = document.getElementById('toggleSidebar');
+    const closeSidebar = document.getElementById('closeSidebar');
     const sidebar = document.getElementById('sidebar');
-    const chatContainer = document.getElementById('chatContainer');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
 
     let socket;
     let currentChatId = null;
     let histories = [];
+    let currentAssistantDiv = null;
+
+    function openSidebar() {
+      sidebar.classList.remove('max-md:-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    }
+    function closeSidebarFn() {
+      sidebar.classList.add('max-md:-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    }
 
     toggleSidebar.addEventListener('click', () => {
-      sidebar.classList.toggle('collapsed');
-      chatContainer.classList.toggle('sidebar-open');
+      if (sidebar.classList.contains('max-md:-translate-x-full')) openSidebar();
+      else closeSidebarFn();
     });
-
-    sidebarOverlay.addEventListener('click', () => {
-      sidebar.classList.add('collapsed');
-      chatContainer.classList.remove('sidebar-open');
-    });
+    closeSidebar.addEventListener('click', closeSidebarFn);
+    sidebarOverlay.addEventListener('click', closeSidebarFn);
 
     promptInput.addEventListener('input', () => {
       promptInput.style.height = 'auto';
-      promptInput.style.height = (promptInput.scrollHeight) + 'px';
+      promptInput.style.height = promptInput.scrollHeight + 'px';
     });
 
     promptInput.addEventListener('keydown', (e) => {
@@ -436,30 +200,37 @@
       messagesNode.innerHTML = '';
       if (!items.length) {
         messagesNode.innerHTML = `
-          <div class="message-wrapper" style="height: 60vh; display: flex; align-items: center; justify-content: center; opacity: 0.5;">
-            <div style="text-align: center;">
-              <div class="brand-title" style="font-size: 32px; margin-bottom: 8px;">Hablar con IA</div>
-              <p>Elegí un modelo y empezá a chatear.</p>
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-center opacity-40">
+              <p class="text-3xl font-extrabold tracking-tight">Hablar con IA</p>
+              <p class="mt-2 text-sm text-slate">Elegí un modelo abajo y empezá a chatear.</p>
             </div>
           </div>`;
         return;
       }
-
-      for (const item of items) {
-        appendMessageToUI(item.role, item.content);
-      }
+      for (const item of items) appendMessageToUI(item.role, item.content);
       scrollToBottom();
     }
 
     function appendMessageToUI(role, content) {
       const wrapper = document.createElement('div');
-      wrapper.className = 'message-wrapper';
-      const div = document.createElement('div');
-      div.className = `message ${role === 'user' ? 'user' : 'assistant'}`;
-      div.textContent = content;
-      wrapper.appendChild(div);
+      wrapper.className = 'max-w-3xl mx-auto w-full';
+
+      if (role === 'user') {
+        wrapper.innerHTML = `<div class="flex justify-end"><div class="bg-ocean/5 border border-ocean/10 text-ink rounded-2xl rounded-br-md px-5 py-3 text-[15px] leading-relaxed max-w-[85%] whitespace-pre-wrap">${escapeHtml(content)}</div></div>`;
+      } else {
+        const badge = `<div class="w-7 h-7 rounded-lg bg-gradient-to-br from-ocean to-mint flex items-center justify-center text-white text-[10px] font-extrabold shrink-0">IA</div>`;
+        wrapper.innerHTML = `<div class="msg-assistant flex gap-3 items-start"><div>${badge}</div><div class="text-[15px] leading-relaxed text-ink whitespace-pre-wrap min-w-0">${escapeHtml(content)}</div></div>`;
+      }
+
       messagesNode.appendChild(wrapper);
-      return div;
+      return role === 'assistant' ? wrapper.querySelector('.whitespace-pre-wrap:last-child') : null;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
     }
 
     function scrollToBottom() {
@@ -467,25 +238,20 @@
     }
 
     function renderHistory() {
-      historyList.innerHTML = histories
-        .map((chat) => `
-          <button type="button" class="history-item ${chat.chat_id === currentChatId ? 'active' : ''}" data-chat-id="${chat.chat_id}">
-            <div class="title">${chat.title || 'Nuevo chat'}</div>
-            <div class="date">${AppBridge.formatDate(chat.updated_at)}</div>
-          </button>
-        `)
-        .join('');
+      historyList.innerHTML = histories.map(chat => `
+        <button type="button" class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition ${chat.chat_id === currentChatId ? 'bg-white shadow-sm font-semibold text-ink' : 'text-slate hover:bg-white/60 hover:text-ink'}" data-chat-id="${chat.chat_id}">
+          <div class="truncate">${chat.title || 'Nuevo chat'}</div>
+          <div class="text-[10px] mt-0.5 opacity-50">${AppBridge.formatDate(chat.updated_at)}</div>
+        </button>
+      `).join('');
 
-      historyList.querySelectorAll('[data-chat-id]').forEach((node) => {
+      historyList.querySelectorAll('[data-chat-id]').forEach(node => {
         node.addEventListener('click', () => {
           const chatId = node.getAttribute('data-chat-id');
           if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'open_chat', chat_id: chatId }));
           }
-          if (window.innerWidth <= 768) {
-            sidebar.classList.add('collapsed');
-            chatContainer.classList.remove('sidebar-open');
-          }
+          closeSidebarFn();
         });
       });
     }
@@ -499,26 +265,19 @@
       try {
         const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
         modelSelect.innerHTML = data.models
-          .map((model) => `<option value="${model.id}">${model.label}</option>`)
+          .map(m => `<option value="${m.id}">${m.label}</option>`)
           .join('');
       } catch (error) {
-        AppBridge.setStatus(chatStatus, 'error', error.message);
+        modelSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
       }
     }
-
-    let socket;
-    let currentChatId = null;
-    let histories = [];
-    let currentAssistantDiv = null;
 
     async function openSocket() {
       try {
         const response = await AppBridge.apiFetch('/api/chat-token', {
           method: 'POST',
           headers: {
-            ...(localStorage.getItem('app_access_token')
-              ? { 'X-Access-Token': localStorage.getItem('app_access_token') }
-              : {}),
+            ...(localStorage.getItem('app_access_token') ? { 'X-Access-Token': localStorage.getItem('app_access_token') } : {}),
           },
           body: JSON.stringify({
             access_token: localStorage.getItem('app_access_token') || null,
@@ -534,12 +293,11 @@
 
         socket.addEventListener('message', (event) => {
           const data = JSON.parse(event.data);
+
           if (data.type === 'init') {
             histories = data.chats || [];
             renderHistory();
-            if (!histories.length) {
-              AppBridge.setStatus(sidebarStatus, 'pending', 'Sin historial.');
-            }
+            if (!histories.length) sidebarStatus.innerHTML = '<p class="px-3 text-xs text-slate/50">Sin historial.</p>';
             return;
           }
 
@@ -552,7 +310,6 @@
           }
 
           if (data.type === 'assistant_thinking') {
-            AppBridge.setStatus(chatStatus, 'pending', 'IA pensando...');
             currentAssistantDiv = appendMessageToUI('assistant', '');
             scrollToBottom();
             return;
@@ -569,18 +326,16 @@
           if (data.type === 'assistant_message_end') {
             currentChatId = data.chat_id || currentChatId;
             updateQuota(data.entitlement);
-            chatStatus.className = 'status'; // hide
             currentAssistantDiv = null;
-            
-            if (currentChatId && !histories.find((chat) => chat.chat_id === currentChatId)) {
-               histories.unshift({ chat_id: currentChatId, title: data.chat_title || 'Chat', updated_at: Date.now() });
-               renderHistory();
+            if (currentChatId && !histories.find(c => c.chat_id === currentChatId)) {
+              histories.unshift({ chat_id: currentChatId, title: data.chat_title || 'Chat', updated_at: Date.now() });
+              renderHistory();
             }
             return;
           }
 
           if (data.type === 'error') {
-            AppBridge.setStatus(chatStatus, 'error', data.message);
+            chatStatus.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">${data.message}</div>`;
           }
         });
 
@@ -588,7 +343,7 @@
           connectionState.textContent = 'Desconectado';
         });
       } catch (error) {
-        AppBridge.setStatus(chatStatus, 'error', error.message);
+        chatStatus.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">${error.message}</div>`;
         connectionState.textContent = 'Sin conexión';
       }
     }
@@ -597,17 +352,11 @@
       const content = promptInput.value.trim();
       if (!content) return;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
-        AppBridge.setStatus(chatStatus, 'error', 'El chat no está conectado.');
+        chatStatus.innerHTML = '<div class="max-w-3xl mx-auto px-4 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">El chat no está conectado.</div>';
         return;
       }
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'message-wrapper';
-      const userDiv = document.createElement('div');
-      userDiv.className = 'message user';
-      userDiv.textContent = content;
-      wrapper.appendChild(userDiv);
-      messagesNode.appendChild(wrapper);
+      appendMessageToUI('user', content);
       scrollToBottom();
 
       socket.send(JSON.stringify({
@@ -628,10 +377,7 @@
       chatTitle.textContent = 'Nuevo chat';
       renderMessages([]);
       renderHistory();
-      if (window.innerWidth <= 768) {
-        sidebar.classList.add('collapsed');
-        chatContainer.classList.remove('sidebar-open');
-      }
+      closeSidebarFn();
     });
 
     loadModels();
@@ -639,5 +385,3 @@
   </script>
 </body>
 </html>
-
-
