@@ -94,7 +94,7 @@
     }
 
     .hero-cloud {
-      position: absolute;
+      position: fixed;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -103,6 +103,9 @@
       border-radius: 999px;
       box-shadow: 0 20px 50px rgba(75, 133, 178, 0.14);
       backdrop-filter: blur(6px);
+      z-index: 0;
+      will-change: transform;
+      transition: transform 0.1s linear;
     }
 
     .hero-cloud::before,
@@ -150,13 +153,43 @@
   </style>
 </head>
 <body class="paper-noise min-h-screen bg-cream text-ink">
-  <div class="relative overflow-hidden">
-    <div class="absolute inset-x-0 top-0 h-px bg-white/70"></div>
+  <!-- Fixed parallax clouds -->
+  <div class="hero-cloud h-24 w-44 opacity-90" style="left:2%;top:28%;" data-speed="0.12" data-drift="0.03">
+    <svg class="cloud-logo" style="height:30px;width:auto;" viewBox="0 0 120 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="10" stroke="#112033" stroke-width="2" fill="none"/>
+      <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#112033" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="12" cy="14" r="1.5" fill="#112033"/>
+      <text x="28" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">DeepSeek</text>
+    </svg>
+  </div>
+  <div class="hero-cloud h-20 w-40 opacity-85 hidden md:flex" style="right:4%;top:18%;" data-speed="0.06" data-drift="-0.02">
+    <svg class="cloud-logo" style="height:26px;width:auto;" viewBox="0 0 100 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2a10 10 0 0 0-3.16 19.5l.9-2.32A7.5 7.5 0 1 1 19.5 12a7.47 7.47 0 0 1-2.85 5.9l1.52 1.93A10 10 0 0 0 12 2z" fill="#112033"/>
+      <path d="M12 6.5a5.5 5.5 0 0 0-1.84 10.68l.9-2.32a3 3 0 1 1 1.88 0l.9 2.32A5.5 5.5 0 0 0 12 6.5z" fill="#112033"/>
+      <text x="26" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">OpenAI</text>
+    </svg>
+  </div>
+  <div class="hero-cloud h-16 w-32 opacity-65" style="right:10%;top:62%;" data-speed="0.2" data-drift="0.05">
+    <svg class="cloud-logo" style="height:22px;width:auto;" viewBox="0 0 80 22" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="15" font-weight="800" fill="#112033" letter-spacing="0.04em">Qwen</text>
+    </svg>
+  </div>
+  <div class="hero-cloud h-16 w-36 opacity-70 hidden md:flex" style="left:10%;top:72%;" data-speed="0.15" data-drift="-0.04">
+    <svg class="cloud-logo" style="height:24px;width:auto;" viewBox="0 0 110 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="2" width="4" height="20" rx="1" fill="#112033"/>
+      <rect x="6" y="6" width="4" height="12" rx="1" fill="#112033" opacity="0.7"/>
+      <rect x="12" y="0" width="4" height="24" rx="1" fill="#112033"/>
+      <rect x="18" y="8" width="4" height="8" rx="1" fill="#112033" opacity="0.5"/>
+      <text x="28" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">Mistral</text>
+    </svg>
+  </div>
+  <div class="hero-cloud h-14 w-28 opacity-50 hidden lg:flex" style="left:42%;top:45%;" data-speed="0.08" data-drift="0.06">
+    <svg class="cloud-logo" style="height:18px;width:auto;" viewBox="0 0 80 22" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="14" font-weight="800" fill="#112033" letter-spacing="0.04em">Llama</text>
+    </svg>
+  </div>
 
-    <div class="bg-ocean px-4 py-2 text-center text-xs font-medium tracking-wide text-white">
-      Pagá con Mercado Pago y obtené acceso en minutos.
-    </div>
-
+  <div class="relative overflow-hidden" style="position:relative;z-index:1;">
     <header class="relative z-10">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10">
         <div>
@@ -174,45 +207,12 @@
     <main>
       <section class="relative isolate">
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.45),transparent_34%),linear-gradient(180deg,rgba(188,236,255,0.25),rgba(223,247,242,0.18)_46%,rgba(247,246,239,0.3)_100%)]"></div>
-        <div class="hero-cloud left-[-1rem] top-44 h-24 w-44 opacity-90 md:left-6">
-          <!-- DeepSeek logo -->
-          <svg class="cloud-logo" style="height:30px;width:auto;" viewBox="0 0 120 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#112033" stroke-width="2" fill="none"/>
-            <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#112033" stroke-width="2" fill="none" stroke-linecap="round"/>
-            <circle cx="12" cy="14" r="1.5" fill="#112033"/>
-            <text x="28" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">DeepSeek</text>
-          </svg>
-        </div>
-        <div class="hero-cloud right-6 top-28 hidden h-20 w-40 opacity-90 md:flex">
-          <!-- OpenAI logo -->
-          <svg class="cloud-logo" style="height:26px;width:auto;" viewBox="0 0 100 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2a10 10 0 0 0-3.16 19.5l.9-2.32A7.5 7.5 0 1 1 19.5 12a7.47 7.47 0 0 1-2.85 5.9l1.52 1.93A10 10 0 0 0 12 2z" fill="#112033"/>
-            <path d="M12 6.5a5.5 5.5 0 0 0-1.84 10.68l.9-2.32a3 3 0 1 1 1.88 0l.9 2.32A5.5 5.5 0 0 0 12 6.5z" fill="#112033"/>
-            <text x="26" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">OpenAI</text>
-          </svg>
-        </div>
-        <div class="hero-cloud bottom-28 right-[8%] h-16 w-32 opacity-70">
-          <!-- Qwen logo -->
-          <svg class="cloud-logo" style="height:22px;width:auto;" viewBox="0 0 80 22" xmlns="http://www.w3.org/2000/svg">
-            <text x="0" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="15" font-weight="800" fill="#112033" letter-spacing="0.04em">Qwen</text>
-          </svg>
-        </div>
-        <div class="hero-cloud bottom-10 left-[12%] hidden h-16 w-36 opacity-75 md:flex">
-          <!-- Mistral logo (Le Chat style bars) -->
-          <svg class="cloud-logo" style="height:24px;width:auto;" viewBox="0 0 110 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="0" y="2" width="4" height="20" rx="1" fill="#112033"/>
-            <rect x="6" y="6" width="4" height="12" rx="1" fill="#112033" opacity="0.7"/>
-            <rect x="12" y="0" width="4" height="24" rx="1" fill="#112033"/>
-            <rect x="18" y="8" width="4" height="8" rx="1" fill="#112033" opacity="0.5"/>
-            <text x="28" y="17" font-family="Instrument Sans,system-ui,sans-serif" font-size="13" font-weight="700" fill="#112033" letter-spacing="0.02em">Mistral</text>
-          </svg>
-        </div>
         <div class="absolute left-[10%] top-[20%] h-64 w-64 rounded-full bg-white/20 blur-3xl"></div>
         <div class="absolute bottom-[16%] right-[18%] h-72 w-72 rounded-full bg-mint/25 blur-3xl"></div>
-        <div class="relative mx-auto grid min-h-[calc(100vh-121px)] max-w-7xl items-center gap-12 px-6 py-12 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-16">
+        <div class="relative mx-auto grid min-h-[calc(100vh-80px)] max-w-7xl items-center gap-8 px-4 py-8 sm:gap-12 sm:px-6 sm:py-12 lg:grid-cols-[1.08fr_0.92fr] lg:px-10 lg:py-16">
           <div class="flex flex-col justify-center">
             <div class="max-w-3xl">
-              <h1 class="max-w-4xl text-5xl font-extrabold leading-[0.95] tracking-[-0.06em] text-ink sm:text-7xl lg:text-[6.3rem]">
+              <h1 class="max-w-4xl text-3xl font-extrabold leading-[0.95] tracking-[-0.06em] text-ink sm:text-5xl md:text-7xl lg:text-[6.3rem]">
                 Accedé a IA con Mercado Pago.
               </h1>
               <p class="mt-6 max-w-2xl text-lg leading-8 text-slate">
@@ -424,6 +424,33 @@
     if (params.get("status") === "failure") {
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
     }
+  </script>
+
+  <script>
+    // Parallax clouds — each moves at its own speed + subtle horizontal drift
+    (function () {
+      const clouds = document.querySelectorAll('.hero-cloud[data-speed]');
+      let ticking = false;
+
+      function updateClouds() {
+        const scrollY = window.scrollY;
+        clouds.forEach(cloud => {
+          const speed = parseFloat(cloud.dataset.speed) || 0.1;
+          const drift = parseFloat(cloud.dataset.drift) || 0;
+          const y = -(scrollY * speed);
+          const x = scrollY * drift;
+          cloud.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        });
+        ticking = false;
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          requestAnimationFrame(updateClouds);
+          ticking = true;
+        }
+      }, { passive: true });
+    })();
   </script>
 </body>
 </html>
