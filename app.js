@@ -101,6 +101,13 @@ function bindAuthLinks() {
     }
   }
 
+  const userLabels = document.querySelectorAll('[data-user-label]');
+  for (const label of userLabels) {
+    if (user?.email) {
+      label.textContent = user.email;
+    }
+  }
+
   const adminOnlyLinks = document.querySelectorAll('[data-admin-only]');
   for (const link of adminOnlyLinks) {
     link.style.display = role === 'admin' ? '' : 'none';
