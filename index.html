@@ -201,15 +201,10 @@
 
   <div class="relative overflow-hidden" style="position:relative;z-index:1;">
     <header class="relative z-10">
-      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10">
+      <div class="mx-auto flex max-w-7xl items-center px-6 py-5 lg:px-10">
         <div>
           <p class="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate/80">Acceso a Modelos</p>
           <p class="mt-1 text-2xl font-extrabold tracking-tight">Mercado Pago</p>
-        </div>
-        <div class="hidden items-center gap-5 text-sm text-slate md:flex">
-          <a class="transition hover:text-ink" href="/demo.html">Demo</a>
-          <a class="transition hover:text-ink" href="/auth.html" id="authNavLink">Ingresar</a>
-          <a class="rounded-full border border-white/80 bg-white/50 px-5 py-2 font-semibold text-ink shadow-cloud backdrop-blur transition hover:bg-white" href="#checkout">Comprar</a>
         </div>
       </div>
     </header>
@@ -226,45 +221,33 @@
                 Accedé a IA con Mercado Pago.
               </h1>
               <p class="mt-6 max-w-2xl text-lg leading-8 text-slate">
-                Un solo pago, una sola confirmación y una pantalla final para recibir tu clave de acceso después de la aprobación.
+                Probá gratis o comprá acceso completo. Un pago, una clave, listo.
               </p>
-
-              <div class="mt-8 flex flex-wrap gap-4">
-                <a
-                  class="inline-flex items-center justify-center rounded-full bg-ocean px-7 py-4 text-base font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0]"
-                  href="/demo.html"
-                >
-                  Probar gratis ahora
-                </a>
-                <a
-                  class="inline-flex items-center justify-center rounded-full border border-white/80 bg-white/60 px-7 py-4 text-base font-semibold text-ink shadow-cloud transition hover:bg-white"
-                  href="#checkout"
-                >
-                  Ver compra
-                </a>
-              </div>
-
-              <div class="mt-8 flex flex-wrap items-center gap-3 text-sm text-slate">
-                <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Pago con Mercado Pago</span>
-                <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Acceso a IA</span>
-                <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Entrega digital</span>
-                <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Cuenta opcional</span>
-              </div>
             </div>
 
-            <div class="mt-12 grid max-w-3xl gap-4 sm:grid-cols-3">
-              <div class="rounded-[2rem] border border-white/70 bg-white/50 p-5 shadow-cloud backdrop-blur">
-                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate/80">Precio</p>
-                <p class="mt-2 text-3xl font-bold">ARS 500</p>
+            <!-- Inline demo -->
+            <div class="mt-10 w-full max-w-xl rounded-[2rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl sm:p-8">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Probá gratis</p>
+              <h3 class="mt-2 text-2xl font-extrabold leading-tight">Escribí un prompt y mirá la respuesta</h3>
+              <div class="mt-4">
+                <label class="block text-xs font-semibold uppercase tracking-widest text-slate/70 mb-2">Modelo</label>
+                <select id="demoModel" class="w-full rounded-xl border border-slate/15 bg-white/80 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-ocean/30">
+                  <option value="deepseek-ai/DeepSeek-V3-0324">DeepSeek V3</option>
+                  <option value="Qwen/Qwen2.5-72B-Instruct">Qwen 2.5 72B</option>
+                  <option value="mistralai/Mistral-Small-24B-Instruct-2501">Mistral Small 24B</option>
+                </select>
               </div>
-              <div class="rounded-[2rem] border border-white/70 bg-white/50 p-5 shadow-cloud backdrop-blur">
-                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate/80">Entrega</p>
-                <p class="mt-2 text-3xl font-bold">Clave</p>
+              <div class="mt-4">
+                <textarea id="demoPrompt" rows="3" placeholder="Ej: Explicame qué es una red neuronal en una oración" class="w-full rounded-xl border border-slate/15 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-slate/40 outline-none focus:ring-2 focus:ring-ocean/30 resize-none"></textarea>
               </div>
-              <div class="rounded-[2rem] border border-white/70 bg-white/50 p-5 shadow-cloud backdrop-blur">
-                <p class="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate/80">Proceso</p>
-                <p class="mt-2 text-3xl font-bold">3 pasos</p>
-              </div>
+              <button
+                id="demoBtn"
+                onclick="runDemo()"
+                class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Probar
+              </button>
+              <div id="demoResult" class="mt-4 hidden rounded-xl border border-slate/10 bg-white/80 px-4 py-3 text-sm leading-6 text-ink whitespace-pre-wrap"></div>
             </div>
           </div>
 
@@ -328,95 +311,12 @@
         </div>
       </section>
 
-      <section class="border-y border-white/60 bg-white/30" id="briefing">
-        <div class="mx-auto grid max-w-7xl gap-12 px-6 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:px-10">
-          <div>
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/75">Empezá por acá</p>
-            <h2 class="mt-3 max-w-lg text-5xl font-extrabold leading-none tracking-[-0.05em]">Primero probá gratis. Después decidís si querés comprar.</h2>
-          </div>
-          <div class="grid gap-8 sm:grid-cols-3">
-            <article class="rounded-[1.75rem] border border-white/70 bg-white/50 p-6 shadow-cloud">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-slate/80">01</p>
-              <h3 class="mt-3 text-2xl font-bold">Demo gratis</h3>
-              <p class="mt-3 text-sm leading-6 text-slate">Entrá al demo, elegí un modelo y mirá una respuesta real sin pagar primero.</p>
-            </article>
-            <article class="rounded-[1.75rem] border border-white/70 bg-white/50 p-6 shadow-cloud">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-slate/80">02</p>
-              <h3 class="mt-3 text-2xl font-bold">Comprá si te sirve</h3>
-              <p class="mt-3 text-sm leading-6 text-slate">Si el resultado te convence, hacés el pago y habilitás acceso completo desde el sitio.</p>
-            </article>
-            <article class="rounded-[1.75rem] border border-white/70 bg-white/50 p-6 shadow-cloud">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-slate/80">03</p>
-              <h3 class="mt-3 text-2xl font-bold">Cuenta opcional</h3>
-              <p class="mt-3 text-sm leading-6 text-slate">Si querés, podés crear una cuenta para vincular consumo, demo y compras a tu usuario.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="mx-auto max-w-7xl px-6 py-14 lg:px-10" id="terms">
-        <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
-          <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Cómo funciona</p>
-            <ol class="mt-5 space-y-5">
-              <li class="border-t border-slate/10 pt-5">
-                <p class="text-2xl font-bold">01. Se genera el pago</p>
-                <p class="mt-2 text-sm leading-6 text-slate">La página solicita la preferencia de Mercado Pago y guarda una referencia local para continuar el flujo.</p>
-              </li>
-              <li class="border-t border-slate/10 pt-5">
-                <p class="text-2xl font-bold">02. Confirmás la compra</p>
-                <p class="mt-2 text-sm leading-6 text-slate">Mercado Pago procesa el cobro y te redirige de vuelta al sitio al terminar.</p>
-              </li>
-              <li class="border-t border-slate/10 pt-5">
-                <p class="text-2xl font-bold">03. Recibís la clave</p>
-                <p class="mt-2 text-sm leading-6 text-slate">La pantalla final verifica la aprobación y muestra tu clave de acceso cuando está disponible.</p>
-              </li>
-            </ol>
-          </div>
-
-          <div class="grid gap-6 sm:grid-cols-2">
-            <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud">
-              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Pago</p>
-              <p class="mt-4 text-3xl font-extrabold leading-tight">Mercado Pago procesa tarjeta y billetera.</p>
-            </div>
-            <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud">
-              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Cuenta</p>
-              <p class="mt-4 text-sm leading-6 text-ink">Crear una cuenta es opcional, pero habilita panel personal, trazabilidad y métricas por usuario.</p>
-            </div>
-            <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud sm:col-span-2">
-              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Importante</p>
-              <p class="mt-4 max-w-2xl text-sm leading-6 text-ink">
-                Guardá la clave entregada después de la aprobación. La pantalla final es donde se muestra una vez confirmada la compra.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="mx-auto max-w-7xl px-6 pb-16 lg:px-10">
-        <div class="grid gap-6 md:grid-cols-3">
-          <a class="rounded-[2rem] border border-ocean/20 bg-ocean text-white p-8 shadow-editorial transition hover:-translate-y-1" href="/demo.html">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-white/75">Demo gratis</p>
-            <p class="mt-4 text-3xl font-extrabold leading-tight">Probar IA ahora</p>
-            <p class="mt-3 text-sm leading-6 text-white/85">La opción principal si todavía estás evaluando. Elegí modelo y probalo directo desde la web.</p>
-          </a>
-          <a class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur transition hover:-translate-y-1" href="/auth.html">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Cuenta</p>
-            <p class="mt-4 text-3xl font-extrabold leading-tight text-ink">Ingresar o crear usuario</p>
-            <p class="mt-3 text-sm leading-6 text-slate">Opcional para seguir uso, compras y actividad por persona.</p>
-          </a>
-          <a class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur transition hover:-translate-y-1" href="/admin.html">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Back office</p>
-            <p class="mt-4 text-3xl font-extrabold leading-tight text-ink">Uso total y por usuario</p>
-            <p class="mt-3 text-sm leading-6 text-slate">Panel administrativo con requests, gasto estimado y cercanía al tope cargado.</p>
-          </a>
-        </div>
-      </section>
     </main>
   </div>
 
   <script src="app.js"></script>
   <script>
+    AppBridge.checkAutoRedirect();
     function setStatus(kind, message) {
       const status = document.getElementById("status");
       const kindClasses = {
@@ -476,12 +376,34 @@
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
     }
 
-    const authUser = JSON.parse(localStorage.getItem("auth_user") || "null");
-    if (authUser) {
-      const authNavLink = document.getElementById("authNavLink");
-      if (authNavLink) {
-        authNavLink.textContent = authUser.email;
-        authNavLink.href = "/dashboard.html";
+    async function runDemo() {
+      const btn = document.getElementById("demoBtn");
+      const result = document.getElementById("demoResult");
+      const prompt = document.getElementById("demoPrompt").value.trim();
+      const model = document.getElementById("demoModel").value;
+
+      if (!prompt) return;
+
+      btn.disabled = true;
+      btn.textContent = "Pensando...";
+      result.classList.remove("hidden");
+      result.textContent = "...";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/demo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, model })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error en la demo");
+        result.textContent = data.text;
+      } catch (err) {
+        result.textContent = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Probar";
       }
     }
   </script>
