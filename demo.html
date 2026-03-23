@@ -70,6 +70,28 @@
       return id;
     }
 
+    function resetDemoAnonymousId() {
+      sessionStorage.removeItem('demo_anon_id');
+      localStorage.removeItem('demo_anon_id');
+      return getDemoAnonymousId();
+    }
+
+    async function runDemoRequest(payload, anonymousId) {
+      return AppBridge.apiFetch('/api/demo', {
+        method: 'POST',
+        headers: {
+          ...(localStorage.getItem('app_access_token')
+            ? { 'X-Access-Token': localStorage.getItem('app_access_token') }
+            : {}),
+          'X-Demo-Session': anonymousId,
+        },
+        body: JSON.stringify({
+          ...payload,
+          anonymous_id: anonymousId,
+        }),
+      });
+    }
+
     async function loadModels() {
       try {
         const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
@@ -90,20 +112,25 @@
       AppBridge.setStatus(statusNode, 'pending', 'Ejecutando demo...');
 
       try {
-        const data = await AppBridge.apiFetch('/api/demo', {
-          method: 'POST',
-          headers: {
-            ...(localStorage.getItem('app_access_token')
-              ? { 'X-Access-Token': localStorage.getItem('app_access_token') }
-              : {}),
-            'X-Demo-Session': anonymousId,
-          },
-          body: JSON.stringify({
+        let data;
+        try {
+          data = await runDemoRequest({
             model: form.get('model'),
             prompt: form.get('prompt'),
-            anonymous_id: anonymousId,
-          }),
-        });
+          }, anonymousId);
+        } catch (error) {
+          const shouldRetry =
+            String(error.message || '').includes('No hay saldo suficiente para esta demo') &&
+            !localStorage.getItem('auth_token') &&
+            !localStorage.getItem('app_access_token');
+
+          if (!shouldRetry) throw error;
+
+          data = await runDemoRequest({
+            model: form.get('model'),
+            prompt: form.get('prompt'),
+          }, resetDemoAnonymousId());
+        }
 
         document.getElementById('resultBox').textContent = data.text || 'Sin respuesta del modelo.';
         document.getElementById('usageCost').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);

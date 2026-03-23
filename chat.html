@@ -654,6 +654,12 @@
       return id;
     }
 
+    function resetDemoSessionId() {
+      sessionStorage.removeItem('demo_session_id');
+      localStorage.removeItem('demo_session_id');
+      return getDemoSessionId();
+    }
+
     // --- History sidebar ---
     function renderHistory() {
       const sorted = [...chats].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
@@ -761,15 +767,32 @@
 
       try {
         const token = localStorage.getItem('auth_token');
-        const res = await fetch(`${API_BASE}/api/demo-stream`, {
+        let demoSessionId = getDemoSessionId();
+        let res = await fetch(`${API_BASE}/api/demo-stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Demo-Session': getDemoSessionId(),
+            'X-Demo-Session': demoSessionId,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: getDemoSessionId() }),
+          body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: demoSessionId }),
         });
+
+        if (
+          res.status === 402 &&
+          !token &&
+          !localStorage.getItem('app_access_token')
+        ) {
+          demoSessionId = resetDemoSessionId();
+          res = await fetch(`${API_BASE}/api/demo-stream`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Demo-Session': demoSessionId,
+            },
+            body: JSON.stringify({ prompt: content, model: modelSelect.value, anonymous_id: demoSessionId }),
+          });
+        }
 
         if (!res.ok) {
           const err = await res.json();
