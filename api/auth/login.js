@@ -1,5 +1,6 @@
 const {
   createToken,
+  isDefaultAdminLogin,
   isAdmin,
   publicUser,
   readUserByEmail,
@@ -15,6 +16,25 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = await readJsonBody(req);
+
+    if (isDefaultAdminLogin(body.email, body.password)) {
+      const token = createToken({
+        sub: 'admin-root',
+        email: 'admin',
+        role: 'admin',
+      });
+
+      return res.status(200).json({
+        token,
+        user: {
+          id: 'admin-root',
+          email: 'admin',
+          created_at: Date.now(),
+          last_login_at: Date.now(),
+        },
+      });
+    }
+
     const user = await readUserByEmail(body.email);
 
     if (!user || !verifyPassword(body.password, user)) {

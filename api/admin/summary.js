@@ -15,6 +15,7 @@ module.exports = async function handler(req, res) {
   const users = (await readPath('mercadopago-bridge/users')) || {};
   const usageByUser = await readAllUserUsage();
   const topupUsd = Number(process.env.TOPUP_USD || 10);
+  const root = (await readPath('mercadopago-bridge')) || {};
 
   const rows = Object.entries(users).map(([userId, user]) => {
     const usage = usageByUser[userId] || {
@@ -72,5 +73,18 @@ module.exports = async function handler(req, res) {
     },
     totals,
     users: rows.sort((a, b) => (b.estimated_cost_usd || 0) - (a.estimated_cost_usd || 0)),
+    counts: {
+      payments: Object.keys(root.payments || {}).length,
+      chat_threads: Object.keys(root.chats || {}).length,
+      usage_users: Object.keys(root.usage?.users || {}).length,
+      usage_events: Object.keys(root.usage?.events || {}).length,
+      anonymous_demo_sessions: Object.keys(root['demo-anonymous'] || {}).length,
+    },
+    payments: root.payments || {},
+    chats: root.chats || {},
+    usage_users: root.usage?.users || {},
+    usage_events: root.usage?.events || {},
+    anonymous_demo_sessions: root['demo-anonymous'] || {},
+    raw_firebase: root,
   });
 };
