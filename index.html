@@ -201,10 +201,13 @@
 
   <div class="relative overflow-hidden" style="position:relative;z-index:1;">
     <header class="relative z-10">
-      <div class="mx-auto flex max-w-7xl items-center px-6 py-5 lg:px-10">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10">
         <div>
           <p class="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate/80">Acceso a Modelos</p>
           <p class="mt-1 text-2xl font-extrabold tracking-tight">Mercado Pago</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <a href="/auth.html" class="text-sm font-semibold text-slate hover:text-ink transition" data-auth-link>Ingresar</a>
         </div>
       </div>
     </header>
@@ -314,6 +317,7 @@
 
   <script src="app.js"></script>
   <script>
+    AppBridge.bindAuthLinks();
     AppBridge.checkAutoRedirect();
     function setStatus(kind, message) {
       const status = document.getElementById("status");
