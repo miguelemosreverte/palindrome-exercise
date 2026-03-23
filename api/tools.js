@@ -42,18 +42,35 @@ async function webSearch(query) {
     }
   } catch {}
 
-  // Fallback: DuckDuckGo instant answer API
+  // Fallback: Wikipedia search API (always works from any IP)
   if (!results.length) {
     try {
-      const apiRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-      if (apiRes.ok) {
-        const text = await apiRes.text();
-        const data = JSON.parse(text);
-        if (data.Abstract) {
-          results.push({ title: data.Heading || 'Resultado', url: data.AbstractURL || '', snippet: data.Abstract });
+      const lang = /[áéíóúñ¿¡]/.test(query) ? 'es' : 'en';
+      const wikiUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1&srlimit=5`;
+      const wikiRes = await fetch(wikiUrl);
+      if (wikiRes.ok) {
+        const wikiData = await wikiRes.json();
+        for (const r of (wikiData.query?.search || [])) {
+          results.push({
+            title: r.title,
+            url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(r.title)}`,
+            snippet: r.snippet.replace(/<[^>]*>/g, ''),
+          });
         }
-        for (const topic of (data.RelatedTopics || []).slice(0, 4)) {
-          if (topic.Text) results.push({ title: topic.Text.slice(0, 80), url: topic.FirstURL || '', snippet: topic.Text });
+      }
+    } catch {}
+  }
+
+  // Brave Search API (if key is configured)
+  if (!results.length && process.env.BRAVE_SEARCH_KEY) {
+    try {
+      const braveRes = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`, {
+        headers: { 'X-Subscription-Token': process.env.BRAVE_SEARCH_KEY, Accept: 'application/json' },
+      });
+      if (braveRes.ok) {
+        const braveData = await braveRes.json();
+        for (const r of (braveData.web?.results || []).slice(0, 5)) {
+          results.push({ title: r.title || '', url: r.url || '', snippet: r.description || '' });
         }
       }
     } catch {}
