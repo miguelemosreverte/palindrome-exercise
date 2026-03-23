@@ -648,10 +648,66 @@
     }
 
     function formatAssistantHtml(text) {
-      let html = escapeHtml(text);
-      // Convert <think>...</think> blocks into collapsible details
-      html = html.replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/g,
-        '<details style="margin:8px 0;border:1px solid var(--line);border-radius:12px;padding:0;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Razonamiento</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">$1</div></details>');
+      // Handle <think> blocks first (before escaping)
+      let thinkBlocks = [];
+      let cleaned = text.replace(/<think>([\s\S]*?)<\/think>/g, (_, inner) => {
+        thinkBlocks.push(inner.trim());
+        return `%%THINK_${thinkBlocks.length - 1}%%`;
+      });
+
+      // Handle unclosed <think> (still streaming)
+      let pendingThink = '';
+      const openIdx = cleaned.lastIndexOf('<think>');
+      if (openIdx !== -1 && cleaned.indexOf('</think>', openIdx) === -1) {
+        pendingThink = cleaned.slice(openIdx + 7);
+        cleaned = cleaned.slice(0, openIdx) + `%%THINK_PENDING%%`;
+      }
+
+      // Escape HTML
+      let html = escapeHtml(cleaned);
+
+      // Code blocks (```lang\n...\n```)
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g,
+        '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
+      // Unclosed code block (streaming)
+      html = html.replace(/```(\w*)\n([\s\S]*)$/,
+        '<pre style="margin:8px 0;padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>$2</code></pre>');
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g,
+        '<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
+
+      // Bold
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic
+      html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+
+      // Headers
+      html = html.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:12px 0 4px;">$1</div>');
+      html = html.replace(/^## (.+)$/gm, '<div style="font-size:17px;font-weight:800;margin:14px 0 6px;">$1</div>');
+      html = html.replace(/^# (.+)$/gm, '<div style="font-size:20px;font-weight:800;margin:16px 0 8px;">$1</div>');
+
+      // Bullet lists
+      html = html.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:16px;">• $1</div>');
+      // Numbered lists
+      html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:16px;">$1. $2</div>');
+
+      // Restore think blocks
+      thinkBlocks.forEach((block, i) => {
+        html = html.replace(`%%THINK_${i}%%`,
+          `<details style="margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Razonamiento</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">${escapeHtml(block)}</div></details>`);
+      });
+
+      // Pending think (still streaming)
+      if (pendingThink || html.includes('%%THINK_PENDING%%')) {
+        const thinkContent = pendingThink ? escapeHtml(pendingThink) : '';
+        html = html.replace('%%THINK_PENDING%%',
+          `<details open style="margin:8px 0;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,0.4);"><summary style="cursor:pointer;padding:8px 14px;font-size:12px;font-weight:700;color:var(--slate);user-select:none;">Pensando...</summary><div style="padding:8px 14px 12px;font-size:13px;line-height:1.6;color:var(--slate);white-space:pre-wrap;">${thinkContent}</div></details>`);
+      }
+
+      // Convert remaining newlines to <br> (but not inside pre blocks)
+      html = html.replace(/\n/g, '<br>');
+
       return html;
     }
 
@@ -866,7 +922,7 @@
             if (payload === '[DONE]') continue;
             try {
               const parsed = JSON.parse(payload);
-              if (parsed.text) { fullText += parsed.text; assistantDiv.textContent = fullText; scrollToBottom(); }
+              if (parsed.text) { fullText += parsed.text; assistantDiv.innerHTML = formatAssistantHtml(fullText); scrollToBottom(); }
             } catch {}
           }
         }
