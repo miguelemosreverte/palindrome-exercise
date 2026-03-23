@@ -45,9 +45,13 @@ module.exports = async function handler(req, res) {
     });
 
     if (!mpResponse.ok) {
-      const errorData = await mpResponse.json();
-      console.error('MercadoPago error:', errorData);
-      return res.status(500).json({ error: 'Failed to create payment preference' });
+      const errorText = await mpResponse.text();
+      console.error('MercadoPago error:', mpResponse.status, errorText);
+      return res.status(500).json({
+        error: 'Failed to create payment preference',
+        mp_status: mpResponse.status,
+        mp_error: errorText,
+      });
     }
 
     const preference = await mpResponse.json();
