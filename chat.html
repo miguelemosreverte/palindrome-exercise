@@ -531,19 +531,13 @@
         document.getElementById('usageRemaining').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
         hasPaidAccess = Number(data.access.remaining_usd || 0) > 0 || Number(data.access.credit_limit_usd || 0) > 0 || Boolean(data.access.tokens?.length);
         if (hasPaidAccess) {
-          document.getElementById('billingCopy').textContent = 'Tu cuenta ya tiene acceso habilitado. Si querés, podés sumar más saldo desde la portada.';
-          document.querySelector('.composer').classList.remove('locked');
           promptInput.disabled = false;
           sendBtn.disabled = false;
           promptInput.placeholder = 'Escribí un mensaje...';
-          quotaInfo.textContent = `Saldo restante: ${AppBridge.formatUsd(data.access.remaining_usd || 0)}`;
+          quotaInfo.textContent = `Saldo: ${AppBridge.formatUsd(data.access.remaining_usd || 0)}`;
         } else {
-          document.getElementById('billingCopy').textContent = 'Tu cuenta todavía no tiene saldo configurado. Activá billing para usar el chat completo, o seguí con la demo gratis.';
-          document.querySelector('.composer').classList.add('locked');
-          promptInput.disabled = true;
-          sendBtn.disabled = true;
-          promptInput.placeholder = 'Activá saldo para desbloquear el chat';
-          quotaInfo.textContent = 'Configurá saldo para usar el chat';
+          promptInput.placeholder = 'Canjeá un código o comprá saldo para chatear';
+          quotaInfo.textContent = 'Sin saldo — canjeá un código';
         }
         const firstToken = data.access.tokens?.[0];
         if (firstToken) {
