@@ -376,6 +376,15 @@
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
     }
 
+    function getDemoSessionId() {
+      let id = localStorage.getItem("demo_session_id");
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("demo_session_id", id);
+      }
+      return id;
+    }
+
     async function runDemo() {
       const btn = document.getElementById("demoBtn");
       const result = document.getElementById("demoResult");
@@ -392,8 +401,11 @@
       try {
         const res = await fetch(`${API_BASE}/api/demo`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, model })
+          headers: {
+            "Content-Type": "application/json",
+            "X-Demo-Session": getDemoSessionId()
+          },
+          body: JSON.stringify({ prompt, model, anonymous_id: getDemoSessionId() })
         });
 
         const data = await res.json();
