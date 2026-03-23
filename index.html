@@ -94,7 +94,7 @@
     }
 
     .hero-cloud {
-      position: fixed;
+      position: absolute;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -103,9 +103,6 @@
       border-radius: 999px;
       box-shadow: 0 20px 50px rgba(75, 133, 178, 0.14);
       backdrop-filter: blur(6px);
-      z-index: 0;
-      will-change: transform;
-      transition: transform 0.1s linear;
     }
 
     .hero-cloud::before,
@@ -468,31 +465,5 @@
     }
   </script>
 
-  <script>
-    // Parallax clouds — each moves at its own speed + subtle horizontal drift
-    (function () {
-      const clouds = document.querySelectorAll('.hero-cloud[data-speed]');
-      let ticking = false;
-
-      function updateClouds() {
-        const scrollY = window.scrollY;
-        clouds.forEach(cloud => {
-          const speed = parseFloat(cloud.dataset.speed) || 0.1;
-          const drift = parseFloat(cloud.dataset.drift) || 0;
-          const y = -(scrollY * speed);
-          const x = scrollY * drift;
-          cloud.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-        });
-        ticking = false;
-      }
-
-      window.addEventListener('scroll', () => {
-        if (!ticking) {
-          requestAnimationFrame(updateClouds);
-          ticking = true;
-        }
-      }, { passive: true });
-    })();
-  </script>
 </body>
 </html>
