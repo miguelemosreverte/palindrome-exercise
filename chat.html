@@ -1080,16 +1080,20 @@
         saveChats();
         renderHistory();
 
-        // If tools produced errors, auto-send feedback to LLM for correction
-        if (toolErrors.length && !sending) {
-          const feedback = toolErrors.map(e => `Error en ${e.tool}: ${e.error}`).join('\n');
-          chat.messages.push({ role: 'user', content: `[Sistema] Los siguientes tools fallaron, corregí tu respuesta:\n${feedback}` });
+        // If tools produced errors, send the error output back to the LLM to fix the code
+        if (toolErrors.length) {
+          const feedback = toolErrors.map(e => {
+            if (e.tool === 'python') return `El código Python produjo este error:\n\`\`\`\n${e.error}\n\`\`\`\nCorregí el código y volvé a escribir el bloque <python> con la versión corregida.`;
+            if (e.tool === 'chart') return `El bloque <chart> falló:\n${e.error}\nRecordá que <chart> debe contener SOLO JSON válido de Chart.js. Volvé a escribir el bloque <chart> corregido.`;
+            return `Error en ${e.tool}: ${e.error}`;
+          }).join('\n\n');
+
+          chat.messages.push({ role: 'user', content: feedback });
           chat.updated_at = Date.now();
           saveChats();
-          // Trigger automatic retry
-          promptInput.value = '';
+
           sending = false;
-          await autoRetryWithFeedback(chat, assistantDiv);
+          await autoRetryWithFeedback(chat);
         }
       } catch (err) {
         assistantDiv.textContent = 'Error: ' + err.message;
@@ -1100,8 +1104,10 @@
       }
     }
 
-    async function autoRetryWithFeedback(chat, prevDiv) {
-      // Add a visual indicator
+    async function autoRetryWithFeedback(chat, retryCount = 0) {
+      const MAX_RETRIES = 2;
+      if (retryCount >= MAX_RETRIES) return;
+
       const retryDiv = appendMessageToUI('assistant', '', true);
       scrollToBottom();
       let fullText = '';
@@ -1128,6 +1134,7 @@
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let lastFormat = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1140,7 +1147,13 @@
               const parsed = JSON.parse(payload);
               if (parsed.text) {
                 fullText += parsed.text;
-                retryDiv.textContent = fullText;
+                const now = Date.now();
+                if (now - lastFormat > 150) {
+                  try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch { retryDiv.textContent = fullText; }
+                  lastFormat = now;
+                } else {
+                  retryDiv.textContent = fullText;
+                }
                 scrollToBottom();
               }
             } catch {}
@@ -1153,7 +1166,20 @@
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
         saveChats();
-        // Don't retry again to avoid loops
+        renderHistory();
+
+        // If still errors, retry again with the new error
+        if (retryErrors.length) {
+          const feedback = retryErrors.map(e => {
+            if (e.tool === 'python') return `El código Python sigue fallando:\n\`\`\`\n${e.error}\n\`\`\`\nCorregí el error y volvé a escribir el bloque <python>.`;
+            if (e.tool === 'chart') return `El gráfico sigue fallando: ${e.error}\nEscribí un bloque <chart> con JSON válido.`;
+            return `Error en ${e.tool}: ${e.error}`;
+          }).join('\n\n');
+
+          chat.messages.push({ role: 'user', content: feedback });
+          saveChats();
+          await autoRetryWithFeedback(chat, retryCount + 1);
+        }
       } catch {}
     }
 
