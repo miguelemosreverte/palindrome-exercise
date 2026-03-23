@@ -146,6 +146,44 @@ const CASES = [
         : { pass: true, blocks: { python: pyBlock, chart: chartBlock } };
     },
   },
+  // === PIPELINE: search → python → chart ===
+  {
+    name: 'pipeline_invasiones_inglesas',
+    category: 'pipeline',
+    prompt: 'Buscá en Wikipedia la cronología de las Invasiones Inglesas a Buenos Aires. Después usá Python para generar el JSON de Chart.js que represente esa timeline. Finalmente usá la herramienta <chart> para renderizar el gráfico.',
+    validate(text) {
+      const searchBlock = extractBlock(text, 'web_search');
+      const pyBlock = extractBlock(text, 'python');
+      const chartBlock = extractBlock(text, 'chart');
+      const issues = [];
+
+      if (!searchBlock) issues.push('No <web_search> block');
+      if (!pyBlock) issues.push('No <python> block');
+      if (!chartBlock) issues.push('No <chart> block');
+
+      if (pyBlock && !pyBlock.includes('print')) issues.push('Python has no print() — needed to output data');
+      if (chartBlock) {
+        const r = validateChartJSON(chartBlock);
+        if (!r.pass) issues.push('Chart: ' + r.reason);
+      }
+
+      // Check ordering: search should come before python, python before chart
+      if (searchBlock && pyBlock) {
+        const searchPos = text.indexOf('<web_search>');
+        const pyPos = text.indexOf('<python>');
+        if (pyPos < searchPos) issues.push('Python appears before search — should search first');
+      }
+      if (pyBlock && chartBlock) {
+        const pyPos = text.indexOf('<python>');
+        const chartPos = text.indexOf('<chart>');
+        if (chartPos < pyPos) issues.push('Chart appears before python — should generate data first');
+      }
+
+      return issues.length
+        ? { pass: false, reason: issues.join('; ') }
+        : { pass: true, blocks: { web_search: searchBlock, python: pyBlock, chart: chartBlock } };
+    },
+  },
 ];
 
 // ─── Helpers ───
@@ -203,9 +241,22 @@ function validateChartJSON(str) {
   }
 }
 
+// ─── Simulated tool execution (for multi-turn tests) ───
+
+function simulateSearch(query) {
+  // Return fake but realistic search results for testing
+  return `[Resultados de búsqueda para "${query}"]\n- Wikipedia: Invasiones Inglesas al Río de la Plata. Primera invasión: junio 1806, William Carr Beresford tomó Buenos Aires. Reconquista: 12 agosto 1806 por Santiago de Liniers. Segunda invasión: junio 1807, John Whitelocke atacó con 8000 hombres. Defensa: 5-7 julio 1807, vecinos de Buenos Aires rechazaron al invasor. Rendición británica: 7 julio 1807.`;
+}
+
+function simulatePython(code) {
+  // We can't run Python here but we can check if it prints JSON
+  if (code.includes('json.dumps')) return '{"simulated":"python output would go here"}';
+  return '(Python output)';
+}
+
 // ─── API call ───
 
-async function callLLM(prompt) {
+async function callLLM(messages) {
   const res = await fetch(`${API_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -214,10 +265,7 @@ async function callLLM(prompt) {
     },
     body: JSON.stringify({
       model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: prompt },
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: 2048,
     }),
@@ -228,6 +276,51 @@ async function callLLM(prompt) {
   return data.choices?.[0]?.message?.content || '';
 }
 
+async function callLLMMultiTurn(prompt, maxTurns = 3) {
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: prompt },
+  ];
+
+  const allText = [];
+
+  for (let turn = 0; turn < maxTurns; turn++) {
+    const text = await callLLM(messages);
+    allText.push(text);
+    messages.push({ role: 'assistant', content: text });
+
+    // Check if there are tool calls that need execution
+    const searchBlock = extractBlock(text, 'web_search');
+    const pyBlock = extractBlock(text, 'python');
+
+    const toolResults = [];
+
+    if (searchBlock) {
+      const result = simulateSearch(searchBlock);
+      toolResults.push(result);
+    }
+
+    if (pyBlock) {
+      const result = simulatePython(pyBlock);
+      toolResults.push(`[Resultado de Python]\n${result}`);
+    }
+
+    // If no tools were called, or chart was the last thing, we're done
+    const chartBlock = extractBlock(text, 'chart');
+    if (!searchBlock && !pyBlock) break;
+    if (chartBlock && !searchBlock && !pyBlock) break;
+
+    // Inject tool results and continue
+    if (toolResults.length) {
+      messages.push({ role: 'user', content: toolResults.join('\n\n') + '\n\nContinuá con el siguiente paso.' });
+    } else {
+      break;
+    }
+  }
+
+  return allText.join('\n\n---TURN---\n\n');
+}
+
 // ─── Runner ───
 
 async function runCase(tc) {
@@ -235,7 +328,10 @@ async function runCase(tc) {
   process.stdout.write(`  ${tc.name} ... `);
 
   try {
-    const text = await callLLM(tc.prompt);
+    const isMultiTurn = tc.category === 'pipeline';
+    const text = isMultiTurn
+      ? await callLLMMultiTurn(tc.prompt)
+      : await callLLM([{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: tc.prompt }]);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     const result = tc.validate(text);
 

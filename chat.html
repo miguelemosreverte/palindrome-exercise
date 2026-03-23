@@ -892,22 +892,35 @@
       if (!el) return null;
       const resultsDiv = el.querySelector('.search-results');
       try {
-        const res = await fetch(`${API_BASE}/api/tools`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tool: 'web_search', query }),
-        });
-        const data = await res.json();
-        if (!data.results?.length) {
+        // Search Wikipedia directly from browser (no CORS issues, no server needed)
+        const lang = /[áéíóúñ¿¡]/.test(query) ? 'es' : 'en';
+        const results = [];
+
+        for (const l of [lang, ...(lang === 'es' ? ['en'] : [])]) {
+          if (results.length >= 5) break;
+          const wikiRes = await fetch(`https://${l}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1&srlimit=5&origin=*`);
+          if (wikiRes.ok) {
+            const wikiData = await wikiRes.json();
+            for (const r of (wikiData.query?.search || [])) {
+              results.push({
+                title: r.title + (l !== lang ? ' (EN)' : ''),
+                url: `https://${l}.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
+                snippet: (r.snippet || '').replace(/<[^>]*>/g, ''),
+              });
+            }
+          }
+        }
+
+        if (!results.length) {
           resultsDiv.textContent = 'Sin resultados.';
           logToolAttempt('web_search', query, '0 results', null);
           return null;
         }
-        resultsDiv.innerHTML = data.results.map(r =>
+        resultsDiv.innerHTML = results.map(r =>
           `<div style="margin-top:6px;"><a href="${r.url}" target="_blank" style="color:var(--ocean);font-weight:600;font-size:12px;">${escapeHtml(r.title || r.url)}</a><div style="font-size:12px;line-height:1.5;">${escapeHtml(r.snippet)}</div></div>`
         ).join('');
-        logToolAttempt('web_search', query, `${data.results.length} results`, null);
-        return data.results;
+        logToolAttempt('web_search', query, `${results.length} results`, null);
+        return results;
       } catch (err) {
         resultsDiv.textContent = 'Error: ' + err.message;
         return null;
