@@ -1,65 +1,59 @@
 const { readJsonBody } = require('../lib/http');
 
 async function webSearch(query) {
-  // Try DuckDuckGo instant answer API first (JSON, no scraping)
-  const ddgApi = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-  const apiRes = await fetch(ddgApi, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
-  });
-
   const results = [];
 
-  if (apiRes.ok) {
-    let data;
-    try { data = await apiRes.json(); } catch { data = {}; }
+  // Use DuckDuckGo Lite (always works, lightweight HTML)
+  try {
+    const ddgUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
+    const response = await fetch(ddgUrl, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `q=${encodeURIComponent(query)}`,
+    });
 
-    // Abstract (main answer)
-    if (data.Abstract) {
-      results.push({ title: data.Heading || 'Resultado', url: data.AbstractURL || '', snippet: data.Abstract });
-    }
+    if (response.ok) {
+      const html = await response.text();
+      // DDG Lite has results in <a class="result-link"> and snippets in <td class="result-snippet">
+      const linkRegex = /<a[^>]+class="result-link"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
+      const snippetRegex = /<td[^>]+class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g;
 
-    // Related topics
-    if (data.RelatedTopics) {
-      for (const topic of data.RelatedTopics.slice(0, 5)) {
-        if (topic.Text) {
-          results.push({ title: topic.Text.slice(0, 80), url: topic.FirstURL || '', snippet: topic.Text });
-        }
+      const links = [];
+      let m;
+      while ((m = linkRegex.exec(html)) !== null) {
+        links.push({ url: m[1], title: m[2].replace(/<[^>]*>/g, '').trim() });
+      }
+
+      const snippets = [];
+      while ((m = snippetRegex.exec(html)) !== null) {
+        snippets.push(m[1].replace(/<[^>]*>/g, '').trim());
+      }
+
+      for (let i = 0; i < Math.min(links.length, 5); i++) {
+        results.push({
+          title: links[i]?.title || '',
+          url: links[i]?.url || '',
+          snippet: snippets[i] || '',
+        });
       }
     }
+  } catch {}
 
-    // Answer
-    if (data.Answer && !results.length) {
-      results.push({ title: 'Respuesta', url: '', snippet: data.Answer });
-    }
-  }
-
-  // Fallback: use SearXNG public instance
+  // Fallback: DuckDuckGo instant answer API
   if (!results.length) {
     try {
-      const searxUrl = `https://search.ononoki.org/search?q=${encodeURIComponent(query)}&format=json&engines=google,bing,duckduckgo`;
-      const searxRes = await fetch(searxUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
-      });
-      if (searxRes.ok) {
-        const searxData = await searxRes.json();
-        for (const r of (searxData.results || []).slice(0, 5)) {
-          results.push({ title: r.title || '', url: r.url || '', snippet: r.content || '' });
+      const apiRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+      if (apiRes.ok) {
+        const text = await apiRes.text();
+        const data = JSON.parse(text);
+        if (data.Abstract) {
+          results.push({ title: data.Heading || 'Resultado', url: data.AbstractURL || '', snippet: data.Abstract });
         }
-      }
-    } catch {}
-  }
-
-  // Second fallback: another SearXNG instance
-  if (!results.length) {
-    try {
-      const searxUrl2 = `https://searx.be/search?q=${encodeURIComponent(query)}&format=json`;
-      const searxRes2 = await fetch(searxUrl2, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChutesAI-Bridge/1.0)' },
-      });
-      if (searxRes2.ok) {
-        const searxData2 = await searxRes2.json();
-        for (const r of (searxData2.results || []).slice(0, 5)) {
-          results.push({ title: r.title || '', url: r.url || '', snippet: r.content || '' });
+        for (const topic of (data.RelatedTopics || []).slice(0, 4)) {
+          if (topic.Text) results.push({ title: topic.Text.slice(0, 80), url: topic.FirstURL || '', snippet: topic.Text });
         }
       }
     } catch {}
@@ -80,12 +74,8 @@ module.exports = async function handler(req, res) {
     if (tool === 'web_search') {
       const query = String(body.query || '').trim();
       if (!query) return res.status(400).json({ error: 'Query vacía' });
-      try {
-        const results = await webSearch(query);
-        return res.status(200).json({ tool: 'web_search', query, results });
-      } catch (searchErr) {
-        return res.status(200).json({ tool: 'web_search', query, results: [], error: searchErr.message });
-      }
+      const results = await webSearch(query);
+      return res.status(200).json({ tool: 'web_search', query, results });
     }
 
     return res.status(400).json({ error: `Tool desconocido: ${tool}` });
