@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Panel personal de uso y actividad estimada.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Cuenta</div>
+        <div class="brand-title">Mi panel</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/demo.html">Demo</a>
+        <a class="nav-link" href="/admin.html">Admin</a>
+        <button class="nav-pill" type="button" data-logout>Salir</button>
+      </div>
+    </nav>
+
+    <main class="section stack">
+      <section class="glass-panel">
+        <div class="panel-header">
+          <div>
+            <div class="section-kicker">Usuario</div>
+            <h1 class="panel-title" id="emailValue">Cargando...</h1>
+          </div>
+          <div class="panel-price">
+            <div class="section-kicker">Ultimo acceso</div>
+            <div class="amount" style="font-size:28px" id="lastLoginValue">-</div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="card stat-card">
+            <div class="stat-label">Requests</div>
+            <div class="stat-value" id="requestsValue">0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Caracteres enviados</div>
+            <div class="stat-value" id="promptCharsValue">0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Gasto estimado</div>
+            <div class="stat-value" id="costValue">USD 0</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card-grid">
+        <article class="card tile">
+          <div class="section-kicker">Actividad</div>
+          <h3 id="lastUsedValue">Sin actividad</h3>
+          <p>Fecha estimada del ultimo uso registrado en demo o requests vinculados a tu cuenta.</p>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Demo</div>
+          <h3>Probar modelos</h3>
+          <p>Usá la demo con tu cuenta iniciada para que el consumo quede asociado a tu usuario.</p>
+          <a class="button secondary" href="/demo.html">Ir a la demo</a>
+        </article>
+        <article class="card tile" id="adminCard" style="display:none">
+          <div class="section-kicker">Admin</div>
+          <h3>Back office</h3>
+          <p>Tu cuenta tiene acceso administrativo. Podés ver el resumen total del sistema.</p>
+          <a class="button secondary" href="/admin.html">Abrir admin</a>
+        </article>
+      </section>
+
+      <div id="status" class="status"></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.bindAuthLinks();
+    const statusNode = document.getElementById('status');
+
+    async function loadDashboard() {
+      try {
+        const data = await AppBridge.apiFetch('/api/auth/me');
+        document.getElementById('emailValue').textContent = data.user.email;
+        document.getElementById('lastLoginValue').textContent = AppBridge.formatDate(data.user.last_login_at);
+        document.getElementById('requestsValue').textContent = data.usage.requests || 0;
+        document.getElementById('promptCharsValue').textContent = data.usage.prompt_chars || 0;
+        document.getElementById('costValue').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
+        document.getElementById('lastUsedValue').textContent = AppBridge.formatDate(data.usage.last_used_at);
+
+        if (data.role === 'admin') {
+          document.getElementById('adminCard').style.display = 'block';
+        }
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', 'Necesitás iniciar sesión para ver este panel.');
+        setTimeout(() => {
+          window.location.href = '/auth.html';
+        }, 900);
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

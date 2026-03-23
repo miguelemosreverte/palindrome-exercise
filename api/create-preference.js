@@ -1,5 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
+const { authFromRequest } = require('../lib/auth');
 const { writePayment } = require('../lib/firebase');
+const { readJsonBody } = require('../lib/http');
 
 module.exports = async function handler(req, res) {
   // Handle CORS preflight
@@ -12,6 +14,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const body = await readJsonBody(req);
+    const auth = authFromRequest(req);
     const externalReference = uuidv4();
     const frontendUrl = process.env.FRONTEND_URL || 'https://miguelemosreverte.github.io/palindrome-exercise';
 
@@ -19,7 +23,7 @@ module.exports = async function handler(req, res) {
     const preferenceBody = {
       items: [
         {
-          title: 'ChutesAI API Access',
+          title: 'Acceso a IA',
           quantity: 1,
           unit_price: 500,
           currency_id: 'ARS',
@@ -60,6 +64,8 @@ module.exports = async function handler(req, res) {
     await writePayment(externalReference, {
       status: 'pending',
       created_at: Date.now(),
+      user_id: auth?.sub || null,
+      user_email: auth?.email || body.email || null,
     });
 
     return res.status(200).json({

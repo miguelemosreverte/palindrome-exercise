@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Back office</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Back office de usuarios, uso total y presupuesto estimado.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Administracion</div>
+        <div class="brand-title">Back office</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/dashboard.html">Mi panel</a>
+        <a class="nav-link" href="/demo.html">Demo</a>
+        <button class="nav-pill" type="button" data-logout>Salir</button>
+      </div>
+    </nav>
+
+    <main class="section stack">
+      <section class="stats">
+        <div class="card stat-card">
+          <div class="stat-label">Usuarios</div>
+          <div class="stat-value" id="usersValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Requests</div>
+          <div class="stat-value" id="requestsValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Gastado estimado</div>
+          <div class="stat-value" id="spentValue">USD 0</div>
+        </div>
+      </section>
+
+      <section class="split-grid">
+        <article class="card tile">
+          <div class="section-kicker">Presupuesto</div>
+          <h3 id="budgetValue">USD 10</h3>
+          <p id="budgetCopy">Cargando...</p>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Cerca del limite</div>
+          <h3 id="utilizationValue">0%</h3>
+          <p>Porcentaje estimado del top up consumido en función del uso registrado.</p>
+        </article>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Requests</th>
+              <th>Chars in</th>
+              <th>Chars out</th>
+              <th>USD estimado</th>
+              <th>Ultimo uso</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable"></tbody>
+        </table>
+      </section>
+
+      <div id="status" class="status"></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.bindAuthLinks();
+    const statusNode = document.getElementById('status');
+
+    async function loadAdmin() {
+      try {
+        const data = await AppBridge.apiFetch('/api/admin/summary');
+        document.getElementById('usersValue').textContent = data.totals.users;
+        document.getElementById('requestsValue').textContent = data.totals.requests;
+        document.getElementById('spentValue').textContent = AppBridge.formatUsd(data.budget.estimated_spent_usd);
+        document.getElementById('budgetValue').textContent = AppBridge.formatUsd(data.budget.topped_up_usd);
+        document.getElementById('budgetCopy').textContent =
+          `Restante estimado: ${AppBridge.formatUsd(data.budget.estimated_remaining_usd)}.`;
+        document.getElementById('utilizationValue').textContent = `${data.budget.utilization_pct}%`;
+
+        const rows = data.users.map((user) => `
+          <tr>
+            <td>${user.email || 'Sin email'}</td>
+            <td>${user.requests || 0}</td>
+            <td>${user.prompt_chars || 0}</td>
+            <td>${user.response_chars || 0}</td>
+            <td>${AppBridge.formatUsd(user.estimated_cost_usd || 0)}</td>
+            <td>${AppBridge.formatDate(user.last_used_at)}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('usersTable').innerHTML = rows || '<tr><td colspan="6">Todavia no hay usuarios con actividad.</td></tr>';
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', 'No tenés acceso al back office.');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 900);
+      }
+    }
+
+    loadAdmin();
+  </script>
+</body>
+</html>

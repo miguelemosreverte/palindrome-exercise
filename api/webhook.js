@@ -1,4 +1,4 @@
-const { writePayment } = require('../lib/firebase');
+const { patchPayment, readPayment, writePayment } = require('../lib/firebase');
 
 module.exports = async function handler(req, res) {
   // Handle CORS preflight
@@ -39,17 +39,21 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Missing external_reference' });
     }
 
+    const existingPayment = await readPayment(externalReference);
+
     if (payment.status === 'approved') {
-      await writePayment(externalReference, {
+      const payload = {
+        ...(existingPayment || {}),
         status: 'approved',
         api_key: process.env.CHUTESAI_API_KEY,
         paid_amount: payment.transaction_amount,
         currency: payment.currency_id,
         paid_at: Date.now(),
         payment_id: paymentId,
-      });
+      };
+      await writePayment(externalReference, payload);
     } else {
-      await writePayment(externalReference, {
+      await patchPayment(externalReference, {
         status: payment.status,
         updated_at: Date.now(),
         payment_id: paymentId,

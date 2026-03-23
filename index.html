@@ -196,7 +196,10 @@
           <p class="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate/80">Acceso a Modelos</p>
           <p class="mt-1 text-2xl font-extrabold tracking-tight">Mercado Pago</p>
         </div>
-        <div class="hidden items-center gap-8 text-sm text-slate md:flex">
+        <div class="hidden items-center gap-5 text-sm text-slate md:flex">
+          <a class="transition hover:text-ink" href="/demo.html">Demo</a>
+          <a class="transition hover:text-ink" href="/auth.html" id="authNavLink">Ingresar</a>
+          <a class="transition hover:text-ink" href="/dashboard.html">Mi panel</a>
           <a class="transition hover:text-ink" href="#briefing">Resumen</a>
           <a class="transition hover:text-ink" href="#terms">Cómo funciona</a>
           <a class="rounded-full border border-white/80 bg-white/50 px-5 py-2 font-semibold text-ink shadow-cloud backdrop-blur transition hover:bg-white" href="#checkout">Comprar</a>
@@ -223,6 +226,7 @@
                 <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Pago con Mercado Pago</span>
                 <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Acceso a IA</span>
                 <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Entrega digital</span>
+                <span class="rounded-full border border-white/70 bg-white/60 px-4 py-2 shadow-cloud">Cuenta opcional</span>
               </div>
             </div>
 
@@ -321,8 +325,8 @@
             </article>
             <article class="rounded-[1.75rem] border border-white/70 bg-white/50 p-6 shadow-cloud">
               <p class="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-slate/80">03</p>
-              <h3 class="mt-3 text-2xl font-bold">IA disponible</h3>
-              <p class="mt-3 text-sm leading-6 text-slate">La compra te habilita acceso a distintas IA disponibles dentro de la plataforma.</p>
+              <h3 class="mt-3 text-2xl font-bold">Cuenta opcional</h3>
+              <p class="mt-3 text-sm leading-6 text-slate">Si querés, podés crear una cuenta para vincular consumo, demo y compras a tu usuario.</p>
             </article>
           </div>
         </div>
@@ -354,8 +358,8 @@
               <p class="mt-4 text-3xl font-extrabold leading-tight">Mercado Pago procesa tarjeta y billetera.</p>
             </div>
             <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud">
-              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Acceso</p>
-              <p class="mt-4 text-sm leading-6 text-ink">Esta compra habilita acceso digital a IA por 500 ARS.</p>
+              <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Cuenta</p>
+              <p class="mt-4 text-sm leading-6 text-ink">Crear una cuenta es opcional, pero habilita panel personal, trazabilidad y métricas por usuario.</p>
             </div>
             <div class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud sm:col-span-2">
               <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Importante</p>
@@ -366,9 +370,30 @@
           </div>
         </div>
       </section>
+
+      <section class="mx-auto max-w-7xl px-6 pb-16 lg:px-10">
+        <div class="grid gap-6 md:grid-cols-3">
+          <a class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur transition hover:-translate-y-1" href="/auth.html">
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Cuenta</p>
+            <p class="mt-4 text-3xl font-extrabold leading-tight text-ink">Ingresar o crear usuario</p>
+            <p class="mt-3 text-sm leading-6 text-slate">Opcional para seguir uso, compras y actividad por persona.</p>
+          </a>
+          <a class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur transition hover:-translate-y-1" href="/demo.html">
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Demo</p>
+            <p class="mt-4 text-3xl font-extrabold leading-tight text-ink">Probar IA antes de comprar</p>
+            <p class="mt-3 text-sm leading-6 text-slate">Elegí un modelo, escribí un prompt y mirá una respuesta real.</p>
+          </a>
+          <a class="rounded-[2rem] border border-white/70 bg-white/55 p-8 shadow-cloud backdrop-blur transition hover:-translate-y-1" href="/admin.html">
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Back office</p>
+            <p class="mt-4 text-3xl font-extrabold leading-tight text-ink">Uso total y por usuario</p>
+            <p class="mt-3 text-sm leading-6 text-slate">Panel administrativo con requests, gasto estimado y cercanía al tope cargado.</p>
+          </a>
+        </div>
+      </section>
     </main>
   </div>
 
+  <script src="app.js"></script>
   <script>
     const bodyApiBase = document.body.dataset.apiBase || "";
     const isGitHubPages = window.location.hostname.endsWith("github.io");
@@ -402,9 +427,17 @@
       setButtonLoading(true);
 
       try {
+        const token = localStorage.getItem("auth_token");
+        const authUser = JSON.parse(localStorage.getItem("auth_user") || "null");
         const res = await fetch(`${API_BASE}/api/create-preference`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" }
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            email: authUser?.email || null
+          })
         });
 
         if (!res.ok) {
@@ -423,6 +456,15 @@
     const params = new URLSearchParams(window.location.search);
     if (params.get("status") === "failure") {
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
+    }
+
+    const authUser = JSON.parse(localStorage.getItem("auth_user") || "null");
+    if (authUser) {
+      const authNavLink = document.getElementById("authNavLink");
+      if (authNavLink) {
+        authNavLink.textContent = authUser.email;
+        authNavLink.href = "/dashboard.html";
+      }
     }
   </script>
 

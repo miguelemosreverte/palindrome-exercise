@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo de IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Demo simple para probar IA y registrar uso opcional por cuenta.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Demo</div>
+        <div class="brand-title">Probar IA</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/auth.html" data-auth-link>Ingresar</a>
+        <a class="nav-link" href="/dashboard.html">Mi panel</a>
+      </div>
+    </nav>
+
+    <main class="split-grid section">
+      <section class="glass-panel">
+        <div class="section-kicker">Elegí un modelo y escribí un prompt</div>
+        <form id="demoForm">
+          <label>Modelo
+            <select id="modelSelect" name="model"></select>
+          </label>
+          <label>Prompt
+            <textarea name="prompt" placeholder="Escribí una pregunta o pedí una demostración breve..."></textarea>
+          </label>
+          <button class="button" type="submit">Ejecutar demo</button>
+        </form>
+        <div class="helper">
+          Si iniciás sesión, el uso de esta demo queda asociado a tu cuenta para el panel y el back office.
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="stack">
+        <div class="card tile">
+          <div class="section-kicker">Respuesta</div>
+          <pre class="output" id="resultBox">Todavia no ejecutaste la demo.</pre>
+        </div>
+        <div class="card tile">
+          <div class="section-kicker">Uso estimado</div>
+          <div class="small-title" id="usageCost">USD 0</div>
+          <p class="copy" id="usageCopy">El costo estimado se mostrará después de cada ejecución.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.bindAuthLinks();
+    const statusNode = document.getElementById('status');
+    const modelSelect = document.getElementById('modelSelect');
+
+    async function loadModels() {
+      try {
+        const data = await AppBridge.apiFetch('/api/demo-config', { method: 'GET' });
+        modelSelect.innerHTML = data.models
+          .map((model) => `<option value="${model.id}">${model.label}</option>`)
+          .join('');
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', error.message);
+      }
+    }
+
+    document.getElementById('demoForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const button = event.currentTarget.querySelector('button');
+      button.disabled = true;
+      AppBridge.setStatus(statusNode, 'pending', 'Ejecutando demo...');
+
+      try {
+        const data = await AppBridge.apiFetch('/api/demo', {
+          method: 'POST',
+          body: JSON.stringify({
+            model: form.get('model'),
+            prompt: form.get('prompt'),
+          }),
+        });
+
+        document.getElementById('resultBox').textContent = data.text || 'Sin respuesta del modelo.';
+        document.getElementById('usageCost').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
+        document.getElementById('usageCopy').textContent =
+          `Requests acumulados para esta identidad: ${data.usage.requests || 0}.`;
+        AppBridge.setStatus(statusNode, 'success', 'Demo ejecutada.');
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    loadModels();
+  </script>
+</body>
+</html>

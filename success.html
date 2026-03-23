@@ -1,54 +1,85 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Confirmed — ChutesAI</title>
+  <title>Compra confirmada</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>ChutesAI Access</h1>
+  <div class="topbar">Pago confirmado y entrega digital en proceso.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Acceso a IA</div>
+        <div class="brand-title">Entrega de clave</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-pill" href="/demo.html">Demo</a>
+      </div>
+    </nav>
 
-    <div id="loading" class="status pending">
-      <div class="spinner"></div>
-      <p style="margin-top: 0.5rem">Confirming payment...</p>
-    </div>
+    <main class="page-grid">
+      <section class="hero-copy stack">
+        <div class="eyebrow">Compra aprobada</div>
+        <h1>Tu acceso está casi listo.</h1>
+        <p>
+          Estamos verificando el estado del pago y esperando la confirmación final. Apenas la entrega esté disponible,
+          vas a ver tu clave en esta pantalla.
+        </p>
+        <div class="stats">
+          <div class="card stat-card">
+            <div class="stat-label">Estado</div>
+            <div class="stat-value" id="stateValue">Verificando</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Entrega</div>
+            <div class="stat-value">Digital</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Canal</div>
+            <div class="stat-value">Mercado Pago</div>
+          </div>
+        </div>
+      </section>
 
-    <div id="success" style="display:none" class="status success">
-      <p>Payment confirmed! Here is your API key:</p>
-      <div class="api-key" id="apiKey"></div>
-      <p style="margin-top: 1rem; color: #888; font-size: 0.85rem;">
-        Copy this key and use it with ChutesAI. Keep it safe — it won't be shown again.
-      </p>
-    </div>
-
-    <div id="error" style="display:none" class="status error">
-      <p id="errorMsg">Something went wrong.</p>
-    </div>
+      <section class="glass-panel stack">
+        <div id="loading" class="status show pending">Confirmando pago...</div>
+        <div id="successBox" style="display:none" class="stack">
+          <div class="section-kicker">Clave lista</div>
+          <pre class="output" id="apiKey"></pre>
+          <div class="helper">Guardá esta clave. Esta es la pantalla donde se entrega una vez confirmada la compra.</div>
+        </div>
+        <div id="error" class="status error"></div>
+      </section>
+    </main>
   </div>
 
+  <script src="app.js"></script>
   <script>
     const FIREBASE_RTDB = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
     const NAMESPACE = 'mercadopago-bridge/payments';
-
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref') || localStorage.getItem('payment_ref');
 
     if (!ref) {
-      showError('No payment reference found. Please start a new payment.');
+      showError('No encontramos la referencia del pago. Iniciá una nueva compra.');
     } else {
       pollPayment(ref);
     }
 
-    async function pollPayment(ref) {
-      const maxAttempts = 30; // 60 seconds at 2s intervals
+    async function pollPayment(paymentRef) {
+      const maxAttempts = 30;
       let attempts = 0;
 
       const interval = setInterval(async () => {
-        attempts++;
+        attempts += 1;
         try {
-          const res = await fetch(`${FIREBASE_RTDB}/${NAMESPACE}/${ref}.json`);
+          const res = await fetch(`${FIREBASE_RTDB}/${NAMESPACE}/${paymentRef}.json`);
           const data = await res.json();
 
           if (data && data.status === 'approved' && data.api_key) {
@@ -56,26 +87,28 @@
             showSuccess(data.api_key);
           } else if (attempts >= maxAttempts) {
             clearInterval(interval);
-            showError('Payment confirmation is taking longer than expected. If you completed the payment, please contact support.');
+            showError('La confirmación está demorando más de lo esperado. Si ya pagaste, volvé a intentar en unos minutos.');
           }
         } catch (err) {
           clearInterval(interval);
-          showError('Error checking payment status: ' + err.message);
+          showError(`Error al consultar el estado del pago: ${err.message}`);
         }
       }, 2000);
     }
 
     function showSuccess(apiKey) {
       document.getElementById('loading').style.display = 'none';
-      document.getElementById('success').style.display = 'block';
+      document.getElementById('successBox').style.display = 'grid';
       document.getElementById('apiKey').textContent = apiKey;
+      document.getElementById('stateValue').textContent = 'Aprobado';
       localStorage.removeItem('payment_ref');
     }
 
     function showError(msg) {
       document.getElementById('loading').style.display = 'none';
-      document.getElementById('error').style.display = 'block';
-      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('error').className = 'status show error';
+      document.getElementById('error').textContent = msg;
+      document.getElementById('stateValue').textContent = 'Demorado';
     }
   </script>
 </body>

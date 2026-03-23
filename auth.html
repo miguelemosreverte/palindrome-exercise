@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingresar o crear cuenta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Cuenta opcional para seguir uso, historial y consumo estimado.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Acceso a IA</div>
+        <div class="brand-title">Cuenta opcional</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/demo.html">Demo</a>
+      </div>
+    </nav>
+
+    <main class="split-grid section">
+      <section class="stack">
+        <div class="eyebrow">Beneficio</div>
+        <h1 class="section-title">Ingresá si querés ver tu uso.</h1>
+        <p class="copy">
+          Crear una cuenta no es obligatorio para comprar, pero sirve para asociar pedidos, demo y consumo estimado por usuario.
+        </p>
+        <div class="card-grid">
+          <div class="card tile">
+            <div class="section-kicker">Seguimiento</div>
+            <h3>Uso por usuario</h3>
+            <p>Requests, caracteres y gasto estimado ligados a una identidad.</p>
+          </div>
+          <div class="card tile">
+            <div class="section-kicker">Back office</div>
+            <h3>Vista administrativa</h3>
+            <p>Resumen total del sistema, gasto estimado y usuarios activos.</p>
+          </div>
+          <div class="card tile">
+            <div class="section-kicker">Demo</div>
+            <h3>Pruebas rápidas</h3>
+            <p>Probá modelos y registrá el uso si querés analizar adopción.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <div class="glass-panel">
+          <div class="section-kicker">Crear cuenta</div>
+          <form id="registerForm">
+            <label>Email
+              <input type="email" name="email" required placeholder="tu@email.com">
+            </label>
+            <label>Contraseña
+              <input type="password" name="password" required minlength="8" placeholder="Minimo 8 caracteres">
+            </label>
+            <button class="button" type="submit">Crear cuenta</button>
+          </form>
+        </div>
+
+        <div class="glass-panel">
+          <div class="section-kicker">Ingresar</div>
+          <form id="loginForm">
+            <label>Email
+              <input type="email" name="email" required placeholder="tu@email.com">
+            </label>
+            <label>Contraseña
+              <input type="password" name="password" required placeholder="Tu contraseña">
+            </label>
+            <button class="button secondary" type="submit">Ingresar</button>
+          </form>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const statusNode = document.getElementById('status');
+
+    async function handleAuth(event, path) {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+
+      try {
+        const data = await AppBridge.apiFetch(path, {
+          method: 'POST',
+          body: JSON.stringify({
+            email: form.get('email'),
+            password: form.get('password'),
+          }),
+        });
+
+        AppBridge.setToken(data.token);
+        AppBridge.setUser(data.user);
+        AppBridge.setStatus(statusNode, 'success', 'Cuenta lista. Redirigiendo...');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 500);
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', error.message);
+      }
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/register'));
+    document.getElementById('loginForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/login'));
+  </script>
+</body>
+</html>
