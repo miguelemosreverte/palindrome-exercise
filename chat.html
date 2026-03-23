@@ -649,6 +649,8 @@
     }
 
     let chartCounter = 0;
+    const pendingChartConfigs = {};
+    const pendingPyCode = {};
 
     function formatAssistantHtml(text) {
       // Extract special blocks before escaping
@@ -700,16 +702,18 @@
         html = html.replace('%%THINK_PENDING%%', `<details open style="${detailStyle}"><summary style="${summaryStyle}">Pensando...</summary><div style="${innerStyle}">${escapeHtml(pendingThink)}</div></details>`);
       }
 
-      // Chart blocks
+      // Chart blocks — store config in JS map, not HTML attributes
       chartBlocks.forEach((block, i) => {
         const id = `chart-${chartCounter++}`;
-        html = html.replace(`%%CHART_${i}%%`, `<div style="margin:12px 0;border-radius:16px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${id}" style="max-height:300px;"></canvas></div><script-placeholder data-chart-id="${id}" data-chart-config="${escapeHtml(block)}"></script-placeholder>`);
+        pendingChartConfigs[id] = block;
+        html = html.replace(`%%CHART_${i}%%`, `<div style="margin:12px 0;border-radius:16px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${id}" style="max-height:300px;"></canvas></div><script-placeholder data-chart-id="${id}"></script-placeholder>`);
       });
 
       // Python blocks
       pythonBlocks.forEach((block, i) => {
         const id = `py-${Date.now()}-${i}`;
-        html = html.replace(`%%PYTHON_${i}%%`, `<div style="margin:8px 0;"><pre style="padding:14px;border-radius:12px 12px 0 0;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;margin:0;"><code>${escapeHtml(block)}</code></pre><div id="${id}" class="py-output" style="padding:10px 14px;border-radius:0 0 12px 12px;background:#0f172a;color:#86efac;font-size:13px;font-family:monospace;white-space:pre-wrap;min-height:24px;">⏳ Ejecutando...</div></div><script-placeholder data-py-id="${id}" data-py-code="${escapeHtml(block)}"></script-placeholder>`);
+        pendingPyCode[id] = block;
+        html = html.replace(`%%PYTHON_${i}%%`, `<div style="margin:8px 0;"><pre style="padding:14px;border-radius:12px 12px 0 0;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;margin:0;"><code>${escapeHtml(block)}</code></pre><div id="${id}" class="py-output" style="padding:10px 14px;border-radius:0 0 12px 12px;background:#0f172a;color:#86efac;font-size:13px;font-family:monospace;white-space:pre-wrap;min-height:24px;">⏳ Ejecutando...</div></div><script-placeholder data-py-id="${id}"></script-placeholder>`);
       });
       if (html.includes('%%PYTHON_PENDING%%')) {
         html = html.replace('%%PYTHON_PENDING%%', `<div style="margin:8px 0;"><pre style="padding:14px;border-radius:12px;background:#1e293b;color:#e2e8f0;font-size:13px;line-height:1.5;overflow-x:auto;"><code>${escapeHtml(pendingPython)}</code></pre><div style="padding:6px 14px;font-size:11px;color:var(--slate);">⏳ Escribiendo código...</div></div>`);
@@ -808,16 +812,26 @@
 
       // Execute charts
       container.querySelectorAll('script-placeholder[data-chart-id]').forEach(el => {
-        const err = executeChart(el.dataset.chartId, el.dataset.chartConfig);
-        if (err) errors.push(err);
+        const id = el.dataset.chartId;
+        const config = pendingChartConfigs[id];
+        if (config) {
+          const err = executeChart(id, config);
+          if (err) errors.push(err);
+          delete pendingChartConfigs[id];
+        }
         el.remove();
       });
 
       // Execute Python
       const pyEls = container.querySelectorAll('script-placeholder[data-py-id]');
       for (const el of pyEls) {
-        const err = await executePython(el.dataset.pyCode, el.dataset.pyId);
-        if (err) errors.push(err);
+        const id = el.dataset.pyId;
+        const code = pendingPyCode[id];
+        if (code) {
+          const err = await executePython(code, id);
+          if (err) errors.push(err);
+          delete pendingPyCode[id];
+        }
         el.remove();
       }
 
@@ -1045,7 +1059,14 @@
         const decoder = new TextDecoder();
 
         let lastFormat = 0;
-        const FORMAT_INTERVAL = 150; // ms — throttle formatting
+        let formatPending = false;
+
+        function renderStream() {
+          try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch {}
+          lastFormat = Date.now();
+          formatPending = false;
+          scrollToBottom();
+        }
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1058,18 +1079,18 @@
               const parsed = JSON.parse(payload);
               if (parsed.text) {
                 fullText += parsed.text;
-                const now = Date.now();
-                if (now - lastFormat > FORMAT_INTERVAL) {
-                  try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch { assistantDiv.textContent = fullText; }
-                  lastFormat = now;
-                } else {
-                  assistantDiv.textContent = fullText;
+                if (!formatPending) {
+                  const wait = Math.max(0, 120 - (Date.now() - lastFormat));
+                  formatPending = true;
+                  if (wait === 0) renderStream();
+                  else setTimeout(renderStream, wait);
                 }
-                scrollToBottom();
               }
             } catch {}
           }
         }
+        // Cancel any pending and do final render
+        formatPending = false;
 
         // Final formatting + tool execution
         try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch { assistantDiv.textContent = fullText; }
@@ -1134,7 +1155,15 @@
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
-        let lastFormat = 0;
+        let retryLastFormat = 0;
+        let retryFormatPending = false;
+
+        function renderRetry() {
+          try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch {}
+          retryLastFormat = Date.now();
+          retryFormatPending = false;
+          scrollToBottom();
+        }
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1147,20 +1176,19 @@
               const parsed = JSON.parse(payload);
               if (parsed.text) {
                 fullText += parsed.text;
-                const now = Date.now();
-                if (now - lastFormat > 150) {
-                  try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch { retryDiv.textContent = fullText; }
-                  lastFormat = now;
-                } else {
-                  retryDiv.textContent = fullText;
+                if (!retryFormatPending) {
+                  const wait = Math.max(0, 120 - (Date.now() - retryLastFormat));
+                  retryFormatPending = true;
+                  if (wait === 0) renderRetry();
+                  else setTimeout(renderRetry, wait);
                 }
-                scrollToBottom();
               }
             } catch {}
           }
         }
+        retryFormatPending = false;
 
-        try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch { retryDiv.textContent = fullText; }
+        try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch {}
         const retryErrors = await processToolPlaceholders(retryDiv);
 
         chat.messages.push({ role: 'assistant', content: fullText });
