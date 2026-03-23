@@ -425,10 +425,7 @@
         }
         renderUserList();
       } catch (error) {
-        AppBridge.setStatus(statusNode, 'error', 'No tenés acceso al back office.');
-        setTimeout(() => {
-          window.location.href = '/dashboard.html';
-        }, 900);
+        AppBridge.setStatus(statusNode, 'error', `No se pudo cargar el back office: ${error.message}`);
       }
     }
 
