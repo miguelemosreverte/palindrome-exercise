@@ -410,8 +410,9 @@
           </div>
           <div class="composer-input-row">
             <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1"></textarea>
-            <button class="send-btn" id="sendBtn">
-              <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <button class="send-btn" id="sendBtn" title="Enviar">
+              <svg id="sendIcon" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg id="stopIcon" style="width:16px;height:16px;display:none;" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             </button>
           </div>
           <div class="composer-hint">Enter para enviar · Shift+Enter nueva línea</div>
@@ -615,6 +616,17 @@
     let currentChatId = null;
     let chats = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     let sending = false;
+    let abortController = null;
+
+    function setStreamingUI(isStreaming) {
+      const sendIcon = document.getElementById('sendIcon');
+      const stopIcon = document.getElementById('stopIcon');
+      sendIcon.style.display = isStreaming ? 'none' : 'block';
+      stopIcon.style.display = isStreaming ? 'block' : 'none';
+      sendBtn.title = isStreaming ? 'Detener' : 'Enviar';
+      sendBtn.style.background = isStreaming ? '#ef4444' : 'var(--ocean)';
+      sendBtn.disabled = false;
+    }
 
     function openSidebarUI() {
       sidebar.classList.add('open');
@@ -661,6 +673,13 @@
         .replace(/<chart>([\s\S]*?)<\/chart>/g, (_, inner) => { chartBlocks.push(inner.trim()); return `%%CHART_${chartBlocks.length-1}%%`; })
         .replace(/<python>([\s\S]*?)<\/python>/g, (_, inner) => { pythonBlocks.push(inner.trim()); return `%%PYTHON_${pythonBlocks.length-1}%%`; })
         .replace(/<web_search>([\s\S]*?)<\/web_search>/g, (_, inner) => { searchBlocks.push(inner.trim()); return `%%SEARCH_${searchBlocks.length-1}%%`; });
+
+      // Handle unclosed <chart> (streaming) — show placeholder
+      const chartOpenIdx = cleaned.lastIndexOf('<chart>');
+      if (chartOpenIdx !== -1 && cleaned.indexOf('</chart>', chartOpenIdx) === -1) {
+        const pendingChart = cleaned.slice(chartOpenIdx + 7);
+        cleaned = cleaned.slice(0, chartOpenIdx) + `%%CHART_PENDING%%`;
+      }
 
       // Handle unclosed tags (streaming)
       let pendingThink = '', pendingPython = '', pendingSearch = '';
@@ -728,6 +747,11 @@
         html = html.replace('%%SEARCH_PENDING%%', `<div style="margin:8px 0;padding:12px 16px;border-radius:12px;background:rgba(49,109,255,0.06);border:1px solid rgba(49,109,255,0.15);font-size:13px;"><strong style="color:var(--ocean);">🔍 Buscando:</strong> ${escapeHtml(pendingSearch)}...</div>`);
       }
 
+      // Pending chart (streaming)
+      if (html.includes('%%CHART_PENDING%%')) {
+        html = html.replace('%%CHART_PENDING%%', `<div style="margin:12px 0;border-radius:16px;background:white;padding:20px;border:1px solid var(--line);text-align:center;color:var(--slate);font-size:13px;">📊 Generando gráfico...</div>`);
+      }
+
       html = html.replace(/\n/g, '<br>');
       return html;
     }
@@ -770,15 +794,25 @@
 
     function executeChart(canvasId, configStr) {
       try {
-        const config = JSON.parse(configStr);
+        // Clean the config string — trim, strip markdown fences if present
+        let clean = configStr.trim();
+        if (clean.startsWith('```')) clean = clean.replace(/^```\w*\n?/, '').replace(/```$/, '').trim();
+        const config = JSON.parse(clean);
         const canvas = document.getElementById(canvasId);
-        if (!canvas) return { error: 'Canvas not found' };
+        if (!canvas) {
+          console.warn('Chart canvas not found:', canvasId);
+          return null; // Not an error worth retrying
+        }
         new Chart(canvas.getContext('2d'), config);
         return null;
       } catch (err) {
+        console.error('Chart error:', err.message, 'Config:', configStr.slice(0, 200));
         const canvas = document.getElementById(canvasId);
-        if (canvas) canvas.parentElement.innerHTML = `<div style="color:#ef4444;font-size:13px;padding:8px;">⚠️ Error en gráfico — reintentando automáticamente...</div>`;
-        return { tool: 'chart', error: `JSON inválido para Chart.js: ${err.message}. El bloque <chart> debe contener SOLO un JSON válido de Chart.js, no código Python ni otro texto.` };
+        if (canvas) {
+          canvas.parentElement.innerHTML = `<div style="color:var(--slate);font-size:12px;padding:12px;background:rgba(0,0,0,0.03);border-radius:12px;">⚠️ No se pudo renderizar el gráfico: ${escapeHtml(err.message)}</div>`;
+        }
+        // Don't retry charts — if the JSON is bad, retrying won't help
+        return null;
       }
     }
 
@@ -986,7 +1020,8 @@
       const content = promptInput.value.trim();
       if (!content || sending) return;
       sending = true;
-      sendBtn.disabled = true;
+      abortController = new AbortController();
+      setStreamingUI(true);
 
       // Create or get chat
       if (!currentChatId) {
@@ -1016,6 +1051,7 @@
         let demoSessionId = getDemoSessionId();
         let res = await fetch(`${API_BASE}/api/demo-stream`, {
           method: 'POST',
+          signal: abortController.signal,
           headers: {
             'Content-Type': 'application/json',
             'X-Demo-Session': demoSessionId,
@@ -1117,11 +1153,23 @@
           await autoRetryWithFeedback(chat);
         }
       } catch (err) {
-        assistantDiv.textContent = 'Error: ' + err.message;
-        assistantDiv.style.color = '#ef4444';
+        if (err.name === 'AbortError') {
+          // User stopped — save what we have so far
+          if (fullText) {
+            try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch {}
+            chat.messages.push({ role: 'assistant', content: fullText });
+            chat.updated_at = Date.now();
+            saveChats();
+            renderHistory();
+          }
+        } else {
+          assistantDiv.textContent = 'Error: ' + err.message;
+          assistantDiv.style.color = '#ef4444';
+        }
       } finally {
         sending = false;
-        sendBtn.disabled = false;
+        abortController = null;
+        setStreamingUI(false);
       }
     }
 
@@ -1211,7 +1259,13 @@
       } catch {}
     }
 
-    sendBtn.addEventListener('click', sendMessage);
+    sendBtn.addEventListener('click', () => {
+      if (sending && abortController) {
+        abortController.abort();
+      } else {
+        sendMessage();
+      }
+    });
 
     document.getElementById('newChatBtn').addEventListener('click', () => {
       currentChatId = null;
