@@ -392,10 +392,6 @@
 
   <script src="app.js"></script>
   <script>
-    const bodyApiBase = document.body.dataset.apiBase || "";
-    const isGitHubPages = window.location.hostname.endsWith("github.io");
-    const API_BASE = bodyApiBase || "https://palindrome-exercise.vercel.app";
-
     function setStatus(kind, message) {
       const status = document.getElementById("status");
       const kindClasses = {
