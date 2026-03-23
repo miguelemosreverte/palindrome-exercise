@@ -956,23 +956,20 @@
       }
 
       // Execute searches
+      let searchResults = [];
       const searchEls = container.querySelectorAll('script-placeholder[data-search-id]');
       for (const el of searchEls) {
         const query = el.dataset.searchQuery;
         const id = el.dataset.searchId;
         el.remove();
         const results = await executeSearch(id, query);
-        if (results && results.length && currentChatId) {
+        if (results && results.length) {
           const summary = results.map(r => `- ${r.title}: ${r.snippet}`).join('\n');
-          const chat = getChat(currentChatId);
-          if (chat) {
-            chat.messages.push({ role: 'assistant', content: `[Resultados de búsqueda para "${query}"]\n${summary}` });
-            saveChats();
-          }
+          searchResults.push({ query, summary, results });
         }
       }
 
-      return errors;
+      return { errors, searchResults };
     }
 
     function renderMessages(items) {
@@ -1216,12 +1213,25 @@
 
         // Final formatting + tool execution
         try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch { assistantDiv.textContent = fullText; }
-        const toolErrors = await processToolPlaceholders(assistantDiv);
+        const { errors: toolErrors, searchResults } = await processToolPlaceholders(assistantDiv);
 
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
         saveChats();
         renderHistory();
+
+        // Auto-continue: if search returned results, feed them back to LLM
+        if (searchResults.length) {
+          const searchFeedback = searchResults.map(s =>
+            `[Resultados de búsqueda para "${s.query}"]\n${s.summary}`
+          ).join('\n\n');
+          chat.messages.push({ role: 'user', content: searchFeedback + '\n\nUsá estos resultados para continuar con el siguiente paso (Python, gráfico, o respuesta final).' });
+          chat.updated_at = Date.now();
+          saveChats();
+          sending = false;
+          await autoRetryWithFeedback(chat);
+          return; // Don't also handle errors — the retry will handle them
+        }
 
         // If tools produced errors, send the error output back to the LLM to fix the code
         if (toolErrors.length) {
@@ -1260,7 +1270,7 @@
     }
 
     async function autoRetryWithFeedback(chat, retryCount = 0) {
-      const MAX_RETRIES = 2;
+      const MAX_RETRIES = 4; // search→python→chart pipeline needs up to 3 continuations
       if (retryCount >= MAX_RETRIES) return;
 
       const retryDiv = appendMessageToUI('assistant', '', true);
@@ -1323,12 +1333,23 @@
         retryFormatPending = false;
 
         try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch {}
-        const retryErrors = await processToolPlaceholders(retryDiv);
+        const { errors: retryErrors, searchResults: retrySearchResults } = await processToolPlaceholders(retryDiv);
 
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
         saveChats();
         renderHistory();
+
+        // Auto-continue with search results
+        if (retrySearchResults.length) {
+          const searchFeedback = retrySearchResults.map(s =>
+            `[Resultados de búsqueda para "${s.query}"]\n${s.summary}`
+          ).join('\n\n');
+          chat.messages.push({ role: 'user', content: searchFeedback + '\n\nContinuá con el siguiente paso.' });
+          saveChats();
+          await autoRetryWithFeedback(chat, retryCount + 1);
+          return;
+        }
 
         // If still errors, retry again with the new error
         if (retryErrors.length) {
