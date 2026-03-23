@@ -748,7 +748,7 @@
 
     async function executePython(code, outputId) {
       const el = document.getElementById(outputId);
-      if (!el) return;
+      if (!el) return null;
       try {
         const pyodide = await loadPyodide();
         pyodide.runPython('import io, sys; sys.stdout = io.StringIO()');
@@ -756,9 +756,11 @@
         const output = pyodide.runPython('sys.stdout.getvalue()');
         el.textContent = output || '(sin output)';
         el.style.color = '#86efac';
+        return null;
       } catch (err) {
         el.textContent = 'Error: ' + err.message;
         el.style.color = '#fca5a5';
+        return { tool: 'python', error: err.message };
       }
     }
 
@@ -766,11 +768,13 @@
       try {
         const config = JSON.parse(configStr);
         const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
+        if (!canvas) return { error: 'Canvas not found' };
         new Chart(canvas.getContext('2d'), config);
+        return null;
       } catch (err) {
         const canvas = document.getElementById(canvasId);
-        if (canvas) canvas.parentElement.innerHTML = `<div style="color:#ef4444;font-size:13px;">Error en gráfico: ${err.message}</div>`;
+        if (canvas) canvas.parentElement.innerHTML = `<div style="color:#ef4444;font-size:13px;padding:8px;">⚠️ Error en gráfico — reintentando automáticamente...</div>`;
+        return { tool: 'chart', error: `JSON inválido para Chart.js: ${err.message}. El bloque <chart> debe contener SOLO un JSON válido de Chart.js, no código Python ni otro texto.` };
       }
     }
 
@@ -799,35 +803,42 @@
       }
     }
 
-    function processToolPlaceholders(container) {
+    async function processToolPlaceholders(container) {
+      const errors = [];
+
       // Execute charts
       container.querySelectorAll('script-placeholder[data-chart-id]').forEach(el => {
-        executeChart(el.dataset.chartId, el.dataset.chartConfig);
+        const err = executeChart(el.dataset.chartId, el.dataset.chartConfig);
+        if (err) errors.push(err);
         el.remove();
       });
+
       // Execute Python
-      container.querySelectorAll('script-placeholder[data-py-id]').forEach(el => {
-        executePython(el.dataset.pyCode, el.dataset.pyId);
+      const pyEls = container.querySelectorAll('script-placeholder[data-py-id]');
+      for (const el of pyEls) {
+        const err = await executePython(el.dataset.pyCode, el.dataset.pyId);
+        if (err) errors.push(err);
         el.remove();
-      });
+      }
+
       // Execute searches
-      container.querySelectorAll('script-placeholder[data-search-id]').forEach(async el => {
+      const searchEls = container.querySelectorAll('script-placeholder[data-search-id]');
+      for (const el of searchEls) {
         const query = el.dataset.searchQuery;
         const id = el.dataset.searchId;
         el.remove();
         const results = await executeSearch(id, query);
-        // If we have search results and a current chat, auto-send follow-up
-        if (results && results.length && currentChatId && !sending) {
+        if (results && results.length && currentChatId) {
           const summary = results.map(r => `- ${r.title}: ${r.snippet}`).join('\n');
           const chat = getChat(currentChatId);
           if (chat) {
             chat.messages.push({ role: 'assistant', content: `[Resultados de búsqueda para "${query}"]\n${summary}` });
-            // Don't auto-continue for now — the results are visible to the user
-            // A future improvement could auto-send these results back to the LLM
             saveChats();
           }
         }
-      });
+      }
+
+      return errors;
     }
 
     function renderMessages(items) {
@@ -1033,6 +1044,9 @@
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
 
+        let lastFormat = 0;
+        const FORMAT_INTERVAL = 150; // ms — throttle formatting
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -1042,19 +1056,41 @@
             if (payload === '[DONE]') continue;
             try {
               const parsed = JSON.parse(payload);
-              if (parsed.text) { fullText += parsed.text; assistantDiv.innerHTML = formatAssistantHtml(fullText); scrollToBottom(); }
+              if (parsed.text) {
+                fullText += parsed.text;
+                const now = Date.now();
+                if (now - lastFormat > FORMAT_INTERVAL) {
+                  try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch { assistantDiv.textContent = fullText; }
+                  lastFormat = now;
+                } else {
+                  assistantDiv.textContent = fullText;
+                }
+                scrollToBottom();
+              }
             } catch {}
           }
         }
 
-        // Apply final formatting and execute tools
-        assistantDiv.innerHTML = formatAssistantHtml(fullText);
-        processToolPlaceholders(assistantDiv);
+        // Final formatting + tool execution
+        try { assistantDiv.innerHTML = formatAssistantHtml(fullText); } catch { assistantDiv.textContent = fullText; }
+        const toolErrors = await processToolPlaceholders(assistantDiv);
 
         chat.messages.push({ role: 'assistant', content: fullText });
         chat.updated_at = Date.now();
         saveChats();
         renderHistory();
+
+        // If tools produced errors, auto-send feedback to LLM for correction
+        if (toolErrors.length && !sending) {
+          const feedback = toolErrors.map(e => `Error en ${e.tool}: ${e.error}`).join('\n');
+          chat.messages.push({ role: 'user', content: `[Sistema] Los siguientes tools fallaron, corregí tu respuesta:\n${feedback}` });
+          chat.updated_at = Date.now();
+          saveChats();
+          // Trigger automatic retry
+          promptInput.value = '';
+          sending = false;
+          await autoRetryWithFeedback(chat, assistantDiv);
+        }
       } catch (err) {
         assistantDiv.textContent = 'Error: ' + err.message;
         assistantDiv.style.color = '#ef4444';
@@ -1062,6 +1098,63 @@
         sending = false;
         sendBtn.disabled = false;
       }
+    }
+
+    async function autoRetryWithFeedback(chat, prevDiv) {
+      // Add a visual indicator
+      const retryDiv = appendMessageToUI('assistant', '', true);
+      scrollToBottom();
+      let fullText = '';
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        const demoSessionId = getDemoSessionId();
+        const res = await fetch(`${API_BASE}/api/demo-stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Demo-Session': demoSessionId,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            prompt: '',
+            model: modelSelect.value,
+            anonymous_id: demoSessionId,
+            messages: chat.messages,
+          }),
+        });
+
+        if (!res.ok) return;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6).trim();
+            if (payload === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.text) {
+                fullText += parsed.text;
+                retryDiv.textContent = fullText;
+                scrollToBottom();
+              }
+            } catch {}
+          }
+        }
+
+        try { retryDiv.innerHTML = formatAssistantHtml(fullText); } catch { retryDiv.textContent = fullText; }
+        const retryErrors = await processToolPlaceholders(retryDiv);
+
+        chat.messages.push({ role: 'assistant', content: fullText });
+        chat.updated_at = Date.now();
+        saveChats();
+        // Don't retry again to avoid loops
+      } catch {}
     }
 
     sendBtn.addEventListener('click', sendMessage);
