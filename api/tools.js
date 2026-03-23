@@ -10,7 +10,8 @@ async function webSearch(query) {
   const results = [];
 
   if (apiRes.ok) {
-    const data = await apiRes.json();
+    let data;
+    try { data = await apiRes.json(); } catch { data = {}; }
 
     // Abstract (main answer)
     if (data.Abstract) {
@@ -79,8 +80,12 @@ module.exports = async function handler(req, res) {
     if (tool === 'web_search') {
       const query = String(body.query || '').trim();
       if (!query) return res.status(400).json({ error: 'Query vacía' });
-      const results = await webSearch(query);
-      return res.status(200).json({ tool: 'web_search', query, results });
+      try {
+        const results = await webSearch(query);
+        return res.status(200).json({ tool: 'web_search', query, results });
+      } catch (searchErr) {
+        return res.status(200).json({ tool: 'web_search', query, results: [], error: searchErr.message });
+      }
     }
 
     return res.status(400).json({ error: `Tool desconocido: ${tool}` });
