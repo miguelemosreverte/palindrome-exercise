@@ -4,10 +4,10 @@ const { readJsonBody } = require('../lib/http');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
 const PREFERRED_FIRST = [
-  'meta-llama/Llama-4-Scout-17B-16E-Instruct',
-  'meta-llama/Llama-3.3-70B-Instruct',
-  'Qwen/Qwen3-32B',
   'mistralai/Mistral-Small',
+  'mistralai/Mistral',
+  'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+  'Qwen/Qwen3-32B',
 ];
 
 async function handleGetModels(req, res) {
