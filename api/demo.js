@@ -36,6 +36,10 @@ module.exports = async function handler(req, res) {
         },
         estimatedCostBeforeRequest
       );
+
+      if (!entitlement?.ok && anonymousId) {
+        entitlement = await consumeAnonymousAccess(anonymousId, estimatedCostBeforeRequest);
+      }
     } else {
       entitlement = await consumeAnonymousAccess(anonymousId, estimatedCostBeforeRequest);
     }
@@ -43,7 +47,7 @@ module.exports = async function handler(req, res) {
     if (!entitlement?.ok) {
       return res.status(402).json({
         error:
-          'No hay saldo suficiente para esta demo. Iniciá sesión con una cuenta con compra aprobada o realizá una compra nueva.',
+          'No hay saldo suficiente para esta demo. Probá más tarde, iniciá sesión con una compra aprobada o realizá una compra nueva.',
       });
     }
 
