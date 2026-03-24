@@ -397,6 +397,7 @@ REGLAS GENERALES:
           const question = data.question || data.pregunta || '';
           if (question) html += `<div class="rc-tree-question">${esc(question)}</div>`;
           const choices = data.choices || data.opciones || data.elecciones || items;
+          if (choices.length) {
             html += '<div class="rc-tree-choices">';
             for (const c of choices) {
               const ct = c.title || c.nombre || c.titulo || '';
