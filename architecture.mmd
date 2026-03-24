@@ -1,0 +1,50 @@
+flowchart TD
+    U[Visitor / User] --> I[index.html]
+    U --> D[demo.html]
+    U --> A[auth.html]
+    U --> C[chat.html]
+    U --> DB[dashboard.html]
+    U --> AD[admin.html]
+    U --> S[success.html]
+
+    I --> MPAPI[/api/create-preference.js/]
+    MPAPI --> MP[Mercado Pago]
+    MP --> W[/api/webhook.js/]
+
+    A --> LOGIN[/api/auth/login.js/]
+    A --> REG[/api/auth/register.js/]
+    DB --> ME[/api/auth/me.js/]
+    AD --> ADMIN[/api/admin/summary.js/]
+
+    D --> DEMO[/api/demo-stream.js GET/POST/]
+    C --> DEMO
+    C --> INF[/api/infer.js/]
+
+    LOGIN --> AUTH[lib/auth.js]
+    REG --> AUTH
+    ME --> AUTH
+    ADMIN --> AUTH
+    DEMO --> AUTH
+    INF --> AUTH
+
+    DEMO --> ACCESS[lib/access.js]
+    INF --> ACCESS
+    ME --> ACCESS
+    W --> ACCESS
+
+    DEMO --> USAGE[lib/usage.js]
+    INF --> USAGE
+    ADMIN --> USAGE
+
+    W --> FB[lib/firebase.js]
+    ACCESS --> FB
+    AUTH --> FB
+    USAGE --> FB
+    ADMIN --> FB
+
+    DEMO --> LLM[LLM Provider\nDEMO_API_BASE / CHUTESAI_API_KEY]
+    INF --> LLM
+    C --> WS[server/chat-server.js\nunfinished / separate realtime path]
+    WS --> LLM
+
+    FB --> RTDB[(Firebase RTDB)]

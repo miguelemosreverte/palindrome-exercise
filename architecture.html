@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Diagram</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f6ef;
+      --ink: #112033;
+      --slate: #5e708a;
+      --line: rgba(17, 32, 51, 0.12);
+      --panel: rgba(255, 255, 255, 0.72);
+      --shadow: 0 18px 50px rgba(17, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Instrument Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(137, 224, 200, 0.28), transparent 28%),
+        radial-gradient(circle at top right, rgba(49, 109, 255, 0.12), transparent 24%),
+        var(--bg);
+    }
+
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px 24px 56px;
+    }
+
+    .header {
+      margin-bottom: 24px;
+    }
+
+    .kicker {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.28em;
+      color: var(--slate);
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(34px, 6vw, 64px);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+    }
+
+    p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--slate);
+      line-height: 1.7;
+    }
+
+    .panel {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: auto;
+      padding: 20px;
+    }
+
+    .mermaid {
+      min-width: 1100px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div class="kicker">Project Map</div>
+      <h1>Architecture Diagram</h1>
+      <p>Saved Mermaid diagram for the current app structure: frontend pages, API routes, auth, usage tracking, Firebase, Mercado Pago, and the current LLM provider integration.</p>
+    </div>
+
+    <div class="panel">
+      <pre class="mermaid">
+flowchart TD
+    U[Visitor / User] --> I[index.html]
+    U --> D[demo.html]
+    U --> A[auth.html]
+    U --> C[chat.html]
+    U --> DB[dashboard.html]
+    U --> AD[admin.html]
+    U --> S[success.html]
+
+    I --> MPAPI[/api/create-preference.js/]
+    MPAPI --> MP[Mercado Pago]
+    MP --> W[/api/webhook.js/]
+
+    A --> LOGIN[/api/auth/login.js/]
+    A --> REG[/api/auth/register.js/]
+    DB --> ME[/api/auth/me.js/]
+    AD --> ADMIN[/api/admin/summary.js/]
+
+    D --> DEMO[/api/demo-stream.js GET/POST/]
+    C --> DEMO
+    C --> INF[/api/infer.js/]
+
+    LOGIN --> AUTH[lib/auth.js]
+    REG --> AUTH
+    ME --> AUTH
+    ADMIN --> AUTH
+    DEMO --> AUTH
+    INF --> AUTH
+
+    DEMO --> ACCESS[lib/access.js]
+    INF --> ACCESS
+    ME --> ACCESS
+    W --> ACCESS
+
+    DEMO --> USAGE[lib/usage.js]
+    INF --> USAGE
+    ADMIN --> USAGE
+
+    W --> FB[lib/firebase.js]
+    ACCESS --> FB
+    AUTH --> FB
+    USAGE --> FB
+    ADMIN --> FB
+
+    DEMO --> LLM[LLM Provider\nDEMO_API_BASE / CHUTESAI_API_KEY]
+    INF --> LLM
+    C --> WS[server/chat-server.js\nunfinished / separate realtime path]
+    WS --> LLM
+
+    FB --> RTDB[(Firebase RTDB)]
+      </pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#ffffff',
+        primaryTextColor: '#112033',
+        primaryBorderColor: '#d8dee7',
+        lineColor: '#5e708a',
+        secondaryColor: '#eef6f4',
+        tertiaryColor: '#f6f7fb',
+        fontFamily: 'Instrument Sans, sans-serif'
+      }
+    });
+  </script>
+</body>
+</html>
