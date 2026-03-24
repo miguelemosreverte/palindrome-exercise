@@ -1,0 +1,13 @@
+flowchart LR
+    A[1. Visitor arrives] --> B[2. Free demo or login]
+    B --> C{3. Wants full access?}
+    C -- No --> D[Stay on free demo]
+    C -- Yes --> E[Login / Create account]
+    E --> F[Dashboard / Billing]
+    F --> G[Checkout via Mercado Pago]
+    G --> H[Webhook confirms payment]
+    H --> I[Access quota becomes available]
+    I --> J[User enters paid chat]
+    J --> K[Backend calls LLM provider]
+    K --> L[Usage is recorded in Firebase]
+    L --> M[Admin sees usage / spend / users]
