@@ -1,5 +1,5 @@
 const { patchPayment, readPayment, writePayment } = require('../lib/firebase');
-const { ensureApprovedPaymentAccess } = require('../lib/access');
+const { ensureWalletAccess } = require('../lib/wallet');
 
 module.exports = async function handler(req, res) {
   // Handle CORS preflight
@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
         payment_id: paymentId,
       };
       await writePayment(externalReference, payload);
-      await ensureApprovedPaymentAccess(externalReference, payload);
+      await ensureWalletAccess(externalReference, payload);
     } else {
       await patchPayment(externalReference, {
         status: payment.status,

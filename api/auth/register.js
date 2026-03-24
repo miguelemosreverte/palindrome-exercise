@@ -1,6 +1,6 @@
 const { createToken, createUser, isAdmin, publicUser } = require('../../lib/auth');
 const { readJsonBody } = require('../../lib/http');
-const { ensureTrialWallet } = require('../../lib/coupons');
+const { ensureTrialWallet } = require('../../lib/wallet');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {

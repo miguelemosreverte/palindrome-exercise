@@ -1,5 +1,5 @@
 const { authFromRequest } = require('../lib/auth');
-const { consumePaidAccess } = require('../lib/access');
+const { consumeWalletBalance } = require('../lib/wallet');
 const { readJsonBody } = require('../lib/http');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
       .join('\n');
 
     const estimatedReserveUsd = estimateCostUsd(prompt, 'x'.repeat(Math.min(maxTokens * 4, 2400)));
-    const entitlement = await consumePaidAccess(
+    const entitlement = await consumeWalletBalance(
       {
         userId: auth?.sub || null,
         email: auth?.email || null,

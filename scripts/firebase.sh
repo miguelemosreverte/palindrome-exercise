@@ -5,7 +5,7 @@
 #   ./scripts/firebase.sh payments                  # list payment records
 #   ./scripts/firebase.sh coupons                   # list coupons
 #   ./scripts/firebase.sh users                     # list users
-#   ./scripts/firebase.sh demo-anonymous            # list anonymous demo sessions
+#   ./scripts/firebase.sh payments/trial-USER_ID    # inspect a specific wallet record
 #   ./scripts/firebase.sh path/to/anything          # read any subpath
 #   ./scripts/firebase.sh payments --shallow        # shallow read (keys only)
 

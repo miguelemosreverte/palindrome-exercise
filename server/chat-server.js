@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { WebSocketServer } = require('ws');
-const { consumePaidAccess } = require('../lib/access');
+const { consumeWalletBalance } = require('../lib/wallet');
 const { appendMessages, createChat, listChatsForUser, readChat } = require('../lib/chat-store');
 const { verifyJwt } = require('../lib/jwt');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
@@ -51,7 +51,7 @@ async function handleUserMessage(ws, session, payload) {
   }
 
   const reserveUsd = estimateCostUsd(userText, 'x'.repeat(1600));
-  const entitlement = await consumePaidAccess(
+  const entitlement = await consumeWalletBalance(
     {
       userId: session.sub || null,
       email: session.email || null,

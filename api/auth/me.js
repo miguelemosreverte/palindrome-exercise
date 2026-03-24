@@ -1,5 +1,5 @@
 const { authFromRequest, publicUser, readUserByEmail } = require('../../lib/auth');
-const { findApprovedPayments, summarizePaidAccess } = require('../../lib/access');
+const { findApprovedWallets, summarizeWallet } = require('../../lib/wallet');
 const { readUserUsage } = require('../../lib/usage');
 
 module.exports = async function handler(req, res) {
@@ -59,18 +59,18 @@ module.exports = async function handler(req, res) {
   }
 
   const usage = await readUserUsage(auth.sub);
-  const activePayments = await findApprovedPayments({
+  const activePayments = await findApprovedWallets({
     userId: auth.sub,
     email: auth.email,
   });
-  const allApprovedPayments = await findApprovedPayments(
+  const allApprovedPayments = await findApprovedWallets(
     {
       userId: auth.sub,
       email: auth.email,
     },
     { includeExpired: true }
   );
-  const access = summarizePaidAccess(activePayments);
+  const access = summarizeWallet(activePayments);
   const trialRecord = allApprovedPayments
     .filter((payment) => payment.wallet_kind === 'trial' || payment.source === 'trial')
     .sort((a, b) => Number(b.expires_at || 0) - Number(a.expires_at || 0))[0];
