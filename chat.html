@@ -224,6 +224,27 @@
     const overlay = $('sidebarOverlay');
     let sessionId = null, sending = false, msgCountBefore = 0;
 
+    // ─── Client-side router (0ms, keyword-based) ───
+    const ROUTE_MODELS = {
+      fast: { providerID: 'opencode', modelID: 'nemotron-3-super-free' },
+      quality: { providerID: 'opencode', modelID: 'gpt-5-nano' },
+    };
+    const ROUTES = [
+      { intent: 'timeline', keywords: ['línea de tiempo','linea de tiempo','timeline','cronología','cronologia','historia de','eventos históricos'], components: ['timeline','table'], model: 'quality' },
+      { intent: 'tree', keywords: ['ayudame a elegir','ayudame a decidir','qué me recomendás','explorar opciones','guiame','qué debería'], components: ['tree','options'], model: 'quality' },
+      { intent: 'options', keywords: ['opciones','alternativas','recomendame','recomendá','sugerí','destinos','proponeme'], components: ['options','cards'], model: 'quality' },
+      { intent: 'chart', keywords: ['gráfico','grafico','chart','barras','torta','pie chart','visualiz'], components: ['chartjs'], model: 'quality' },
+      { intent: 'table', keywords: ['tabla','table','comparar','comparación','ranking','listado'], components: ['table','cards'], model: 'quality' },
+      { intent: 'steps', keywords: ['paso a paso','pasos','cómo hago','como hago','tutorial','instrucciones','proceso'], components: ['steps'], model: 'quality' },
+      { intent: 'code', keywords: ['código','codigo','python','script','programar','ejecutar','bash'], components: [], model: 'quality' },
+      { intent: 'conversation', keywords: [], components: [], model: 'fast' },
+    ];
+    function classifyIntent(text) {
+      const lower = text.toLowerCase();
+      for (const r of ROUTES) { if (r.keywords.some(kw => lower.includes(kw))) return r; }
+      return ROUTES[ROUTES.length - 1];
+    }
+
     const SYSTEM = `Respondé en español. Sos un asistente en una app web con componentes ricos de rendering.
 
 COMPONENTES DISPONIBLES — usá bloques de código con estos lenguajes:
@@ -689,10 +710,19 @@ REGLAS GENERALES:
       const permInterval = setInterval(approvePermissions, 1500);
 
       try {
+        // Route: classify intent → pick model + component hints
+        const route = classifyIntent(text);
         const mv = modelSelect.value;
         const [prov, mid] = mv.includes('::') ? mv.split('::') : [undefined, undefined];
-        const body = { parts: [{ type: 'text', text }], system: SYSTEM };
+        const routeModel = ROUTE_MODELS[route.model] || null;
+        const componentHints = route.components.length
+          ? `\nPara esta respuesta, usá especialmente: ${route.components.map(c => '\`\`\`' + c).join(', ')}.`
+          : '';
+
+        const body = { parts: [{ type: 'text', text }], system: SYSTEM + componentHints };
+        // Use user-selected model if explicitly changed, otherwise use route model
         if (prov && mid) body.model = { providerID: prov, modelID: mid };
+        else if (routeModel) body.model = routeModel;
 
         statusInfo.textContent = 'Procesando...';
         const resp = await fetch(OC + '/session/' + sessionId + '/message', {

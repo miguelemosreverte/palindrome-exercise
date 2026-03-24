@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Progressive Tree Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --ink: #112033; --slate: #56708a; --ocean: #316dff; --mint: #89e0c8; --line: rgba(17,32,51,0.08); --shadow-soft: 0 20px 50px rgba(75,133,178,0.14); }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif; color: var(--ink); background: linear-gradient(180deg, #bcecff 0%, #d8f5f1 42%, #f7f6ef 100%); padding: 40px 20px; min-height: 100vh; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 28px; font-weight: 800; margin-bottom: 24px; }
+    #log { margin-top: 32px; padding: 16px; border-radius: 12px; background: rgba(0,0,0,0.03); font-size: 13px; color: var(--slate); min-height: 40px; }
+    #log .entry { padding: 4px 0; border-bottom: 1px solid var(--line); }
+
+    /* Progressive Tree */
+    .ptree { }
+    .ptree-breadcrumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 16px; min-height: 36px; }
+    .ptree-crumb { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid rgba(49,109,255,0.2); background: rgba(49,109,255,0.06); color: var(--ocean); }
+    .ptree-crumb:hover { background: rgba(49,109,255,0.12); }
+    .ptree-sep { color: var(--slate); opacity: 0.3; font-size: 14px; }
+
+    .ptree-question { font-size: 18px; font-weight: 800; margin-bottom: 14px; animation: fadeUp 0.25s ease-out; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .ptree-choices { display: flex; flex-direction: column; gap: 8px; animation: fadeUp 0.25s ease-out; }
+    .ptree-choice { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .ptree-choice:hover { background: rgba(255,255,255,0.9); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .ptree-choice-body { flex: 1; }
+    .ptree-choice-title { font-size: 15px; font-weight: 700; }
+    .ptree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .ptree-choice-arrow { color: var(--slate); opacity: 0.3; font-size: 16px; }
+    .ptree-choice.leaf .ptree-choice-arrow { color: var(--ocean); opacity: 0.6; }
+
+    .ptree-loading { text-align: center; padding: 20px; color: var(--slate); font-size: 14px; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    .ptree-result { padding: 20px; border-radius: 16px; border: 1px solid rgba(49,109,255,0.15); background: rgba(49,109,255,0.04); animation: fadeUp 0.25s ease-out; }
+    .ptree-result-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--ocean); font-weight: 700; margin-bottom: 6px; }
+    .ptree-result-text { font-size: 15px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Progressive Tree</h1>
+    <div id="tree-root"></div>
+    <div id="log"><div style="opacity:0.5;">Events will appear here...</div></div>
+  </div>
+
+  <script>
+    // ─── Tree data (full structure, rendered progressively) ───
+    const TREE_DATA = {
+      question: "¿Qué tipo de viaje querés hacer?",
+      choices: [
+        {
+          title: "Naturaleza y aventura",
+          desc: "Montañas, glaciares, selva y senderos.",
+          children: {
+            question: "¿Qué paisaje te atrae más?",
+            choices: [
+              {
+                title: "Patagonia",
+                desc: "Glaciares, lagos y montañas del fin del mundo.",
+                children: {
+                  question: "¿Qué actividad preferís?",
+                  choices: [
+                    { title: "Trekking en El Chaltén", desc: "Senderos al Fitz Roy y glaciares." },
+                    { title: "Navegación por el Perito Moreno", desc: "Ver el glaciar desde el agua." },
+                    { title: "Kayak en Bariloche", desc: "Lagos cristalinos rodeados de bosques." },
+                  ]
+                }
+              },
+              {
+                title: "Selva misionera",
+                desc: "Cataratas del Iguazú y selva subtropical.",
+                children: {
+                  question: "¿Qué te gustaría hacer?",
+                  choices: [
+                    { title: "Cataratas del Iguazú", desc: "Una de las siete maravillas naturales." },
+                    { title: "Ruinas de San Ignacio", desc: "Misiones jesuíticas en la selva." },
+                  ]
+                }
+              },
+              { title: "Cordillera mendocina", desc: "Aconcagua, viñedos y termas." },
+            ]
+          }
+        },
+        {
+          title: "Cultura y gastronomía",
+          desc: "Tango, vino, arquitectura y sabores.",
+          children: {
+            question: "¿Qué aspecto cultural te interesa?",
+            choices: [
+              { title: "Tango y milongas", desc: "La danza más famosa de Buenos Aires." },
+              { title: "Ruta del vino", desc: "Mendoza, Salta, Valle de Uco." },
+              { title: "Arquitectura porteña", desc: "Art Nouveau, La Boca, Recoleta." },
+            ]
+          }
+        },
+        {
+          title: "Playa y relax",
+          desc: "Costa atlántica y descanso.",
+        },
+      ]
+    };
+
+    // ─── Progressive tree renderer ───
+    const treeRoot = document.getElementById('tree-root');
+    const logEl = document.getElementById('log');
+    let path = []; // Array of { title, nodeRef }
+
+    function log(msg) {
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      entry.textContent = msg;
+      logEl.prepend(entry);
+    }
+
+    function getCurrentNode() {
+      let node = TREE_DATA;
+      for (const step of path) {
+        const choice = node.choices?.find(c => c.title === step.title);
+        if (choice?.children) node = choice.children;
+        else return null; // Leaf reached
+      }
+      return node;
+    }
+
+    function render() {
+      const node = getCurrentNode();
+      let html = '';
+
+      // Breadcrumbs
+      if (path.length) {
+        html += '<div class="ptree-breadcrumbs">';
+        path.forEach((step, i) => {
+          if (i > 0) html += '<span class="ptree-sep">›</span>';
+          html += `<span class="ptree-crumb" onclick="goBack(${i})">${esc(step.title)}</span>`;
+        });
+        html += '</div>';
+      }
+
+      if (!node) {
+        // Leaf — show result
+        const lastChoice = path[path.length - 1];
+        html += `<div class="ptree-result">
+          <div class="ptree-result-label">Tu selección</div>
+          <div class="ptree-result-text"><strong>${esc(lastChoice.title)}</strong></div>
+          <div style="margin-top:8px;font-size:13px;color:var(--slate);">${esc(lastChoice.desc || '')}</div>
+          <div style="margin-top:12px;font-size:12px;color:var(--ocean);font-weight:600;">Ruta: ${path.map(s => s.title).join(' → ')}</div>
+        </div>`;
+        log('LEAF: ' + path.map(s => s.title).join(' → '));
+      } else {
+        // Show current level
+        html += `<div class="ptree-question">${esc(node.question || '¿Qué elegís?')}</div>`;
+        html += '<div class="ptree-choices">';
+        for (const choice of (node.choices || [])) {
+          const hasChildren = !!choice.children;
+          html += `<div class="ptree-choice ${hasChildren ? '' : 'leaf'}" onclick="pick('${esc(choice.title).replace(/'/g, "\\'")}', '${esc(choice.desc || '').replace(/'/g, "\\'")}', ${hasChildren})">
+            <div class="ptree-choice-body">
+              <div class="ptree-choice-title">${esc(choice.title)}</div>
+              ${choice.desc ? `<div class="ptree-choice-desc">${esc(choice.desc)}</div>` : ''}
+            </div>
+            <div class="ptree-choice-arrow">${hasChildren ? '›' : '→'}</div>
+          </div>`;
+        }
+        html += '</div>';
+      }
+
+      treeRoot.innerHTML = html;
+    }
+
+    function pick(title, desc, hasChildren) {
+      path.push({ title, desc });
+      log('PICK: ' + title);
+      render();
+    }
+
+    function goBack(toIndex) {
+      const removed = path.splice(toIndex);
+      log('BACK to level ' + toIndex + ' (removed: ' + removed.map(s => s.title).join(', ') + ')');
+      render();
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

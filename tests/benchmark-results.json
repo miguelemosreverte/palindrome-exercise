@@ -1,0 +1,32 @@
+{
+  "date": "2026-03-24T00:30:00Z",
+  "server": "https://opencode-production-42c2.up.railway.app",
+  "latency": {
+    "note": "Simple 'say hi' prompt. Results vary with cold starts.",
+    "results": [
+      { "model": "nemotron-3-super-free", "provider": "opencode", "best_ms": 1946, "typical_ms": 3000, "label": "Nemotron 3 Super Free" },
+      { "model": "big-pickle", "provider": "opencode", "best_ms": 2802, "typical_ms": 5000, "label": "Big Pickle" },
+      { "model": "gpt-5-nano", "provider": "opencode", "best_ms": 3650, "typical_ms": 5000, "label": "GPT-5 Nano" },
+      { "model": "mimo-v2-pro-free", "provider": "opencode", "best_ms": 2717, "typical_ms": 5000, "label": "MiMo V2 Pro Free" },
+      { "model": "mimo-v2-omni-free", "provider": "opencode", "best_ms": 1704, "typical_ms": 9000, "note": "High variance, sometimes 50s cold start", "label": "MiMo V2 Omni Free" },
+      { "model": "minimax-m2.5-free", "provider": "opencode", "best_ms": 6540, "typical_ms": 9000, "label": "MiniMax M2.5 Free" }
+    ]
+  },
+  "routing_accuracy": {
+    "note": "All tested models achieve 6/6 on intent classification.",
+    "categories": ["timeline", "options", "tree", "cards", "table", "steps", "chart", "conversation"],
+    "test_prompts": [
+      { "prompt": "Haceme una línea de tiempo de Argentina", "expected": "timeline" },
+      { "prompt": "¿Qué opciones de carrera tengo?", "expected": "options" },
+      { "prompt": "Mostrá los datos de población en una tabla", "expected": "table" },
+      { "prompt": "Creá un gráfico con las ventas", "expected": "chart" },
+      { "prompt": "Hola, ¿cómo estás?", "expected": "conversation" },
+      { "prompt": "Quiero planificar un viaje paso a paso", "expected": "steps" }
+    ]
+  },
+  "recommendations": {
+    "interactive_clicks": "nemotron-3-super-free or big-pickle (2-3s consistent)",
+    "general_conversation": "gpt-5-nano (best quality/latency ratio)",
+    "routing_classifier": "Client-side keyword heuristic preferred over LLM call (instant, 0ms)"
+  }
+}
