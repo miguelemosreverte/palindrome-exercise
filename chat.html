@@ -182,12 +182,31 @@ CAPACIDADES DE RENDERING DE LA UI:
 {"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30],"backgroundColor":["#316dff","#4a8af5","#6ba3f7"]}]},"options":{"responsive":true,"plugins":{"legend":{"display":true}}}}
 \`\`\`
 
-REGLAS PARA GRÁFICOS:
-- Usá \`\`\`chartjs con JSON puro de Chart.js v4 adentro. NO crees archivos HTML.
-- NO uses "horizontalBar". Para barras horizontales: "type":"bar" + "indexAxis":"y".
-- Si los datos son años: ponelos como labels (strings), no como data numérica.
+REGLAS PARA \`\`\`chartjs:
+- JSON puro adentro. NO crees archivos HTML. NO pongas comentarios JS (//) en el JSON.
 - Paleta por defecto: #316dff, #4a8af5, #6ba3f7, #89bff9, #a8d4fb, #c7e6fd
 - Siempre incluí "options":{"responsive":true}
+
+PATRONES CORRECTOS POR TIPO DE DATO:
+
+TIMELINE / LÍNEA DE TIEMPO (eventos con años):
+- Usá "type":"scatter" con eje X = año, eje Y = 0 (todos en la misma línea)
+- Labels de los eventos en tooltips
+- Ejemplo:
+\`\`\`chartjs
+{"type":"scatter","data":{"datasets":[{"label":"Eventos","data":[{"x":1816,"y":0},{"x":1853,"y":0},{"x":1976,"y":0}],"backgroundColor":"#316dff","pointRadius":8}]},"options":{"responsive":true,"scales":{"x":{"title":{"display":true,"text":"Año"},"type":"linear","min":1800,"max":2030},"y":{"display":false}},"plugins":{"tooltip":{"callbacks":{}}}}}
+\`\`\`
+Para timelines, NUNCA uses barras con años como data (se ven barras de 0 a 2000 que no tienen sentido).
+
+COMPARACIÓN DE VALORES (poblaciones, ventas, etc):
+- "type":"bar" vertical o con "indexAxis":"y" para horizontal
+- data = los valores numéricos reales
+
+DISTRIBUCIÓN / PORCENTAJES:
+- "type":"pie" o "type":"doughnut"
+
+EVOLUCIÓN EN EL TIEMPO (datos que cambian):
+- "type":"line"
 
 REGLAS GENERALES:
 - Podés usar bash para ejecutar Python, buscar en la web, etc — usá tus herramientas normalmente.
