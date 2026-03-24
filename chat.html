@@ -330,26 +330,39 @@
     // ─── Models ───
     async function loadModels() {
       try {
-        // Use /config/providers for actually configured (usable) models
-        const data = await fetch(OC + '/config/providers').then(r => r.json());
+        // Load configured providers first, then all available
+        const [configured, all] = await Promise.all([
+          fetch(OC + '/config/providers').then(r => r.json()),
+          fetch(OC + '/provider').then(r => r.json()),
+        ]);
+
+        // Prioritized free providers
+        const FREE_PROVIDERS = ['opencode', 'evroc', 'zenmux', 'zai', 'io-net', 'nvidia', 'groq', 'cerebras', 'alibaba-coding-plan', 'inference', 'fastrouter'];
+
         let html = '';
-        for (const p of (data.providers || [])) {
+
+        // Show configured providers first
+        for (const p of (configured.providers || [])) {
           const models = Object.values(p.models || {}).filter(m => m.status === 'active' || !m.status);
+          if (!models.length) continue;
+          html += `<optgroup label="★ ${esc(p.name || p.id)}">`;
+          for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
+          html += '</optgroup>';
+        }
+
+        // Then free providers from the full catalog
+        const configuredIds = new Set((configured.providers || []).map(p => p.id));
+        for (const pid of FREE_PROVIDERS) {
+          if (configuredIds.has(pid)) continue;
+          const p = (all.all || []).find(pr => pr.id === pid);
+          if (!p) continue;
+          const models = Object.values(p.models || {}).slice(0, 15);
           if (!models.length) continue;
           html += `<optgroup label="${esc(p.name || p.id)}">`;
           for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
           html += '</optgroup>';
         }
-        if (!html) {
-          // Fallback to /provider if no config
-          const allData = await fetch(OC + '/provider').then(r => r.json());
-          for (const p of (allData.all || []).slice(0, 3)) {
-            const models = Object.values(p.models || {}).slice(0, 10);
-            html += `<optgroup label="${esc(p.name || p.id)}">`;
-            for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
-            html += '</optgroup>';
-          }
-        }
+
         modelSelect.innerHTML = html || '<option>No hay modelos</option>';
       } catch { modelSelect.innerHTML = '<option>Error</option>'; }
     }
