@@ -311,7 +311,7 @@
 
         for (const msg of msgs) {
           const parts = msg.parts || [];
-          if (msg.role === 'user') {
+          if ((msg.role || msg.info?.role) === 'user') {
             const tp = parts.find(p => p.type === 'text');
             if (tp) addUserMsg(tp.text);
           } else {
@@ -330,25 +330,27 @@
     // ─── Models ───
     async function loadModels() {
       try {
-        const data = await fetch(OC + '/provider').then(r => r.json());
-        const models = [];
-        for (const p of (data.all || [])) {
-          for (const [, m] of Object.entries(p.models || {})) {
-            if (m.id && m.name) models.push({ prov: p.id, id: m.id, name: m.name });
-          }
-        }
-        // Group and sort
-        const grouped = {};
-        for (const m of models) {
-          (grouped[m.prov] = grouped[m.prov] || []).push(m);
-        }
+        // Use /config/providers for actually configured (usable) models
+        const data = await fetch(OC + '/config/providers').then(r => r.json());
         let html = '';
-        for (const [prov, ms] of Object.entries(grouped).slice(0, 5)) {
-          html += `<optgroup label="${esc(prov)}">`;
-          for (const m of ms.slice(0, 15)) html += `<option value="${m.prov}::${m.id}">${esc(m.name)}</option>`;
+        for (const p of (data.providers || [])) {
+          const models = Object.values(p.models || {}).filter(m => m.status === 'active' || !m.status);
+          if (!models.length) continue;
+          html += `<optgroup label="${esc(p.name || p.id)}">`;
+          for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
           html += '</optgroup>';
         }
-        modelSelect.innerHTML = html;
+        if (!html) {
+          // Fallback to /provider if no config
+          const allData = await fetch(OC + '/provider').then(r => r.json());
+          for (const p of (allData.all || []).slice(0, 3)) {
+            const models = Object.values(p.models || {}).slice(0, 10);
+            html += `<optgroup label="${esc(p.name || p.id)}">`;
+            for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
+            html += '</optgroup>';
+          }
+        }
+        modelSelect.innerHTML = html || '<option>No hay modelos</option>';
       } catch { modelSelect.innerHTML = '<option>Error</option>'; }
     }
 
@@ -405,11 +407,27 @@
         if (prov && mid) body.model = { providerID: prov, modelID: mid };
 
         statusInfo.textContent = 'Procesando...';
-        await fetch(OC + '/session/' + sessionId + '/message', {
+        const resp = await fetch(OC + '/session/' + sessionId + '/message', {
           method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
         });
 
         think.remove();
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
+        }
+
+        // Check if the response has content
+        const respData = await resp.text();
+        if (respData) {
+          try {
+            const parsed = JSON.parse(respData);
+            if (parsed.error) {
+              throw new Error(Array.isArray(parsed.error) ? parsed.error.map(e=>e.message).join(', ') : parsed.error);
+            }
+          } catch(e) { if (e.message.includes('Server error') || e.message.includes('error')) throw e; }
+        }
 
         // Fetch all new messages
         const msgs = await fetch(OC + '/session/' + sessionId + '/message').then(r => r.json());
@@ -418,7 +436,7 @@
         messagesNode.innerHTML = '';
         for (const msg of msgs) {
           const parts = msg.parts || [];
-          if (msg.role === 'user') {
+          if ((msg.role || msg.info?.role) === 'user') {
             const tp = parts.find(p => p.type === 'text');
             if (tp) addUserMsg(tp.text);
           } else {
