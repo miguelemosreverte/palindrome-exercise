@@ -2,7 +2,7 @@ flowchart TB
     subgraph browser[Browser UI]
         index[index.html]
         auth[auth.html]
-        demo[demo.html]
+        trialInfo[demo.html trial page]
         dashboard[dashboard.html]
         chat[chat.html]
         admin[admin.html]
@@ -12,7 +12,6 @@ flowchart TB
 
     subgraph api[Vercel API Routes]
         authApi[/api/auth/*/]
-        demoApi[/api/demo-stream.js/]
         inferApi[/api/infer.js/]
         paymentApi[/api/create-preference.js/]
         webhookApi[/api/webhook.js/]
@@ -34,10 +33,6 @@ flowchart TB
     browser --> api
     authApi --> libAuth
     authApi --> libFirebase
-    demoApi --> libAuth
-    demoApi --> libAccess
-    demoApi --> libUsage
-    demoApi --> llm
     inferApi --> libAuth
     inferApi --> libAccess
     inferApi --> libUsage

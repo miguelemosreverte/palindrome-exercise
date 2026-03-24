@@ -59,12 +59,37 @@ module.exports = async function handler(req, res) {
   }
 
   const usage = await readUserUsage(auth.sub);
-  const access = summarizePaidAccess(
-    await findApprovedPayments({
+  const activePayments = await findApprovedPayments({
+    userId: auth.sub,
+    email: auth.email,
+  });
+  const allApprovedPayments = await findApprovedPayments(
+    {
       userId: auth.sub,
       email: auth.email,
-    })
+    },
+    { includeExpired: true }
   );
+  const access = summarizePaidAccess(activePayments);
+  const trialRecord = allApprovedPayments
+    .filter((payment) => payment.wallet_kind === 'trial' || payment.source === 'trial')
+    .sort((a, b) => Number(b.expires_at || 0) - Number(a.expires_at || 0))[0];
+
+  if (trialRecord) {
+    const trialActive = !trialRecord.expires_at || Number(trialRecord.expires_at) > Date.now();
+    access.trial = {
+      active: trialActive,
+      expired: !trialActive,
+      expires_at: trialRecord.expires_at || null,
+    };
+  } else {
+    access.trial = {
+      active: false,
+      expired: false,
+      expires_at: null,
+    };
+  }
+
   return res.status(200).json({
     user: publicUser(user),
     usage,

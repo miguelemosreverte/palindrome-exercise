@@ -41,7 +41,43 @@ module.exports = async function handler(req, res) {
   });
 
   const payments = (await readPath('mercadopago-bridge/payments')) || {};
+  const walletBreakdown = {
+    total_wallets: 0,
+    trial_wallets: 0,
+    paid_wallets: 0,
+    coupon_wallets: 0,
+    expired_wallets: 0,
+    active_wallets: 0,
+    active_trial_wallets: 0,
+    active_paid_wallets: 0,
+    active_coupon_wallets: 0,
+  };
   for (const payment of Object.values(payments)) {
+    if (payment.status === 'approved') {
+      walletBreakdown.total_wallets += 1;
+      if (payment.wallet_kind === 'trial' || payment.source === 'trial') {
+        walletBreakdown.trial_wallets += 1;
+      } else if (payment.wallet_kind === 'coupon' || payment.source === 'coupon') {
+        walletBreakdown.coupon_wallets += 1;
+      } else {
+        walletBreakdown.paid_wallets += 1;
+      }
+
+      const expired = payment.expires_at && Number(payment.expires_at) <= Date.now();
+      if (expired) {
+        walletBreakdown.expired_wallets += 1;
+      } else {
+        walletBreakdown.active_wallets += 1;
+        if (payment.wallet_kind === 'trial' || payment.source === 'trial') {
+          walletBreakdown.active_trial_wallets += 1;
+        } else if (payment.wallet_kind === 'coupon' || payment.source === 'coupon') {
+          walletBreakdown.active_coupon_wallets += 1;
+        } else {
+          walletBreakdown.active_paid_wallets += 1;
+        }
+      }
+    }
+
     if (payment.status !== 'approved' || !payment.user_id) continue;
     const row = rows.find((entry) => entry.user_id === payment.user_id);
     if (!row) continue;
@@ -95,13 +131,13 @@ module.exports = async function handler(req, res) {
       chat_threads: Object.keys(root.chats || {}).length,
       usage_users: Object.keys(root.usage?.users || {}).length,
       usage_events: Object.keys(root.usage?.events || {}).length,
-      anonymous_demo_sessions: Object.keys(root['demo-anonymous'] || {}).length,
+      wallet_records: walletBreakdown.total_wallets,
     },
+    wallet_breakdown: walletBreakdown,
     payments: root.payments || {},
     chats: root.chats || {},
     usage_users: root.usage?.users || {},
     usage_events: root.usage?.events || {},
-    anonymous_demo_sessions: root['demo-anonymous'] || {},
     raw_firebase: root,
   });
 };

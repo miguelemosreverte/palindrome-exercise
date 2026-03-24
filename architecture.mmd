@@ -1,6 +1,6 @@
 flowchart TD
     U[Visitor / User] --> I[index.html]
-    U --> D[demo.html]
+    U --> T[demo.html trial page]
     U --> A[auth.html]
     U --> C[chat.html]
     U --> DB[dashboard.html]
@@ -16,24 +16,19 @@ flowchart TD
     DB --> ME[/api/auth/me.js/]
     AD --> ADMIN[/api/admin/summary.js/]
 
-    D --> DEMO[/api/demo-stream.js GET/POST/]
-    C --> DEMO
     C --> INF[/api/infer.js/]
 
     LOGIN --> AUTH[lib/auth.js]
     REG --> AUTH
     ME --> AUTH
     ADMIN --> AUTH
-    DEMO --> AUTH
     INF --> AUTH
 
-    DEMO --> ACCESS[lib/access.js]
-    INF --> ACCESS
+    INF --> ACCESS[lib/access.js]
     ME --> ACCESS
     W --> ACCESS
 
-    DEMO --> USAGE[lib/usage.js]
-    INF --> USAGE
+    INF --> USAGE[lib/usage.js]
     ADMIN --> USAGE
 
     W --> FB[lib/firebase.js]
@@ -42,8 +37,11 @@ flowchart TD
     USAGE --> FB
     ADMIN --> FB
 
-    DEMO --> LLM[LLM Provider\nDEMO_API_BASE / CHUTESAI_API_KEY]
-    INF --> LLM
+    REG --> TW[Trial Wallet]
+    LOGIN --> TW
+    TW --> FB
+
+    INF --> LLM[LLM Provider\nLLM_API_BASE / LLM_API_KEY]
     C --> WS[server/chat-server.js\nunfinished / separate realtime path]
     WS --> LLM
 

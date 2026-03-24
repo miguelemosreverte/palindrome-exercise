@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Uso y saldo</title>
+  <title>Wallet y uso</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="topbar">Panel personal de uso y actividad estimada.</div>
+  <div class="topbar">Wallet personal, prueba activa y actividad estimada.</div>
   <div class="shell">
     <nav class="nav">
       <div>
         <div class="brand-kicker">Cuenta</div>
-        <div class="brand-title">Uso y saldo</div>
+        <div class="brand-title">Wallet y uso</div>
       </div>
       <div class="nav-links">
         <a class="nav-link" href="/">Inicio</a>
@@ -71,19 +71,20 @@
             <div class="stat-value" id="costValue">USD 0</div>
           </div>
         </div>
+        <div class="helper" id="walletStateMessage">Cargando estado de wallet...</div>
       </section>
 
       <section class="card-grid">
         <article class="card tile">
           <div class="section-kicker">Actividad</div>
           <h3 id="lastUsedValue">Sin actividad</h3>
-          <p>Fecha estimada del ultimo uso registrado en demo o requests vinculados a tu cuenta.</p>
+          <p>Fecha estimada del último uso registrado en tu cuenta, incluyendo chats e inferencias vinculadas a tu wallet.</p>
         </article>
-        <article class="card tile">
-          <div class="section-kicker">Demo</div>
-          <h3>Probar modelos</h3>
-          <p>Usá la demo con tu cuenta iniciada para que el consumo quede asociado a tu usuario.</p>
-          <a class="button secondary" href="/demo.html">Ir a la demo</a>
+        <article class="card tile" id="walletActionCard">
+          <div class="section-kicker">Wallet</div>
+          <h3 id="walletActionTitle">Preparando estado</h3>
+          <p id="walletActionCopy">Estamos calculando tu prueba, tu saldo y el próximo paso recomendado.</p>
+          <a class="button secondary" id="walletActionLink" href="/chat.html">Abrir chat</a>
         </article>
         <article class="card tile" id="adminCard" style="display:none">
           <div class="section-kicker">Admin</div>
@@ -94,9 +95,9 @@
       </section>
 
       <section class="glass-panel stack">
-        <div class="section-kicker">Uso programatico</div>
+        <div class="section-kicker">Uso programático</div>
         <div class="helper">
-          Si ya tenés una compra aprobada, podés usar el endpoint seguro de este proyecto. El consumo se controla del lado del servidor.
+          Si ya tenés saldo pago o un token de acceso aprobado, podés usar el endpoint seguro de este proyecto. El consumo se controla del lado del servidor.
         </div>
         <pre class="output" id="inferSnippet">Todavia no hay acceso habilitado para esta cuenta.</pre>
       </section>
@@ -123,15 +124,49 @@
         document.getElementById('requestsValue').textContent = data.usage.requests || 0;
         document.getElementById('promptCharsValue').textContent = data.usage.prompt_chars || 0;
         document.getElementById('costValue').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
-        document.getElementById('limitValue').textContent = AppBridge.formatUsd(data.access.credit_limit_usd || 0);
-        document.getElementById('usedValue').textContent = AppBridge.formatUsd(data.access.spent_estimated_usd || 0);
-        document.getElementById('creditValue').textContent = AppBridge.formatUsd(data.access.remaining_usd || 0);
-        const utilizationPct = data.access.credit_limit_usd
-          ? (((data.access.spent_estimated_usd || 0) / data.access.credit_limit_usd) * 100).toFixed(1)
+        document.getElementById('limitValue').textContent = AppBridge.formatUsd(data.wallet.credit_limit_usd || 0);
+        document.getElementById('usedValue').textContent = AppBridge.formatUsd(data.wallet.spent_estimated_usd || 0);
+        document.getElementById('creditValue').textContent = AppBridge.formatUsd(data.wallet.remaining_usd || 0);
+        const utilizationPct = data.wallet.credit_limit_usd
+          ? (((data.wallet.spent_estimated_usd || 0) / data.wallet.credit_limit_usd) * 100).toFixed(1)
           : '0.0';
         document.getElementById('usagePctValue').textContent = `${utilizationPct}%`;
         document.getElementById('lastUsedValue').textContent = AppBridge.formatDate(data.usage.last_used_at);
-        const firstToken = data.access.tokens?.[0];
+        const walletStateNode = document.getElementById('walletStateMessage');
+        const walletActionTitle = document.getElementById('walletActionTitle');
+        const walletActionCopy = document.getElementById('walletActionCopy');
+        const walletActionLink = document.getElementById('walletActionLink');
+        const trial = data.wallet?.trial || {};
+        const hasRemaining = Number(data.wallet?.remaining_usd || 0) > 0;
+        const trialEndsText = trial.expires_at ? AppBridge.formatDate(trial.expires_at) : 'sin fecha';
+
+        if (trial.active) {
+          walletStateNode.textContent = `Tu prueba gratis está activa hasta ${trialEndsText}. Si querés seguir después, podés cargar saldo en tu wallet en cualquier momento.`;
+          walletActionTitle.textContent = 'Prueba activa';
+          walletActionCopy.textContent = 'Ya podés usar el chat completo. Cuando termine la prueba, el sistema te va a pedir saldo para seguir.';
+          walletActionLink.textContent = 'Abrir chat';
+          walletActionLink.href = '/chat.html';
+        } else if (hasRemaining) {
+          walletStateNode.textContent = `Tenés ${AppBridge.formatUsd(data.wallet.remaining_usd || 0)} disponibles en tu wallet.`;
+          walletActionTitle.textContent = 'Wallet activo';
+          walletActionCopy.textContent = 'Tu prueba terminó o ya usaste saldo pago. Podés seguir entrando al chat con tu balance actual.';
+          walletActionLink.textContent = 'Abrir chat';
+          walletActionLink.href = '/chat.html';
+        } else if (trial.expired) {
+          walletStateNode.textContent = `Tu prueba gratis terminó el ${trialEndsText}. Para seguir usando el producto, necesitás cargar saldo.`;
+          walletActionTitle.textContent = 'Prueba vencida';
+          walletActionCopy.textContent = 'No hace falta cambiar de cuenta ni de flujo: simplemente cargá wallet y seguí desde el mismo chat.';
+          walletActionLink.textContent = 'Cargar saldo';
+          walletActionLink.href = '/#checkout';
+        } else {
+          walletStateNode.textContent = 'Todavía no hay saldo disponible en tu wallet. Podés cargarlo cuando quieras y seguir desde el mismo producto.';
+          walletActionTitle.textContent = 'Sin saldo todavía';
+          walletActionCopy.textContent = 'La experiencia principal está pensada para entrar al chat con prueba o wallet activo.';
+          walletActionLink.textContent = 'Cargar saldo';
+          walletActionLink.href = '/#checkout';
+        }
+
+        const firstToken = data.wallet.tokens?.[0];
         if (firstToken) {
           document.getElementById('inferSnippet').textContent =
 `curl -X POST "${window.location.origin}/api/infer" \\
@@ -145,9 +180,7 @@
   }'`;
         }
 
-        if (data.role === 'admin') {
-          document.getElementById('adminCard').style.display = 'block';
-        }
+        document.getElementById('adminCard').style.display = data.role === 'admin' ? 'block' : 'none';
       } catch (error) {
         AppBridge.setStatus(statusNode, 'error', 'Necesitás iniciar sesión para ver este panel.');
         setTimeout(() => {

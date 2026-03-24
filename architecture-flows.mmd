@@ -1,13 +1,14 @@
 flowchart LR
-    A[1. Visitor arrives] --> B[2. Free demo or login]
-    B --> C{3. Wants full access?}
-    C -- No --> D[Stay on free demo]
-    C -- Yes --> E[Login / Create account]
-    E --> F[Dashboard / Billing]
-    F --> G[Checkout via Mercado Pago]
-    G --> H[Webhook confirms payment]
-    H --> I[Access quota becomes available]
-    I --> J[User enters paid chat]
-    J --> K[Backend calls LLM provider]
-    K --> L[Usage is recorded in Firebase]
-    L --> M[Admin sees usage / spend / users]
+    A[1. Visitor arrives] --> B[2. Create account or log in]
+    B --> C[3. Trial wallet is provisioned]
+    C --> D{4. Trial or paid balance available?}
+    D -- Yes --> E[5. User enters full chat]
+    E --> F[6. Backend calls LLM provider]
+    F --> G[7. Usage is recorded in Firebase]
+    G --> H[8. Wallet spend is updated]
+    H --> I[9. Admin sees usage, wallet, payments, and users]
+    D -- No --> J[5. User lands in wallet dashboard]
+    J --> K[6. Checkout via Mercado Pago]
+    K --> L[7. Webhook confirms payment]
+    L --> M[8. Paid wallet becomes available]
+    M --> E

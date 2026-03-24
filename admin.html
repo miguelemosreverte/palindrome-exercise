@@ -67,6 +67,10 @@
           <div class="stat-value" id="paymentsValue">0</div>
         </div>
         <div class="card stat-card">
+          <div class="stat-label">Wallets</div>
+          <div class="stat-value" id="walletsValue">0</div>
+        </div>
+        <div class="card stat-card">
           <div class="stat-label">Chats</div>
           <div class="stat-value" id="chatsValue">0</div>
         </div>
@@ -153,7 +157,7 @@
                 <div class="stat-value" id="selectedCost">USD 0</div>
               </div>
               <div class="card stat-card">
-                <div class="stat-label">Remaining credit</div>
+                <div class="stat-label">Wallet remaining</div>
                 <div class="stat-value" id="selectedCredit">USD 0</div>
               </div>
             </div>
@@ -202,9 +206,11 @@
               <tr>
                 <th>Reference</th>
                 <th>User</th>
+                <th>Wallet</th>
                 <th>Status</th>
                 <th>Credit</th>
                 <th>Spent</th>
+                <th>Expires</th>
                 <th>Updated</th>
               </tr>
             </thead>
@@ -257,20 +263,20 @@
         </article>
 
         <article class="glass-panel stack">
-          <div class="section-kicker">Anonymous demo sessions</div>
+          <div class="section-kicker">Wallet records</div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Session</th>
-                  <th>Requests</th>
-                  <th>Limit</th>
-                  <th>Spent</th>
-                  <th>Remaining</th>
-                  <th>Created</th>
+                  <th>Type</th>
+                  <th>Active</th>
+                  <th>Expired</th>
+                  <th>Credit issued</th>
+                  <th>Estimated spent</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
-              <tbody id="anonymousTable"></tbody>
+              <tbody id="walletTable"></tbody>
             </table>
           </div>
         </article>
@@ -372,13 +378,15 @@
             <tr>
               <td>${escapeHtml(payment.ref || '-')}</td>
               <td>${escapeHtml(payment.email || payment.user_id || 'Anonymous')}</td>
+              <td>${escapeHtml(payment.wallet_kind || payment.source || 'paid')}</td>
               <td>${escapeHtml(payment.status || 'unknown')}</td>
               <td>${escapeHtml(AppBridge.formatUsd(payment.credit_limit_usd || 0))}</td>
               <td>${escapeHtml(AppBridge.formatUsd(payment.spent_estimated_usd || 0))}</td>
+              <td>${escapeHtml(formatAdminDate(payment.expires_at))}</td>
               <td>${escapeHtml(formatAdminDate(payment.updated_at || payment.created_at || payment.date_approved))}</td>
             </tr>
           `).join('')
-        : renderEmptyRow(6, 'No payment records yet.');
+        : renderEmptyRow(8, 'No payment records yet.');
     }
 
     function renderChatsTable(chats) {
@@ -418,23 +426,44 @@
         : renderEmptyRow(6, 'No user usage summaries yet.');
     }
 
-    function renderAnonymousTable(sessions) {
-      const entries = Object.entries(sessions || {})
-        .map(([sessionId, session]) => ({ session_id: sessionId, ...session }))
-        .sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+    function renderWalletBreakdownTable(breakdown, totals) {
+      const rows = [
+        {
+          type: 'Trial wallets',
+          active: breakdown.active_trial_wallets || 0,
+          expired: breakdown.expired_wallets || 0,
+          credit: 'Trial credit policy',
+          spent: 'Tracked in usage',
+          notes: 'Provisioned automatically at signup or first login.',
+        },
+        {
+          type: 'Paid wallets',
+          active: breakdown.active_paid_wallets || 0,
+          expired: 0,
+          credit: AppBridge.formatUsd(totals.credit_limit_usd || 0),
+          spent: AppBridge.formatUsd(totals.credit_spent_usd || 0),
+          notes: 'Created from approved Mercado Pago purchases.',
+        },
+        {
+          type: 'Coupon wallets',
+          active: breakdown.active_coupon_wallets || 0,
+          expired: 0,
+          credit: 'Coupon based',
+          spent: 'Tracked in usage',
+          notes: 'Promotional or manually granted balance.',
+        },
+      ];
 
-      document.getElementById('anonymousTable').innerHTML = entries.length
-        ? entries.map((session) => `
-            <tr>
-              <td>${escapeHtml(session.session_id)}</td>
-              <td>${escapeHtml(session.requests || 0)}</td>
-              <td>${escapeHtml(session.requests_limit || 0)}</td>
-              <td>${escapeHtml(AppBridge.formatUsd(session.spent_estimated_usd || 0))}</td>
-              <td>${escapeHtml(AppBridge.formatUsd(Math.max(Number(session.credit_limit_usd || 0) - Number(session.spent_estimated_usd || 0), 0)))}</td>
-              <td>${escapeHtml(formatAdminDate(session.created_at || session.updated_at))}</td>
-            </tr>
-          `).join('')
-        : renderEmptyRow(6, 'No anonymous demo sessions yet.');
+      document.getElementById('walletTable').innerHTML = rows.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.type)}</td>
+          <td>${escapeHtml(row.active)}</td>
+          <td>${escapeHtml(row.expired)}</td>
+          <td>${escapeHtml(row.credit)}</td>
+          <td>${escapeHtml(row.spent)}</td>
+          <td>${escapeHtml(row.notes)}</td>
+        </tr>
+      `).join('');
     }
 
     function renderFirebaseOverview(data) {
@@ -445,9 +474,9 @@
           copy: `${data.counts.usage_users || 0} users have tracked usage summaries.`,
         },
         {
-          kicker: 'Payments',
-          title: data.counts.payments,
-          copy: `${AppBridge.formatUsd(data.totals.credit_limit_usd || 0)} credit issued across approved purchases.`,
+          kicker: 'Wallets',
+          title: data.counts.wallet_records,
+          copy: `${data.wallet_breakdown.active_wallets || 0} active wallets across trial, paid, and coupon access.`,
         },
         {
           kicker: 'Chats',
@@ -460,9 +489,9 @@
           copy: `${escapeHtml(AppBridge.formatUsd(data.totals.estimated_cost_usd || 0))} estimated total usage cost tracked so far.`,
         },
         {
-          kicker: 'Anonymous demos',
-          title: data.counts.anonymous_demo_sessions,
-          copy: `${data.counts.anonymous_demo_sessions || 0} anonymous demo identities currently saved.`,
+          kicker: 'Trial wallets',
+          title: data.wallet_breakdown.trial_wallets,
+          copy: `${data.wallet_breakdown.expired_wallets || 0} trial wallets have already expired.`,
         },
         {
           kicker: 'Budget remaining',
@@ -668,6 +697,7 @@
         setText('spentValue', AppBridge.formatUsd(data.budget.estimated_spent_usd));
         setText('remainingValue', AppBridge.formatUsd(data.budget.estimated_remaining_usd));
         setText('paymentsValue', data.counts.payments);
+        setText('walletsValue', data.counts.wallet_records);
         setText('chatsValue', data.counts.chat_threads);
         setText('eventsValue', data.counts.usage_events);
         setText('promptTotalValue', data.totals.prompt_chars || 0);
@@ -679,10 +709,6 @@
           data.counts.usage_events
             ? `Estimated spend ${AppBridge.formatUsd(data.budget.estimated_spent_usd)} out of ${AppBridge.formatUsd(data.budget.topped_up_usd)}. Remaining: ${AppBridge.formatUsd(data.budget.estimated_remaining_usd)}.`
             : `No tracked usage yet. Budget remains untouched at ${AppBridge.formatUsd(data.budget.topped_up_usd)} until the first payment-approved request is recorded.`
-        );
-        setText(
-          'budgetCopy',
-          `Estimated remaining: ${AppBridge.formatUsd(data.budget.estimated_remaining_usd)}. Users: ${data.totals.users}.`
         );
         setText('utilizationValue', `${data.budget.utilization_pct}%`);
 
@@ -701,7 +727,7 @@
         renderPaymentsTable(data.payments);
         renderChatsTable(data.chats);
         renderUsageUsersTable(data.usage_users);
-        renderAnonymousTable(data.anonymous_demo_sessions);
+        renderWalletBreakdownTable(data.wallet_breakdown, data.totals);
         renderFirebaseOverview(data);
         renderJsonBlock('firebaseJson', data.raw_firebase, 'No Firebase records found under the configured app root yet.');
         renderCharts(data);
