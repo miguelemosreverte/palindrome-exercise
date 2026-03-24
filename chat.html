@@ -173,6 +173,27 @@
     const overlay = $('sidebarOverlay');
     let sessionId = null, sending = false, msgCountBefore = 0;
 
+    const SYSTEM = `Respondé en español. Sos un asistente en una app web que tiene rendering especial.
+
+CAPACIDADES DE RENDERING DE LA UI:
+- La UI renderiza Chart.js automáticamente cuando escribís un bloque de código con lenguaje "chartjs". Ejemplo:
+
+\`\`\`chartjs
+{"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30],"backgroundColor":["#316dff","#4a8af5","#6ba3f7"]}]},"options":{"responsive":true,"plugins":{"legend":{"display":true}}}}
+\`\`\`
+
+REGLAS PARA GRÁFICOS:
+- Usá \`\`\`chartjs con JSON puro de Chart.js v4 adentro. NO crees archivos HTML.
+- NO uses "horizontalBar". Para barras horizontales: "type":"bar" + "indexAxis":"y".
+- Si los datos son años: ponelos como labels (strings), no como data numérica.
+- Paleta por defecto: #316dff, #4a8af5, #6ba3f7, #89bff9, #a8d4fb, #c7e6fd
+- Siempre incluí "options":{"responsive":true}
+
+REGLAS GENERALES:
+- Podés usar bash para ejecutar Python, buscar en la web, etc — usá tus herramientas normalmente.
+- Cuando el usuario pida un gráfico, SIEMPRE usá el bloque \`\`\`chartjs en vez de crear archivos HTML.
+- Podés combinar texto, herramientas y gráficos en la misma respuesta.`;
+
     // ─── Sidebar ───
     function openSB() { sidebar.classList.add('open'); overlay.classList.add('open'); }
     function closeSB() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
@@ -188,11 +209,26 @@
     function scroll() { messagesNode.scrollTop = messagesNode.scrollHeight; }
 
     // ─── Markdown renderer ───
+    let chartId = 0;
+    const pendingCharts = {};
+
     function md(text) {
       try {
         let h = esc(text);
         const p = h.split('```');
-        if (p.length >= 3) { h = ''; for (let i = 0; i < p.length; i++) { if (i%2===0) h += p[i]; else { const c = p[i].replace(/^\w*\n/,''); h += `<pre style="margin:8px 0;padding:12px;border-radius:10px;background:#0f172a;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;"><code>${c}</code></pre>`; }}}
+        if (p.length >= 3) { h = ''; for (let i = 0; i < p.length; i++) { if (i%2===0) h += p[i]; else {
+          const raw = p[i];
+          const isChart = raw.startsWith('chartjs\n') || raw.startsWith('chartjs\r');
+          if (isChart) {
+            const json = raw.replace(/^chartjs\s*\n?/, '').trim();
+            const cid = 'chart-' + (chartId++);
+            pendingCharts[cid] = json;
+            h += `<div style="margin:12px 0;border-radius:14px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${cid}" style="max-height:350px;"></canvas></div>`;
+          } else {
+            const c = raw.replace(/^\w*\n/, '');
+            h += `<pre style="margin:8px 0;padding:12px;border-radius:10px;background:#0f172a;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;"><code>${c}</code></pre>`;
+          }
+        }}}
         h = h.replace(/`([^`\n]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;font-size:13px;font-family:\'JetBrains Mono\',monospace;">$1</code>');
         h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
         h = h.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:10px 0 4px;">$1</div>');
@@ -275,6 +311,31 @@
       const html = renderParts(parts);
       r.innerHTML = `<div class="msg-assistant"><div class="msg-badge"></div><div style="min-width:0;flex:1;">${html}</div></div>`;
       messagesNode.appendChild(r); scroll();
+      // Render any pending charts
+      renderPendingCharts();
+    }
+
+    function renderPendingCharts() {
+      for (const [cid, json] of Object.entries(pendingCharts)) {
+        const canvas = document.getElementById(cid);
+        if (!canvas) continue;
+        try {
+          let clean = json.trim();
+          // Fix common LLM issues
+          if (clean.startsWith('```')) clean = clean.replace(/^```\w*\n?/, '').replace(/```$/, '').trim();
+          // Try to fix extra trailing braces
+          let config;
+          try { config = JSON.parse(clean); } catch {
+            let fixed = clean;
+            for (let i = 0; i < 3; i++) fixed = fixed.replace(/\}\s*\}$/, '}');
+            config = JSON.parse(fixed);
+          }
+          new Chart(canvas.getContext('2d'), config);
+        } catch (e) {
+          canvas.parentElement.innerHTML = `<div style="color:var(--slate);font-size:12px;padding:12px;">⚠️ Error rendering chart: ${esc(e.message)}</div><pre style="font-size:11px;color:var(--slate);padding:8px;max-height:150px;overflow:auto;">${esc(json.slice(0,500))}</pre>`;
+        }
+        delete pendingCharts[cid];
+      }
     }
 
     function showEmpty() {
@@ -338,13 +399,19 @@
 
         // Prioritized free providers
         const FREE_PROVIDERS = ['opencode', 'evroc', 'zenmux', 'zai', 'io-net', 'nvidia', 'groq', 'cerebras', 'alibaba-coding-plan', 'inference', 'fastrouter'];
+        const MODEL_PRIORITY = ['gpt-5-nano', 'big-pickle', 'nemotron', 'mimo', 'minimax', 'devstral', 'llama-3.3', 'qwen3', 'deepseek'];
 
         let html = '';
 
-        // Show configured providers first
+        // Show configured providers first, sorted by priority
         for (const p of (configured.providers || [])) {
           const models = Object.values(p.models || {}).filter(m => m.status === 'active' || !m.status);
           if (!models.length) continue;
+          models.sort((a, b) => {
+            const aIdx = MODEL_PRIORITY.findIndex(k => (a.id || '').toLowerCase().includes(k));
+            const bIdx = MODEL_PRIORITY.findIndex(k => (b.id || '').toLowerCase().includes(k));
+            return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
+          });
           html += `<optgroup label="★ ${esc(p.name || p.id)}">`;
           for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
           html += '</optgroup>';
@@ -416,7 +483,7 @@
       try {
         const mv = modelSelect.value;
         const [prov, mid] = mv.includes('::') ? mv.split('::') : [undefined, undefined];
-        const body = { parts: [{ type: 'text', text }] };
+        const body = { parts: [{ type: 'text', text }], system: SYSTEM };
         if (prov && mid) body.model = { providerID: prov, modelID: mid };
 
         statusInfo.textContent = 'Procesando...';
