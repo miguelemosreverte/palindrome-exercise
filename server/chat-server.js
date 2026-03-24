@@ -7,7 +7,8 @@ const { verifyJwt } = require('../lib/jwt');
 const { estimateCostUsd, recordUsage } = require('../lib/usage');
 
 const PORT = Number(process.env.CHAT_WS_PORT || 8787);
-const DEMO_API_BASE = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
+const LLM_API_BASE = process.env.LLM_API_BASE;
+const LLM_API_KEY = process.env.LLM_API_KEY;
 
 function send(ws, type, payload) {
   ws.send(JSON.stringify({ type, ...payload }));
@@ -95,11 +96,15 @@ async function handleUserMessage(ws, session, payload) {
   send(ws, 'assistant_thinking', { chat_id: chatId, model });
 
   // Use fetch with streaming
-  const response = await fetch(`${DEMO_API_BASE}/chat/completions`, {
+  if (!LLM_API_BASE || !LLM_API_KEY) {
+    return send(ws, 'error', { message: 'LLM provider is not configured.' });
+  }
+
+  const response = await fetch(`${LLM_API_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}`,
+      Authorization: `Bearer ${LLM_API_KEY}`,
     },
     body: JSON.stringify({
       model,

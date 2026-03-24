@@ -226,31 +226,24 @@
                 Accedé a IA con Mercado Pago.
               </h1>
               <p class="mt-6 max-w-2xl text-lg leading-8 text-slate">
-                Probá gratis o comprá acceso completo. Un pago, una clave, listo.
+                Empezá con una prueba gratis de 7 días o cargá saldo para acceso continuo. Tu wallet se activa desde la cuenta y después todo pasa por el chat completo.
               </p>
             </div>
 
-            <!-- Inline demo -->
             <div class="mt-10 w-full max-w-xl rounded-[2rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl sm:p-8">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Probá gratis</p>
-              <h3 class="mt-2 text-2xl font-extrabold leading-tight">Escribí un prompt y mirá la respuesta</h3>
-              <div class="mt-4">
-                <label class="block text-xs font-semibold uppercase tracking-widest text-slate/70 mb-2">Modelo</label>
-                <select id="demoModel" class="w-full rounded-xl border border-slate/15 bg-white/80 px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-ocean/30">
-                  <option value="">Cargando modelos...</option>
-                </select>
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Prueba gratis</p>
+              <h3 class="mt-2 text-2xl font-extrabold leading-tight">Usá la aplicación completa durante 7 días</h3>
+              <p class="mt-4 text-sm leading-7 text-slate">
+                En vez de una demo aislada, creás tu cuenta y entrás directo al producto. Durante la prueba inicial ves tu wallet, tu uso y el chat completo en una sola experiencia.
+              </p>
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a href="/auth.html" class="inline-flex items-center justify-center rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0]">
+                  Empezar prueba gratis
+                </a>
+                <a href="/dashboard.html" class="inline-flex items-center justify-center rounded-full border border-slate/15 bg-white/80 px-6 py-3 text-sm font-semibold text-ink transition hover:-translate-y-[1px]">
+                  Ver wallet
+                </a>
               </div>
-              <div class="mt-4">
-                <textarea id="demoPrompt" rows="3" placeholder="Ej: Explicame qué es una red neuronal en una oración" class="w-full rounded-xl border border-slate/15 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-slate/40 outline-none focus:ring-2 focus:ring-ocean/30 resize-none"></textarea>
-              </div>
-              <button
-                id="demoBtn"
-                onclick="runDemo()"
-                class="mt-4 inline-flex w-full items-center justify-center rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Probar
-              </button>
-              <div id="demoResult" class="mt-4 hidden rounded-xl border border-slate/10 bg-white/80 px-4 py-3 text-sm leading-6 text-ink whitespace-pre-wrap"></div>
             </div>
           </div>
 
@@ -380,88 +373,6 @@
       setStatus("error", "El pago no se completó. Revisá los datos e intentá nuevamente.");
     }
 
-    // Load models from ChutesAI
-    (async function loadModels() {
-      const select = document.getElementById("demoModel");
-      try {
-        const res = await fetch(`${API_BASE}/api/demo-stream`);
-        const data = await res.json();
-        select.innerHTML = "";
-        (data.models || []).forEach(m => {
-          const opt = document.createElement("option");
-          opt.value = m.id;
-          opt.textContent = m.label;
-          select.appendChild(opt);
-        });
-      } catch {
-        select.innerHTML = '<option value="deepseek-ai/DeepSeek-V3.2-TEE">DeepSeek V3.2</option>';
-      }
-    })();
-
-    function getDemoSessionId() {
-      let id = localStorage.getItem("demo_session_id");
-      if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem("demo_session_id", id);
-      }
-      return id;
-    }
-
-    async function runDemo() {
-      const btn = document.getElementById("demoBtn");
-      const result = document.getElementById("demoResult");
-      const prompt = document.getElementById("demoPrompt").value.trim();
-      const model = document.getElementById("demoModel").value;
-
-      if (!prompt) return;
-
-      btn.disabled = true;
-      btn.textContent = "Pensando...";
-      result.classList.remove("hidden");
-      result.textContent = "";
-
-      try {
-        const res = await fetch(`${API_BASE}/api/demo-stream`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Demo-Session": getDemoSessionId()
-          },
-          body: JSON.stringify({ prompt, model, anonymous_id: getDemoSessionId() })
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Error en la demo");
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const payload = line.slice(6).trim();
-            if (payload === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(payload);
-              if (parsed.text) result.textContent += parsed.text;
-            } catch {}
-          }
-        }
-      } catch (err) {
-        result.textContent = result.textContent || ("Error: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Probar";
-      }
-    }
   </script>
 
 </body>

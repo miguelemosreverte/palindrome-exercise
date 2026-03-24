@@ -1,5 +1,5 @@
 # Prompt: Hacé un gráfico de torta que muestre la distribución: Frontend 35%, Backend 40%, DevOps 15%, QA 10%.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:18:28.284Z
 # Pass: true
 # Meta: {"colors":["#316dff","#4a8af5","#89bff9","#a8d4fb"],"hasOptions":true}

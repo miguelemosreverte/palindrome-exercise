@@ -1,5 +1,5 @@
 # Prompt: Buscá en Wikipedia la cronología de las Invasiones Inglesas a Buenos Aires. Después usá Python para generar el JSON de Chart.js que represente esa timeline. Finalmente usá la herramienta <chart> para renderizar el gráfico.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:34:05.676Z
 # Pass: false
 # Reason: No <web_search> block

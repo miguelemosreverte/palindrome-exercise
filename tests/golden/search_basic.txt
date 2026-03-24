@@ -1,5 +1,5 @@
 # Prompt: Buscá cuál es la población actual de Argentina.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:18:30.572Z
 # Pass: false
 # Reason: No <web_search> block found

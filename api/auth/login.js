@@ -8,6 +8,7 @@ const {
   verifyPassword,
 } = require('../../lib/auth');
 const { readJsonBody } = require('../../lib/http');
+const { ensureTrialWallet } = require('../../lib/coupons');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -44,6 +45,7 @@ module.exports = async function handler(req, res) {
     }
 
     await updateLastLogin(user.id);
+    await ensureTrialWallet(user.id, user.email);
     const role = isAdmin(user.email) ? 'admin' : 'user';
     const token = createToken({
       sub: user.id,

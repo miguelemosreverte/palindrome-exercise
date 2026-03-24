@@ -1,5 +1,5 @@
 # Prompt: Hacé un gráfico que muestre estos eventos históricos de Argentina: Revolución de Mayo (1810), Independencia (1816), Batalla de Caseros (1852), Constitución (1853), Ley Sáenz Peña (1912).
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:18:23.347Z
 # Pass: true
 # Meta: {"colors":["#316dff","#4a8af5","#6ba3f7","#89bff9","#a8d4fb"],"hasOptions":true}

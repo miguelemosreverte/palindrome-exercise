@@ -1,6 +1,6 @@
 const { createToken, createUser, isAdmin, publicUser } = require('../../lib/auth');
 const { readJsonBody } = require('../../lib/http');
-const { grantWelcomeCredit } = require('../../lib/coupons');
+const { ensureTrialWallet } = require('../../lib/coupons');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,11 +16,11 @@ module.exports = async function handler(req, res) {
       role: isAdmin(user.email) ? 'admin' : 'user',
     });
 
-    // Auto-grant $1 welcome credit
-    await grantWelcomeCredit(user.id, user.email);
+    await ensureTrialWallet(user.id, user.email);
 
     return res.status(201).json({
       token,
+      role: isAdmin(user.email) ? 'admin' : 'user',
       user: publicUser(user),
     });
   } catch (error) {

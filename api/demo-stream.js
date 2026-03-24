@@ -13,9 +13,11 @@ const PREFERRED_FIRST = [
 
 async function handleGetModels(req, res) {
   try {
-    const demoBase = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
-    const response = await fetch(`${demoBase}/models`, {
-      headers: { Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}` },
+    const providerBase = process.env.LLM_API_BASE;
+    const providerKey = process.env.LLM_API_KEY;
+    if (!providerBase || !providerKey) throw new Error('LLM provider not configured');
+    const response = await fetch(`${providerBase}/models`, {
+      headers: { Authorization: `Bearer ${providerKey}` },
     });
     if (!response.ok) throw new Error(`${response.status}`);
     const data = await response.json();
@@ -36,7 +38,7 @@ async function handleGetModels(req, res) {
       models: [
         { id: 'Qwen/Qwen3-32B-TEE', label: 'Qwen/Qwen3-32B' },
         { id: 'deepseek-ai/DeepSeek-V3.2-TEE', label: 'DeepSeek V3.2' },
-        { id: 'chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE', label: 'Mistral Small 3.1' },
+        { id: 'mistralai/Mistral-Small-3.1-24B-Instruct-2503', label: 'Mistral Small 3.1' },
       ],
       warning: error.message,
     });
@@ -82,12 +84,16 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const demoBase = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
-    const demoRes = await fetch(`${demoBase}/chat/completions`, {
+    const providerBase = process.env.LLM_API_BASE;
+    const providerKey = process.env.LLM_API_KEY;
+    if (!providerBase || !providerKey) {
+      return res.status(500).json({ error: 'LLM provider is not configured' });
+    }
+    const demoRes = await fetch(`${providerBase}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}`,
+        Authorization: `Bearer ${providerKey}`,
       },
       body: JSON.stringify({
         model,

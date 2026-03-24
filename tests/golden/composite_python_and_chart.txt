@@ -1,5 +1,5 @@
 # Prompt: Usá Python para generar 20 números aleatorios entre 1 y 100, y después hacé un gráfico de línea con esos datos.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:15:25.375Z
 # Pass: true
 

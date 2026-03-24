@@ -16,9 +16,9 @@ const fs = require('fs');
 const path = require('path');
 const SYSTEM_PROMPT = require('../lib/system-prompt');
 
-const API_BASE = 'https://llm.chutes.ai/v1';
-const API_KEY = process.env.CHUTESAI_API_KEY;
-const MODEL = process.env.TEST_MODEL || 'chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE';
+const API_BASE = process.env.LLM_API_BASE;
+const API_KEY = process.env.LLM_API_KEY;
+const MODEL = process.env.TEST_MODEL || 'mistralai/Mistral-Small-3.1-24B-Instruct-2503';
 const GOLDEN_DIR = path.join(__dirname, 'golden');
 
 // ─── Test cases ───
@@ -379,7 +379,7 @@ async function main() {
   const filter = process.argv[2];
 
   if (!API_KEY) {
-    console.error('Missing CHUTESAI_API_KEY in .env');
+    console.error('Missing LLM_API_KEY in .env');
     process.exit(1);
   }
 

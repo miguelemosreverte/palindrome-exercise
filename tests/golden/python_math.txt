@@ -1,5 +1,5 @@
 # Prompt: Usá Python para calcular la raíz cuadrada de 144 y el factorial de 10.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:18:07.054Z
 # Pass: true
 

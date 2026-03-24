@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demo de IA</title>
+  <title>Prueba gratis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="topbar">Demo simple para probar IA y registrar uso opcional por cuenta.</div>
+  <div class="topbar">Prueba gratis de 7 días para entrar directo al producto.</div>
   <div class="shell">
     <nav class="nav">
       <div>
-        <div class="brand-kicker">Demo</div>
-        <div class="brand-title">Probar IA</div>
+        <div class="brand-kicker">Prueba gratis</div>
+        <div class="brand-title">Empezar con wallet</div>
       </div>
       <div class="nav-links">
         <a class="nav-link" href="/">Inicio</a>
@@ -25,31 +25,34 @@
 
     <main class="split-grid section">
       <section class="glass-panel">
-        <div class="section-kicker">Elegí un modelo y escribí un prompt</div>
-        <form id="demoForm">
-          <label>Modelo
-            <select id="modelSelect" name="model"></select>
-          </label>
-          <label>Prompt
-            <textarea name="prompt" placeholder="Escribí una pregunta o pedí una demostración breve..."></textarea>
-          </label>
-          <button class="button" type="submit">Ejecutar demo</button>
-        </form>
+        <div class="section-kicker">Entrá al producto completo</div>
+        <h1 class="panel-title" style="font-size:42px">No más demo separada.</h1>
+        <p class="copy" style="margin-top:14px">
+          La prueba gratuita ahora se hace dentro de la aplicación real. Creás tu cuenta, recibís un wallet de prueba por 7 días y usás el chat completo desde el primer minuto.
+        </p>
+        <div style="margin-top:20px; display:flex; flex-wrap:wrap; gap:12px;">
+          <a class="button" href="/auth.html">Crear cuenta y empezar</a>
+          <a class="button secondary" href="/dashboard.html">Ver wallet</a>
+        </div>
         <div class="helper">
-          Si iniciás sesión, el uso de esta demo queda asociado a tu cuenta para el panel y el back office.
+          Si tu prueba vence o te quedás sin saldo, desde el dashboard podés cargar wallet y seguir sin cambiar de flujo.
         </div>
         <div id="status" class="status"></div>
       </section>
 
       <section class="stack">
         <div class="card tile">
-          <div class="section-kicker">Respuesta</div>
-          <pre class="output" id="resultBox">Todavia no ejecutaste la demo.</pre>
+          <div class="section-kicker">Qué incluye</div>
+          <pre class="output" id="resultBox">- Chat completo
+- Historial por usuario
+- Wallet y consumo
+- Vista administrativa
+- Upgrade a saldo pago sin cambiar de cuenta</pre>
         </div>
         <div class="card tile">
-          <div class="section-kicker">Uso estimado</div>
-          <div class="small-title" id="usageCost">USD 0</div>
-          <p class="copy" id="usageCopy">El costo estimado se mostrará después de cada ejecución.</p>
+          <div class="section-kicker">Después de la prueba</div>
+          <div class="small-title" id="usageCost">Wallet</div>
+          <p class="copy" id="usageCopy">Cuando termina la prueba, el producto te lleva al wallet para cargar saldo y seguir usando el chat.</p>
         </div>
       </section>
     </main>
@@ -58,93 +61,6 @@
   <script src="app.js"></script>
   <script>
     AppBridge.bindAuthLinks();
-    const statusNode = document.getElementById('status');
-    const modelSelect = document.getElementById('modelSelect');
-
-    function getDemoAnonymousId() {
-      let id = sessionStorage.getItem('demo_anon_id');
-      if (!id) {
-        id = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-        sessionStorage.setItem('demo_anon_id', id);
-      }
-      return id;
-    }
-
-    function resetDemoAnonymousId() {
-      sessionStorage.removeItem('demo_anon_id');
-      localStorage.removeItem('demo_anon_id');
-      return getDemoAnonymousId();
-    }
-
-    async function runDemoRequest(payload, anonymousId) {
-      return AppBridge.apiFetch('/api/demo', {
-        method: 'POST',
-        headers: {
-          ...(localStorage.getItem('app_access_token')
-            ? { 'X-Access-Token': localStorage.getItem('app_access_token') }
-            : {}),
-          'X-Demo-Session': anonymousId,
-        },
-        body: JSON.stringify({
-          ...payload,
-          anonymous_id: anonymousId,
-        }),
-      });
-    }
-
-    async function loadModels() {
-      try {
-        const data = await AppBridge.apiFetch('/api/demo-stream', { method: 'GET' });
-        modelSelect.innerHTML = data.models
-          .map((model) => `<option value="${model.id}">${model.label}</option>`)
-          .join('');
-      } catch (error) {
-        AppBridge.setStatus(statusNode, 'error', error.message);
-      }
-    }
-
-    document.getElementById('demoForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      const button = event.currentTarget.querySelector('button');
-      const anonymousId = getDemoAnonymousId();
-      button.disabled = true;
-      AppBridge.setStatus(statusNode, 'pending', 'Ejecutando demo...');
-
-      try {
-        let data;
-        try {
-          data = await runDemoRequest({
-            model: form.get('model'),
-            prompt: form.get('prompt'),
-          }, anonymousId);
-        } catch (error) {
-          const shouldRetry =
-            String(error.message || '').includes('No hay saldo suficiente para esta demo') &&
-            !localStorage.getItem('auth_token') &&
-            !localStorage.getItem('app_access_token');
-
-          if (!shouldRetry) throw error;
-
-          data = await runDemoRequest({
-            model: form.get('model'),
-            prompt: form.get('prompt'),
-          }, resetDemoAnonymousId());
-        }
-
-        document.getElementById('resultBox').textContent = data.text || 'Sin respuesta del modelo.';
-        document.getElementById('usageCost').textContent = AppBridge.formatUsd(data.usage.estimated_cost_usd || 0);
-        document.getElementById('usageCopy').textContent =
-          `Requests acumulados para esta identidad: ${data.usage.requests || 0}. Saldo estimado restante: ${AppBridge.formatUsd(data.entitlement?.remaining_usd || 0)}.`;
-        AppBridge.setStatus(statusNode, 'success', 'Demo ejecutada.');
-      } catch (error) {
-        AppBridge.setStatus(statusNode, 'error', error.message);
-      } finally {
-        button.disabled = false;
-      }
-    });
-
-    loadModels();
   </script>
 </body>
 </html>

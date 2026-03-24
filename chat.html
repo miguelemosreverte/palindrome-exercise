@@ -146,6 +146,23 @@
     .rc-tree-choice-title { font-size: 15px; font-weight: 700; }
     .rc-tree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
     .rc-tree-choice-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+    /* Progressive tree */
+    .ptree { margin: 8px 0; }
+    .ptree-breadcrumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+    .ptree-crumb { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(49,109,255,0.2); background: rgba(49,109,255,0.06); color: var(--ocean); transition: all 0.15s; }
+    .ptree-crumb:hover { background: rgba(49,109,255,0.12); }
+    .ptree-sep { color: var(--slate); opacity: 0.3; font-size: 14px; }
+    .ptree-question { font-size: 17px; font-weight: 800; margin-bottom: 12px; animation: fadeUp 0.2s ease-out; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .ptree-choices { display: flex; flex-direction: column; gap: 8px; animation: fadeUp 0.2s ease-out; }
+    .ptree-choice { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .ptree-choice:hover { background: rgba(255,255,255,0.9); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .ptree-choice-body { flex: 1; }
+    .ptree-choice-title { font-size: 15px; font-weight: 700; }
+    .ptree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .ptree-choice-arrow { color: var(--slate); opacity: 0.3; font-size: 16px; }
+    .ptree-choice.leaf .ptree-choice-arrow { color: var(--ocean); opacity: 0.6; }
+    .ptree-result { padding: 18px; border-radius: 14px; border: 1px solid rgba(49,109,255,0.15); background: rgba(49,109,255,0.04); animation: fadeUp 0.2s ease-out; }
   </style>
 </head>
 <body class="fade-in">
@@ -295,11 +312,12 @@ Para instrucciones paso a paso:
 {"items":[{"title":"Paso 1","desc":"Hacé esto"},{"title":"Paso 2","desc":"Después esto"}]}
 \`\`\`
 
-## 7. \`\`\`tree — Árbol de decisión / Exploración
-Para navegar opciones jerárquicas con niveles:
+## 7. \`\`\`tree — Árbol de decisión interactivo
+La UI renderiza el tree de forma PROGRESIVA: muestra un nivel a la vez, el usuario clickea una opción y se expande el siguiente nivel. Usá "children" para anidar niveles:
 \`\`\`tree
-{"levels":[{"label":"¿Qué te interesa?","options":["Naturaleza","Cultura","Aventura"],"selected":"Cultura"},{"label":"¿Qué tipo de cultura?","options":["Gastronomía","Museos","Arquitectura"]}],"question":"¿Querés profundizar?","choices":[{"title":"Gastronomía porteña","desc":"Parrillas, empanadas, y café"},{"title":"Tango y milongas","desc":"La danza más famosa de Argentina"}]}
+{"question":"¿Qué tipo de viaje?","choices":[{"title":"Naturaleza","desc":"Montañas y glaciares","children":{"question":"¿Qué paisaje?","choices":[{"title":"Patagonia","desc":"Fin del mundo"},{"title":"Selva","desc":"Iguazú y misiones"}]}},{"title":"Cultura","desc":"Tango, vino y arquitectura"}]}
 \`\`\`
+Cuantos más niveles de "children" incluyas, más interactivo es. Las opciones sin "children" son hojas finales que disparan una respuesta del modelo.
 
 REGLAS GENERALES:
 - PREFERÍ SIEMPRE los componentes ricos sobre markdown plano. Si hay datos tabulares → \`\`\`table. Si hay opciones → \`\`\`options. Si hay eventos cronológicos → \`\`\`timeline. Si hay métricas → \`\`\`cards. Si hay pasos → \`\`\`steps. Si hay decisiones jerárquicas → \`\`\`tree.
@@ -327,7 +345,147 @@ REGLAS GENERALES:
     // ─── Markdown renderer ───
     let chartId = 0;
     const pendingCharts = {};
+    const pendingTrees = {};
+    const treeStates = {}; // treeId → { data, path: [{title, desc}] }
     const RICH_BLOCKS = ['chartjs', 'timeline', 'options', 'cards', 'table', 'steps', 'tree'];
+
+    // Normalize tree data from various model output formats into a standard structure
+    function normalizeTree(data) {
+      // Standard: { question, choices: [{ title, desc, children: { question, choices } }] }
+      const items = Array.isArray(data) ? data : null;
+      const choices = data.choices || data.opciones || data.elecciones || items || [];
+
+      function normalizeChoices(arr) {
+        return (arr || []).map(c => {
+          if (typeof c === 'string') return { title: c, desc: '' };
+          const title = c.title || c.nombre || c.titulo || c.opcion || c.destino || '';
+          const desc = c.desc || c.descripcion || c.description || '';
+          const childData = c.children || c.hijos || c.subopciones || c.sub || null;
+          const children = childData ? {
+            question: childData.question || childData.pregunta || '',
+            choices: normalizeChoices(childData.choices || childData.opciones || childData.items || []),
+          } : null;
+          return { title, desc, children };
+        });
+      }
+
+      // Handle levels format → convert to nested tree
+      const levels = data.levels || data.niveles || [];
+      const areas = data.areas_de_interes || data.areas || data.categorias || [];
+      if (areas.length) {
+        return {
+          question: data.question || data.pregunta || '¿Qué elegís?',
+          choices: areas.map(a => ({
+            title: a.nombre || a.name || a.title || '',
+            desc: a.descripcion || a.description || a.desc || '',
+            children: (a.carreras || a.opciones || a.children || []).length ? {
+              question: '¿Cuál te interesa?',
+              choices: normalizeChoices(a.carreras || a.opciones || a.children || []),
+            } : null,
+          })),
+        };
+      }
+
+      return {
+        question: data.question || data.pregunta || '¿Qué elegís?',
+        choices: normalizeChoices(choices),
+      };
+    }
+
+    // Get the current node in the tree based on the path
+    function getTreeNode(treeId) {
+      const state = treeStates[treeId];
+      if (!state) return null;
+      let node = state.data;
+      for (const step of state.path) {
+        const choice = node.choices?.find(c => c.title === step.title);
+        if (choice?.children) node = choice.children;
+        else return null; // leaf
+      }
+      return node;
+    }
+
+    // Render a progressive tree
+    function renderTree(treeId) {
+      const el = document.getElementById(treeId);
+      if (!el) return;
+      const state = treeStates[treeId];
+      const node = getTreeNode(treeId);
+      let html = '';
+
+      // Breadcrumbs
+      if (state.path.length) {
+        html += '<div class="ptree-breadcrumbs">';
+        state.path.forEach((step, i) => {
+          if (i > 0) html += '<span class="ptree-sep">›</span>';
+          html += `<span class="ptree-crumb" onclick="treeGoBack('${treeId}',${i})">${esc(step.title)}</span>`;
+        });
+        html += '</div>';
+      }
+
+      if (!node) {
+        // Leaf — show selection + auto-send to model
+        const last = state.path[state.path.length - 1];
+        const fullPath = state.path.map(s => s.title).join(' → ');
+        html += `<div class="ptree-result">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:var(--ocean);font-weight:700;margin-bottom:6px;">Selección</div>
+          <div style="font-size:16px;font-weight:700;">${esc(last.title)}</div>
+          ${last.desc ? `<div style="margin-top:4px;font-size:13px;color:var(--slate);">${esc(last.desc)}</div>` : ''}
+          <div style="margin-top:8px;font-size:12px;color:var(--ocean);font-weight:600;">Ruta: ${esc(fullPath)}</div>
+        </div>`;
+        // Auto-send selection to model
+        if (!state.sent) {
+          state.sent = true;
+          setTimeout(() => {
+            promptInput.value = 'Elegí: ' + fullPath + '. Contame más sobre esta opción.';
+            send();
+          }, 300);
+        }
+      } else {
+        // Current level
+        html += `<div class="ptree-question">${esc(node.question || '¿Qué elegís?')}</div>`;
+        html += '<div class="ptree-choices">';
+        for (const c of (node.choices || [])) {
+          const hasKids = !!c.children;
+          html += `<div class="ptree-choice ${hasKids ? '' : 'leaf'}" onclick="treePick('${treeId}','${esc(c.title).replace(/'/g,"\\'")}','${esc(c.desc||'').replace(/'/g,"\\'")}')">
+            <div class="ptree-choice-body">
+              <div class="ptree-choice-title">${esc(c.title)}</div>
+              ${c.desc ? `<div class="ptree-choice-desc">${esc(c.desc)}</div>` : ''}
+            </div>
+            <div class="ptree-choice-arrow">${hasKids ? '›' : '→'}</div>
+          </div>`;
+        }
+        html += '</div>';
+      }
+
+      el.innerHTML = html;
+      scroll();
+    }
+
+    function treePick(treeId, title, desc) {
+      const state = treeStates[treeId];
+      if (!state) return;
+      state.path.push({ title, desc });
+      state.sent = false;
+      renderTree(treeId);
+    }
+
+    function treeGoBack(treeId, toIndex) {
+      const state = treeStates[treeId];
+      if (!state) return;
+      state.path.splice(toIndex);
+      state.sent = false;
+      renderTree(treeId);
+    }
+
+    // Initialize pending trees after DOM update
+    function initPendingTrees() {
+      for (const [treeId, data] of Object.entries(pendingTrees)) {
+        treeStates[treeId] = { data, path: [], sent: false };
+        renderTree(treeId);
+        delete pendingTrees[treeId];
+      }
+    }
 
     function renderRichBlock(lang, json) {
       try {
@@ -372,45 +530,10 @@ REGLAS GENERALES:
           }).join('')}</div>`;
         }
         if (lang === 'tree') {
-          let html = '<div>';
-          // Handle various tree structures
-          const levels = data.levels || data.niveles || [];
-          const areas = data.areas_de_interes || data.areas || data.categorias || [];
-
-          // If model used areas_de_interes format, convert to levels
-          if (areas.length && !levels.length) {
-            const opts = areas.map(a => a.nombre || a.name || a.title || '');
-            levels.push({ options: opts });
-          }
-
-          if (levels.length) {
-            html += '<div class="rc-tree-levels">';
-            for (const level of levels) {
-              const opts = level.options || level.opciones || [];
-              html += '<div class="rc-tree-row">';
-              for (const opt of opts) {
-                const optName = typeof opt === 'string' ? opt : (opt.nombre || opt.name || opt.title || '');
-                const sel = optName === (level.selected || level.seleccionado) ? ' selected' : '';
-                html += `<span class="rc-tree-pill${sel}" onclick="selectOption(this,'${esc(optName).replace(/'/g,"\\'")}')" style="cursor:pointer;">${esc(optName)}</span>`;
-              }
-              html += '</div><div class="rc-tree-arrow">↓</div>';
-            }
-            html += '</div>';
-          }
-          const question = data.question || data.pregunta || '';
-          if (question) html += `<div class="rc-tree-question">${esc(question)}</div>`;
-          const choices = data.choices || data.opciones || data.elecciones || items;
-          if (choices.length) {
-            html += '<div class="rc-tree-choices">';
-            for (const c of choices) {
-              const ct = c.title || c.nombre || c.titulo || '';
-              const cd = c.desc || c.descripcion || c.description || '';
-              html += `<div class="rc-tree-choice" onclick="selectOption(this,'${esc(ct).replace(/'/g,"\\'")}')"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(ct)}</div>${cd ? `<div class="rc-tree-choice-desc">${esc(cd)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
-            }
-            html += '</div>';
-          }
-          html += '</div>';
-          return html;
+          // Store tree data and create a progressive interactive widget
+          const treeId = 'ptree-' + (chartId++);
+          pendingTrees[treeId] = normalizeTree(data);
+          return `<div id="${treeId}" class="ptree"></div>`;
         }
         if (lang === 'chartjs') {
           const cid = 'chart-' + (chartId++);
@@ -520,8 +643,8 @@ REGLAS GENERALES:
       const html = renderParts(parts);
       r.innerHTML = `<div class="msg-assistant"><div class="msg-badge"></div><div style="min-width:0;flex:1;">${html}</div></div>`;
       messagesNode.appendChild(r); scroll();
-      // Render any pending charts
       renderPendingCharts();
+      initPendingTrees();
     }
 
     function renderPendingCharts() {

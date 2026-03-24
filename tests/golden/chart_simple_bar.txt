@@ -1,5 +1,5 @@
 # Prompt: Hacé un gráfico de barras con las ventas trimestrales: Q1=150, Q2=230, Q3=180, Q4=310.
-# Model: chutesai/Mistral-Small-3.1-24B-Instruct-2503-TEE
+# Model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
 # Date: 2026-03-23T22:18:14.168Z
 # Pass: true
 # Meta: {"colors":["#316dff","#4a8af5","#6ba3f7","#89bff9"],"hasOptions":true}

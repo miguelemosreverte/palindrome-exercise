@@ -52,12 +52,16 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const demoBase = process.env.DEMO_API_BASE || 'https://llm.chutes.ai/v1';
-    const providerRes = await fetch(`${demoBase}/chat/completions`, {
+    const providerBase = process.env.LLM_API_BASE;
+    const providerKey = process.env.LLM_API_KEY;
+    if (!providerBase || !providerKey) {
+      return res.status(500).json({ error: 'LLM provider is not configured' });
+    }
+    const providerRes = await fetch(`${providerBase}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.CHUTESAI_API_KEY}`,
+        Authorization: `Bearer ${providerKey}`,
       },
       body: JSON.stringify({
         model,

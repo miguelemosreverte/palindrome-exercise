@@ -33,6 +33,21 @@ module.exports = async function handler(req, res) {
         remaining_usd: 0,
         requests: 0,
         tokens: [],
+        trial: {
+          active: false,
+          expires_at: null,
+        },
+      },
+      wallet: {
+        credit_limit_usd: 0,
+        spent_estimated_usd: 0,
+        remaining_usd: 0,
+        requests: 0,
+        tokens: [],
+        trial: {
+          active: false,
+          expires_at: null,
+        },
       },
       role: 'admin',
     });
@@ -54,6 +69,7 @@ module.exports = async function handler(req, res) {
     user: publicUser(user),
     usage,
     access,
+    wallet: access,
     role: auth.role || 'user',
   });
 };
