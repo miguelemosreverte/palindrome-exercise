@@ -301,11 +301,13 @@ Para navegar opciones jerárquicas con niveles:
 \`\`\`
 
 REGLAS GENERALES:
-- SIEMPRE usá estos bloques cuando la información lo amerite. NO crees archivos HTML.
-- NO pongas comentarios JS (//) dentro del JSON.
-- Podés combinar texto, herramientas y componentes ricos en la misma respuesta.
-- Cuando el usuario pida una línea de tiempo, usá \`\`\`timeline (NO chartjs con barras).
-- Cuando ofrezcas opciones o decisiones, usá \`\`\`options o \`\`\`tree.`;
+- PREFERÍ SIEMPRE los componentes ricos sobre markdown plano. Si hay datos tabulares → \`\`\`table. Si hay opciones → \`\`\`options. Si hay eventos cronológicos → \`\`\`timeline. Si hay métricas → \`\`\`cards. Si hay pasos → \`\`\`steps. Si hay decisiones jerárquicas → \`\`\`tree.
+- NO crees archivos HTML. NO pongas comentarios JS (//) dentro del JSON.
+- Podés combinar texto y componentes en la misma respuesta.
+- Los componentes son INTERACTIVOS: cuando el usuario hace click en una opción o elección del tree, el sistema envía automáticamente esa selección como mensaje. Tenelo en cuenta para ofrecer profundización progresiva.
+- Para \`\`\`timeline: NUNCA uses chartjs con barras para eventos. Usá \`\`\`timeline siempre.
+- Para recomendaciones o alternativas: usá \`\`\`options.
+- Para guiar una decisión paso a paso: usá \`\`\`tree.`;
 
     // ─── Sidebar ───
     function openSB() { sidebar.classList.add('open'); overlay.classList.add('open'); }
@@ -345,7 +347,7 @@ REGLAS GENERALES:
           return `<div class="rc-options">${items.map(item => {
             const title = item.title || item.nombre || item.destino || item.opcion || '';
             const desc = item.desc || item.descripcion || item.description || '';
-            return `<div class="rc-option" onclick="this.classList.toggle('selected')"><div class="rc-option-body"><div class="rc-option-title">${esc(title)}</div>${desc ? `<div class="rc-option-desc">${esc(desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`;
+            return `<div class="rc-option" onclick="selectOption(this,'${esc(title).replace(/'/g,"\\'")}')"><div class="rc-option-body"><div class="rc-option-title">${esc(title)}</div>${desc ? `<div class="rc-option-desc">${esc(desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`;
           }).join('')}</div>`;
         }
         if (lang === 'cards') {
@@ -388,7 +390,7 @@ REGLAS GENERALES:
               for (const opt of opts) {
                 const optName = typeof opt === 'string' ? opt : (opt.nombre || opt.name || opt.title || '');
                 const sel = optName === (level.selected || level.seleccionado) ? ' selected' : '';
-                html += `<span class="rc-tree-pill${sel}">${esc(optName)}</span>`;
+                html += `<span class="rc-tree-pill${sel}" onclick="selectOption(this,'${esc(optName).replace(/'/g,"\\'")}')" style="cursor:pointer;">${esc(optName)}</span>`;
               }
               html += '</div><div class="rc-tree-arrow">↓</div>';
             }
@@ -402,7 +404,7 @@ REGLAS GENERALES:
             for (const c of choices) {
               const ct = c.title || c.nombre || c.titulo || '';
               const cd = c.desc || c.descripcion || c.description || '';
-              html += `<div class="rc-tree-choice" onclick="this.style.borderColor='var(--ocean)';this.style.background='rgba(49,109,255,0.06)'"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(ct)}</div>${cd ? `<div class="rc-tree-choice-desc">${esc(cd)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
+              html += `<div class="rc-tree-choice" onclick="selectOption(this,'${esc(ct).replace(/'/g,"\\'")}')"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(ct)}</div>${cd ? `<div class="rc-tree-choice-desc">${esc(cd)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
             }
             html += '</div>';
           }
@@ -605,7 +607,7 @@ REGLAS GENERALES:
 
         // Prioritized free providers
         const FREE_PROVIDERS = ['opencode', 'evroc', 'zenmux', 'zai', 'io-net', 'nvidia', 'groq', 'cerebras', 'alibaba-coding-plan', 'inference', 'fastrouter'];
-        const MODEL_PRIORITY = ['gpt-5-nano', 'big-pickle', 'nemotron', 'mimo', 'minimax', 'devstral', 'llama-3.3', 'qwen3', 'deepseek'];
+        const MODEL_PRIORITY = ['mimo-v2-omni', 'mimo-v2-pro', 'gpt-5-nano', 'big-pickle', 'nemotron', 'minimax', 'devstral', 'llama-3.3', 'qwen3', 'deepseek'];
 
         let html = '';
 
@@ -739,6 +741,23 @@ REGLAS GENERALES:
         clearInterval(permInterval);
         resetUI();
         statusInfo.textContent = '';
+      }
+    }
+
+    // ─── Interactive component clicks → auto-send ───
+    function selectOption(el, text) {
+      if (sending) return;
+      // Toggle visual state
+      const wasSelected = el.classList.contains('selected');
+      // Deselect siblings
+      el.parentElement.querySelectorAll('.selected').forEach(s => s.classList.remove('selected'));
+      if (!wasSelected) {
+        el.classList.add('selected');
+        // Auto-send as user message after a brief delay
+        setTimeout(() => {
+          promptInput.value = text;
+          send();
+        }, 150);
       }
     }
 
