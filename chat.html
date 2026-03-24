@@ -804,12 +804,47 @@ REGLAS GENERALES:
       addUserMsg(text);
       promptInput.value = ''; promptInput.style.height = 'auto';
 
-      // Thinking indicator
-      const think = document.createElement('div'); think.className = 'msg-row msg-fade';
-      think.innerHTML = `<div class="msg-assistant"><div class="msg-badge"></div><div class="step-indicator"><span style="animation:pulse 1.2s infinite;">●</span> Pensando...</div></div>`;
-      messagesNode.appendChild(think); scroll();
+      // Create streaming response area
+      const streamRow = document.createElement('div'); streamRow.className = 'msg-row msg-fade';
+      const streamInner = document.createElement('div'); streamInner.className = 'msg-assistant';
+      streamInner.innerHTML = '<div class="msg-badge"></div><div style="min-width:0;flex:1;" id="stream-content"></div>';
+      streamRow.appendChild(streamInner);
+      messagesNode.appendChild(streamRow); scroll();
 
-      // Start permission polling
+      const streamEl = document.getElementById('stream-content');
+      let reasoningText = '';
+      let responseText = '';
+      let currentTools = [];
+      let reasoningOpen = true;
+
+      function updateStreamUI() {
+        let html = '';
+        // Reasoning (collapsible, live)
+        if (reasoningText) {
+          html += `<details class="reasoning-block" ${reasoningOpen ? 'open' : ''}>
+            <summary>Razonamiento <span style="animation:pulse 1.2s infinite;font-size:10px;">●</span></summary>
+            <div class="reasoning-text">${esc(reasoningText)}</div>
+          </details>`;
+        }
+        // Tools
+        for (const t of currentTools) {
+          html += renderTool(t);
+        }
+        // Text
+        if (responseText) {
+          html += `<div class="msg-content">${md(responseText)}</div>`;
+        }
+        // If nothing yet, show thinking
+        if (!html) {
+          html = '<div class="step-indicator"><span style="animation:pulse 1.2s infinite;">●</span> Pensando...</div>';
+        }
+        streamEl.innerHTML = html;
+        scroll();
+      }
+
+      updateStreamUI();
+
+      // Start permission polling + SSE listener
       const permInterval = setInterval(approvePermissions, 1500);
 
       try {
@@ -819,32 +854,81 @@ REGLAS GENERALES:
         if (prov && mid) body.model = { providerID: prov, modelID: mid };
 
         statusInfo.textContent = 'Procesando...';
-        const resp = await fetch(OC + '/session/' + sessionId + '/message', {
+
+        // Start SSE stream BEFORE sending message
+        const evtRes = await fetch(OC + '/event');
+        const reader = evtRes.body.getReader();
+        const decoder = new TextDecoder();
+
+        // Send message (fire and forget — response comes via SSE)
+        fetch(OC + '/session/' + sessionId + '/message', {
           method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
         });
 
-        think.remove();
+        // Process SSE events
+        let done = false;
+        const partTexts = {}; // partID → accumulated text
 
-        if (!resp.ok) {
-          const errText = await resp.text();
-          throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
+        while (!done) {
+          const result = await reader.read();
+          if (result.done) break;
+
+          const chunk = decoder.decode(result.value, { stream: true });
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            try {
+              const evt = JSON.parse(line.slice(5));
+
+              // Only process events for our session
+              const evtSession = evt.properties?.sessionID || evt.properties?.part?.sessionID || '';
+              if (evtSession && evtSession !== sessionId) continue;
+
+              if (evt.type === 'message.part.delta') {
+                const p = evt.properties;
+                const partId = p.partID;
+                if (!partTexts[partId]) partTexts[partId] = '';
+                partTexts[partId] += p.delta || '';
+
+                // Check what type this part is
+                if (p.field === 'text') {
+                  // Could be reasoning or response text — check part type from updated events
+                  updateStreamUI();
+                }
+              }
+
+              if (evt.type === 'message.part.updated') {
+                const part = evt.properties?.part;
+                if (!part) continue;
+
+                if (part.type === 'reasoning' && part.text) {
+                  reasoningText = part.text;
+                  updateStreamUI();
+                }
+                if (part.type === 'text' && part.text) {
+                  responseText = part.text;
+                  reasoningOpen = false; // Collapse reasoning when text starts
+                  updateStreamUI();
+                }
+                if (part.type === 'tool') {
+                  // Update or add tool
+                  const idx = currentTools.findIndex(t => t.callID === part.callID);
+                  if (idx >= 0) currentTools[idx] = part;
+                  else currentTools.push(part);
+                  updateStreamUI();
+                }
+              }
+
+              if (evt.type === 'session.idle') {
+                done = true;
+              }
+            } catch {}
+          }
         }
 
-        // Check if the response has content
-        const respData = await resp.text();
-        if (respData) {
-          try {
-            const parsed = JSON.parse(respData);
-            if (parsed.error) {
-              throw new Error(Array.isArray(parsed.error) ? parsed.error.map(e=>e.message).join(', ') : parsed.error);
-            }
-          } catch(e) { if (e.message.includes('Server error') || e.message.includes('error')) throw e; }
-        }
+        reader.cancel();
 
-        // Fetch all new messages
+        // Final render — fetch complete messages for consistency
         const msgs = await fetch(OC + '/session/' + sessionId + '/message').then(r => r.json());
-
-        // Re-render entire conversation (simpler and ensures consistency)
         messagesNode.innerHTML = '';
         for (const msg of msgs) {
           const parts = msg.parts || [];
@@ -859,7 +943,7 @@ REGLAS GENERALES:
         scroll();
         loadSessions();
       } catch (e) {
-        think.remove();
+        streamRow.remove();
         chatStatus.innerHTML = `<div style="padding:10px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-size:13px;">${e.message}</div>`;
       } finally {
         clearInterval(permInterval);
