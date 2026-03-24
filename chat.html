@@ -329,46 +329,79 @@ REGLAS GENERALES:
     function renderRichBlock(lang, json) {
       try {
         const data = JSON.parse(json);
+        // Normalize: model might output array directly or {items:[...]}
+        const items = Array.isArray(data) ? data : (data.items || data.eventos || data.opciones || data.pasos || []);
+
         if (lang === 'timeline') {
-          return `<div class="rc-timeline">${(data.items||[]).map(item => `
-            <div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>
-            <div class="rc-timeline-content"><div class="rc-timeline-date">${esc(item.date||'')}</div><div class="rc-timeline-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-timeline-desc">${esc(item.desc)}</div>` : ''}</div></div>`).join('')}</div>`;
+          return `<div class="rc-timeline">${items.map(item => {
+            const date = item.date || item.año || item.fecha || item.year || '';
+            const title = item.title || item.nombre || item.evento || item.event || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>
+            <div class="rc-timeline-content"><div class="rc-timeline-date">${esc(String(date))}</div><div class="rc-timeline-title">${esc(title)}</div>${desc ? `<div class="rc-timeline-desc">${esc(desc)}</div>` : ''}</div></div>`;
+          }).join('')}</div>`;
         }
         if (lang === 'options') {
-          return `<div class="rc-options">${(data.items||[]).map(item => `
-            <div class="rc-option" onclick="this.classList.toggle('selected')"><div class="rc-option-body"><div class="rc-option-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-option-desc">${esc(item.desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`).join('')}</div>`;
+          return `<div class="rc-options">${items.map(item => {
+            const title = item.title || item.nombre || item.destino || item.opcion || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-option" onclick="this.classList.toggle('selected')"><div class="rc-option-body"><div class="rc-option-title">${esc(title)}</div>${desc ? `<div class="rc-option-desc">${esc(desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`;
+          }).join('')}</div>`;
         }
         if (lang === 'cards') {
-          return `<div class="rc-cards">${(data.items||[]).map(item => `
-            <div class="rc-card"><div class="rc-card-label">${esc(item.label||'')}</div><div class="rc-card-value">${esc(item.value||'')}</div>${item.desc ? `<div class="rc-card-desc">${esc(item.desc)}</div>` : ''}</div>`).join('')}</div>`;
+          return `<div class="rc-cards">${items.map(item => {
+            const label = item.label || item.etiqueta || item.nombre || '';
+            const value = item.value || item.valor || '';
+            const desc = item.desc || item.descripcion || '';
+            return `<div class="rc-card"><div class="rc-card-label">${esc(label)}</div><div class="rc-card-value">${esc(String(value))}</div>${desc ? `<div class="rc-card-desc">${esc(desc)}</div>` : ''}</div>`;
+          }).join('')}</div>`;
         }
         if (lang === 'table') {
-          return `<table class="rc-table"><thead><tr>${(data.headers||[]).map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${(data.rows||[]).map(row => `<tr>${row.map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+          const headers = data.headers || data.encabezados || data.columnas || [];
+          const rows = data.rows || data.filas || data.datos || [];
+          return `<table class="rc-table"><thead><tr>${headers.map(h => `<th>${esc(String(h))}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${(Array.isArray(row) ? row : Object.values(row)).map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
         }
         if (lang === 'steps') {
-          return `<div class="rc-steps">${(data.items||[]).map((item, i) => `
-            <div class="rc-step"><div class="rc-step-num">${i+1}</div><div class="rc-step-body"><div class="rc-step-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-step-desc">${esc(item.desc)}</div>` : ''}</div></div>`).join('')}</div>`;
+          return `<div class="rc-steps">${items.map((item, i) => {
+            const title = item.title || item.titulo || item.nombre || item.paso || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-step"><div class="rc-step-num">${i+1}</div><div class="rc-step-body"><div class="rc-step-title">${esc(title)}</div>${desc ? `<div class="rc-step-desc">${esc(desc)}</div>` : ''}</div></div>`;
+          }).join('')}</div>`;
         }
         if (lang === 'tree') {
           let html = '<div>';
-          // Render level breadcrumbs
-          if (data.levels) {
+          // Handle various tree structures
+          const levels = data.levels || data.niveles || [];
+          const areas = data.areas_de_interes || data.areas || data.categorias || [];
+
+          // If model used areas_de_interes format, convert to levels
+          if (areas.length && !levels.length) {
+            const opts = areas.map(a => a.nombre || a.name || a.title || '');
+            levels.push({ options: opts });
+          }
+
+          if (levels.length) {
             html += '<div class="rc-tree-levels">';
-            for (const level of data.levels) {
+            for (const level of levels) {
+              const opts = level.options || level.opciones || [];
               html += '<div class="rc-tree-row">';
-              for (const opt of (level.options || [])) {
-                const sel = opt === level.selected ? ' selected' : '';
-                html += `<span class="rc-tree-pill${sel}">${esc(opt)}</span>`;
+              for (const opt of opts) {
+                const optName = typeof opt === 'string' ? opt : (opt.nombre || opt.name || opt.title || '');
+                const sel = optName === (level.selected || level.seleccionado) ? ' selected' : '';
+                html += `<span class="rc-tree-pill${sel}">${esc(optName)}</span>`;
               }
               html += '</div><div class="rc-tree-arrow">↓</div>';
             }
             html += '</div>';
           }
-          if (data.question) html += `<div class="rc-tree-question">${esc(data.question)}</div>`;
-          if (data.choices) {
+          const question = data.question || data.pregunta || '';
+          if (question) html += `<div class="rc-tree-question">${esc(question)}</div>`;
+          const choices = data.choices || data.opciones || data.elecciones || items;
             html += '<div class="rc-tree-choices">';
-            for (const c of data.choices) {
-              html += `<div class="rc-tree-choice" onclick="this.style.borderColor='var(--ocean)';this.style.background='rgba(49,109,255,0.06)'"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(c.title||'')}</div>${c.desc ? `<div class="rc-tree-choice-desc">${esc(c.desc)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
+            for (const c of choices) {
+              const ct = c.title || c.nombre || c.titulo || '';
+              const cd = c.desc || c.descripcion || c.description || '';
+              html += `<div class="rc-tree-choice" onclick="this.style.borderColor='var(--ocean)';this.style.background='rgba(49,109,255,0.06)'"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(ct)}</div>${cd ? `<div class="rc-tree-choice-desc">${esc(cd)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
             }
             html += '</div>';
           }
