@@ -320,13 +320,19 @@ La UI renderiza el tree de forma PROGRESIVA: muestra un nivel a la vez, el usuar
 Cuantos más niveles de "children" incluyas, más interactivo es. Las opciones sin "children" son hojas finales que disparan una respuesta del modelo.
 
 REGLAS GENERALES:
-- PREFERÍ SIEMPRE los componentes ricos sobre markdown plano. Si hay datos tabulares → \`\`\`table. Si hay opciones → \`\`\`options. Si hay eventos cronológicos → \`\`\`timeline. Si hay métricas → \`\`\`cards. Si hay pasos → \`\`\`steps. Si hay decisiones jerárquicas → \`\`\`tree.
+REGLA OBLIGATORIA: SIEMPRE usá los componentes ricos. NUNCA respondas con listas de markdown cuando un componente lo haría mejor. Esta es la regla más importante.
+
+- Si hay alternativas, recomendaciones o cosas para elegir → OBLIGATORIO usar \`\`\`options o \`\`\`tree. NUNCA listas con bullets.
+- Si hay datos tabulares → OBLIGATORIO usar \`\`\`table. NUNCA tablas markdown.
+- Si hay eventos cronológicos → OBLIGATORIO usar \`\`\`timeline. NUNCA listas de fechas.
+- Si hay métricas o datos resumidos → OBLIGATORIO usar \`\`\`cards.
+- Si hay pasos o instrucciones → OBLIGATORIO usar \`\`\`steps.
+- Si la respuesta involucra decisiones o personalización → OBLIGATORIO usar \`\`\`tree con children anidados. El usuario va a hacer click para explorar.
 - NO crees archivos HTML. NO pongas comentarios JS (//) dentro del JSON.
-- Podés combinar texto y componentes en la misma respuesta.
-- Los componentes son INTERACTIVOS: cuando el usuario hace click en una opción o elección del tree, el sistema envía automáticamente esa selección como mensaje. Tenelo en cuenta para ofrecer profundización progresiva.
-- Para \`\`\`timeline: NUNCA uses chartjs con barras para eventos. Usá \`\`\`timeline siempre.
-- Para recomendaciones o alternativas: usá \`\`\`options.
-- Para guiar una decisión paso a paso: usá \`\`\`tree.`;
+- Podés agregar texto breve antes/después de un componente para contexto, pero el contenido principal SIEMPRE debe estar en un componente.
+- Los componentes son INTERACTIVOS: el usuario hace click y el sistema reacciona. Usá \`\`\`tree con múltiples niveles de children siempre que haya decisiones.
+- Cuando la respuesta tiene varias secciones (itinerario, opciones, datos), usá VARIOS componentes combinados: un \`\`\`timeline para el itinerario, un \`\`\`tree para las opciones, un \`\`\`cards para datos clave.
+- NUNCA ofrezcas "puedo hacerlo en formato tree si querés" — HACELO directamente.`;
 
     // ─── Sidebar ───
     function openSB() { sidebar.classList.add('open'); overlay.classList.add('open'); }
