@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root {
+      --sky: #bcecff; --mist: #dff7f2; --cream: #f7f6ef;
+      --ink: #112033; --slate: #56708a; --ocean: #316dff;
+      --mint: #89e0c8; --line: rgba(17,32,51,0.08);
+      --shadow-soft: 0 20px 50px rgba(75,133,178,0.14);
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #bcecff 0%, #d8f5f1 42%, #f7f6ef 100%);
+      padding: 40px 20px;
+    }
+    .container { max-width: 780px; margin: 0 auto; }
+    h2 { font-size: 24px; font-weight: 800; margin: 40px 0 16px; color: var(--ink); }
+    h2:first-child { margin-top: 0; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--slate); font-weight: 700; margin-bottom: 8px; }
+    .component-box { margin-bottom: 32px; }
+
+    /* ═══════════════════════════════════
+       COMPONENT: Timeline
+       ═══════════════════════════════════ */
+    .rc-timeline { padding: 8px 0; }
+    .rc-timeline-item { display: flex; gap: 16px; position: relative; padding-bottom: 24px; }
+    .rc-timeline-item:last-child { padding-bottom: 0; }
+    .rc-timeline-track { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
+    .rc-timeline-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ocean); border: 3px solid rgba(49,109,255,0.2); z-index: 1; flex-shrink: 0; }
+    .rc-timeline-line { width: 2px; flex: 1; background: var(--line); margin-top: 4px; }
+    .rc-timeline-item:last-child .rc-timeline-line { display: none; }
+    .rc-timeline-content { flex: 1; padding-top: 0; }
+    .rc-timeline-date { font-size: 12px; font-weight: 700; color: var(--ocean); margin-bottom: 2px; }
+    .rc-timeline-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+    .rc-timeline-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+
+    /* ═══════════════════════════════════
+       COMPONENT: Options
+       ═══════════════════════════════════ */
+    .rc-options { display: flex; flex-direction: column; gap: 10px; }
+    .rc-option { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .rc-option:hover { background: rgba(255,255,255,0.85); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .rc-option-body { flex: 1; }
+    .rc-option-title { font-size: 15px; font-weight: 700; }
+    .rc-option-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-option-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+    .rc-option.selected { border-color: var(--ocean); background: rgba(49,109,255,0.06); }
+    .rc-option.selected .rc-option-arrow { color: var(--ocean); opacity: 1; }
+
+    /* ═══════════════════════════════════
+       COMPONENT: Cards
+       ═══════════════════════════════════ */
+    .rc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .rc-card { padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--slate); font-weight: 700; }
+    .rc-card-value { font-size: 28px; font-weight: 800; margin-top: 6px; line-height: 1; }
+    .rc-card-desc { font-size: 13px; color: var(--slate); margin-top: 6px; line-height: 1.4; }
+
+    /* ═══════════════════════════════════
+       COMPONENT: Table
+       ═══════════════════════════════════ */
+    .rc-table { width: 100%; border-collapse: collapse; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--slate); font-weight: 700; text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--line); }
+    .rc-table td { font-size: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .rc-table tr:last-child td { border-bottom: none; }
+    .rc-table tr:hover td { background: rgba(49,109,255,0.03); }
+
+    /* ═══════════════════════════════════
+       COMPONENT: Steps
+       ═══════════════════════════════════ */
+    .rc-steps { display: flex; flex-direction: column; gap: 0; }
+    .rc-step { display: flex; gap: 14px; padding: 14px 0; }
+    .rc-step-num { width: 32px; height: 32px; border-radius: 10px; background: var(--ocean); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+    .rc-step-body { flex: 1; padding-top: 4px; }
+    .rc-step-title { font-size: 15px; font-weight: 700; }
+    .rc-step-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-step + .rc-step { border-top: 1px solid var(--line); }
+    .rc-tree-levels { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 16px; }
+    .rc-tree-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .rc-tree-pill { padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--slate); opacity: 0.45; background: transparent; }
+    .rc-tree-pill.selected { opacity: 1; color: var(--ink); background: rgba(255,255,255,0.6); border-color: rgba(17,32,51,0.2); }
+    .rc-tree-arrow { color: var(--slate); opacity: 0.3; font-size: 18px; line-height: 1; }
+    .rc-tree-question { font-size: 17px; font-weight: 800; text-align: center; margin: 12px 0; }
+    .rc-tree-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .rc-tree-choice { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.15s; }
+    .rc-tree-choice:hover { background: rgba(255,255,255,0.85); box-shadow: 0 20px 50px rgba(75,133,178,0.14); transform: translateY(-1px); }
+    .rc-tree-choice-body { flex: 1; }
+    .rc-tree-choice-title { font-size: 15px; font-weight: 700; }
+    .rc-tree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-tree-choice-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 style="font-size: 36px; font-weight: 800; margin-bottom: 8px;">Component Preview</h1>
+    <p style="color: var(--slate); margin-bottom: 40px;">Visual mock data for each rich component.</p>
+
+    <!-- ═══ TIMELINE ═══ -->
+    <h2>```timeline</h2>
+    <div class="label">Línea de tiempo de Argentina</div>
+    <div class="component-box" id="timeline-preview"></div>
+
+    <!-- ═══ OPTIONS ═══ -->
+    <h2>```options</h2>
+    <div class="label">¿Qué te interesa más?</div>
+    <div class="component-box" id="options-preview"></div>
+
+    <!-- ═══ CARDS ═══ -->
+    <h2>```cards</h2>
+    <div class="label">Resumen de estadísticas</div>
+    <div class="component-box" id="cards-preview"></div>
+
+    <!-- ═══ TABLE ═══ -->
+    <h2>```table</h2>
+    <div class="label">Comparación de ciudades</div>
+    <div class="component-box" id="table-preview"></div>
+
+    <!-- ═══ STEPS ═══ -->
+    <h2>```steps</h2>
+    <div class="label">Proceso de inscripción</div>
+    <div class="component-box" id="steps-preview"></div>
+
+    <!-- ═══ TREE ═══ -->
+    <h2>```tree</h2>
+    <div class="label">Explorar opciones de viaje</div>
+    <div class="component-box" id="tree-preview"></div>
+
+    <!-- ═══ CHARTJS (existing) ═══ -->
+    <h2>```chartjs</h2>
+    <div class="label">Gráfico de barras</div>
+    <div class="component-box">
+      <div style="border-radius:14px;background:white;padding:16px;border:1px solid var(--line);">
+        <canvas id="chart-preview" style="max-height:300px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ═══ MOCK DATA ═══
+    const MOCKS = {
+      timeline: {
+        title: "Historia de Argentina",
+        items: [
+          { date: "1816", title: "Declaración de Independencia", desc: "El Congreso de Tucumán declara la independencia de las Provincias Unidas." },
+          { date: "1853", title: "Constitución Nacional", desc: "Se sanciona la primera constitución argentina." },
+          { date: "1946", title: "Perón asume la presidencia", desc: "Juan Domingo Perón gana las elecciones y transforma la política argentina." },
+          { date: "1976", title: "Golpe de Estado", desc: "Comienza la dictadura militar más sangrienta del país." },
+          { date: "1983", title: "Retorno a la democracia", desc: "Raúl Alfonsín asume como presidente electo." },
+          { date: "2001", title: "Crisis económica", desc: "Estallido social y económico. Cinco presidentes en una semana." },
+          { date: "2023", title: "Milei presidente", desc: "Javier Milei gana las elecciones con propuesta libertaria." },
+        ]
+      },
+
+      options: {
+        question: "¿Qué tipo de viaje te interesa?",
+        items: [
+          { title: "Naturaleza y aventura", desc: "Patagonia, Iguazú, Mendoza — montañas, glaciares y selva." },
+          { title: "Cultura y gastronomía", desc: "Buenos Aires, Salta, Córdoba — tango, vino y arquitectura." },
+          { title: "Playa y relax", desc: "Mar del Plata, Pinamar, Cariló — costa atlántica y descanso." },
+          { title: "Historia y patrimonio", desc: "Misiones jesuíticas, Quebrada de Humahuaca, casco histórico." },
+        ]
+      },
+
+      cards: {
+        items: [
+          { label: "Población", value: "46.2M", desc: "Estimación 2024" },
+          { label: "Superficie", value: "2.78M km²", desc: "8vo país más grande" },
+          { label: "Idioma", value: "Español", desc: "Rioplatense" },
+          { label: "Moneda", value: "ARS", desc: "Peso argentino" },
+        ]
+      },
+
+      table: {
+        headers: ["Ciudad", "Población", "Provincia", "Fundación"],
+        rows: [
+          ["Buenos Aires", "15,000,000", "CABA/GBA", "1536"],
+          ["Córdoba", "1,535,000", "Córdoba", "1573"],
+          ["Rosario", "1,300,000", "Santa Fe", "1793"],
+          ["Mendoza", "1,100,000", "Mendoza", "1561"],
+          ["Tucumán", "900,000", "Tucumán", "1565"],
+        ]
+      },
+
+      steps: {
+        items: [
+          { title: "Creá tu cuenta", desc: "Registrate con email y contraseña en menos de un minuto." },
+          { title: "Elegí un plan", desc: "Seleccioná el plan que mejor se adapte a tus necesidades." },
+          { title: "Configurá tu perfil", desc: "Completá tu información y preferencias." },
+          { title: "Empezá a usar", desc: "Listo — ya podés acceder a todas las funcionalidades." },
+        ]
+      },
+
+      tree: {
+        levels: [
+          { label: "Tipo de experiencia", options: ["Diseñar espacios nuevos", "Mejorar lugares existentes", "Construir y gestionar"], selected: "Diseñar espacios nuevos" },
+          { label: "Escala", options: ["Edificios", "Barrios", "Ciudades enteras"], selected: "Barrios" },
+        ],
+        question: "¿Cuál es tu instinto?",
+        choices: [
+          { title: "Sistemas vivos", desc: "Notás árboles, drenaje, ecología — cómo la naturaleza y el diseño trabajan juntos." },
+          { title: "Política y equidad", desc: "Pensás en quién se beneficia de las decisiones de diseño y quién queda afuera." },
+          { title: "Diseño espacial", desc: "Te interesa cómo las plazas, calles y fachadas crean sentido de lugar." },
+        ]
+      },
+
+      chartjs: {
+        type: "bar",
+        data: {
+          labels: ["Buenos Aires", "Córdoba", "Rosario", "Mendoza", "Tucumán"],
+          datasets: [{ label: "Población (millones)", data: [15, 1.5, 1.3, 1.1, 0.9], backgroundColor: ["#316dff", "#4a8af5", "#6ba3f7", "#89bff9", "#a8d4fb"] }]
+        },
+        options: { responsive: true, plugins: { legend: { display: true } } }
+      }
+    };
+
+    // ═══ RENDERERS ═══
+    function renderTimeline(data) {
+      return `<div class="rc-timeline">${data.items.map(item => `
+        <div class="rc-timeline-item">
+          <div class="rc-timeline-track">
+            <div class="rc-timeline-dot"></div>
+            <div class="rc-timeline-line"></div>
+          </div>
+          <div class="rc-timeline-content">
+            <div class="rc-timeline-date">${item.date}</div>
+            <div class="rc-timeline-title">${item.title}</div>
+            ${item.desc ? `<div class="rc-timeline-desc">${item.desc}</div>` : ''}
+          </div>
+        </div>`).join('')}</div>`;
+    }
+
+    function renderOptions(data) {
+      return `<div class="rc-options">${data.items.map((item, i) => `
+        <div class="rc-option" onclick="this.classList.toggle('selected')">
+          <div class="rc-option-body">
+            <div class="rc-option-title">${item.title}</div>
+            ${item.desc ? `<div class="rc-option-desc">${item.desc}</div>` : ''}
+          </div>
+          <div class="rc-option-arrow">→</div>
+        </div>`).join('')}</div>`;
+    }
+
+    function renderCards(data) {
+      return `<div class="rc-cards">${data.items.map(item => `
+        <div class="rc-card">
+          <div class="rc-card-label">${item.label}</div>
+          <div class="rc-card-value">${item.value}</div>
+          ${item.desc ? `<div class="rc-card-desc">${item.desc}</div>` : ''}
+        </div>`).join('')}</div>`;
+    }
+
+    function renderTable(data) {
+      return `<table class="rc-table">
+        <thead><tr>${data.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${data.rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    function renderSteps(data) {
+      return `<div class="rc-steps">${data.items.map((item, i) => `
+        <div class="rc-step">
+          <div class="rc-step-num">${i + 1}</div>
+          <div class="rc-step-body">
+            <div class="rc-step-title">${item.title}</div>
+            ${item.desc ? `<div class="rc-step-desc">${item.desc}</div>` : ''}
+          </div>
+        </div>`).join('')}</div>`;
+    }
+
+    // ═══ RENDER ALL PREVIEWS ═══
+    document.getElementById('timeline-preview').innerHTML = renderTimeline(MOCKS.timeline);
+    document.getElementById('options-preview').innerHTML = renderOptions(MOCKS.options);
+    document.getElementById('cards-preview').innerHTML = renderCards(MOCKS.cards);
+    document.getElementById('table-preview').innerHTML = renderTable(MOCKS.table);
+    document.getElementById('steps-preview').innerHTML = renderSteps(MOCKS.steps);
+    // Tree
+    function renderTree(data) {
+      let html = '<div>';
+      if (data.levels) {
+        html += '<div class="rc-tree-levels">';
+        for (const level of data.levels) {
+          html += '<div class="rc-tree-row">';
+          for (const opt of (level.options || [])) {
+            html += `<span class="rc-tree-pill${opt === level.selected ? ' selected' : ''}">${opt}</span>`;
+          }
+          html += '</div><div class="rc-tree-arrow">↓</div>';
+        }
+        html += '</div>';
+      }
+      if (data.question) html += `<div class="rc-tree-question">${data.question}</div>`;
+      if (data.choices) {
+        html += '<div class="rc-tree-choices">';
+        for (const c of data.choices) {
+          html += `<div class="rc-tree-choice"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${c.title}</div><div class="rc-tree-choice-desc">${c.desc}</div></div><div class="rc-tree-choice-arrow">→</div></div>`;
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+    document.getElementById('tree-preview').innerHTML = renderTree(MOCKS.tree);
+
+    new Chart(document.getElementById('chart-preview').getContext('2d'), MOCKS.chartjs);
+  </script>
+</body>
+</html>

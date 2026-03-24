@@ -330,6 +330,50 @@ const SCENARIOS = {
       details,
     };
   },
+  // Test 6: Rich component — timeline
+  async component_timeline() {
+    const session = await createSession();
+    const res = await sendMessage(session.id,
+      'Haceme una línea de tiempo de las 5 batallas más importantes de la historia argentina. Usá el bloque ```timeline con JSON.');
+    const parts = extractParts(res);
+    const allText = parts.text.join(' ');
+    const hasTimeline = allText.includes('```timeline') || allText.includes('"items"');
+    return {
+      pass: hasTimeline,
+      reason: hasTimeline ? '' : 'No ```timeline block found in response',
+      details: [`Text preview: ${allText.slice(0, 300)}`],
+    };
+  },
+
+  // Test 7: Rich component — options
+  async component_options() {
+    const session = await createSession();
+    const res = await sendMessage(session.id,
+      'Proponeme 4 destinos de viaje en Argentina con descripción. Usá el bloque ```options con JSON.');
+    const parts = extractParts(res);
+    const allText = parts.text.join(' ');
+    const hasOptions = allText.includes('```options') || allText.includes('"items"');
+    return {
+      pass: hasOptions,
+      reason: hasOptions ? '' : 'No ```options block found',
+      details: [`Text preview: ${allText.slice(0, 300)}`],
+    };
+  },
+
+  // Test 8: Rich component — tree decision
+  async component_tree() {
+    const session = await createSession();
+    const res = await sendMessage(session.id,
+      'Ayudame a elegir una carrera universitaria. Primero preguntame qué área me interesa (ciencias, humanidades, ingeniería), después proponeme opciones específicas. Usá el bloque ```tree con JSON.');
+    const parts = extractParts(res);
+    const allText = parts.text.join(' ');
+    const hasTree = allText.includes('```tree') || allText.includes('"levels"') || allText.includes('"choices"');
+    return {
+      pass: hasTree,
+      reason: hasTree ? '' : 'No ```tree block found',
+      details: [`Text preview: ${allText.slice(0, 300)}`],
+    };
+  },
 };
 
 // ─── Main ───

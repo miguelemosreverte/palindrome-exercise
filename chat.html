@@ -95,6 +95,57 @@
       .chat-sidebar.open { transform: translateX(0); }
       .sidebar-overlay.open { display: block; }
     }
+    /* Rich components */
+    .rc-timeline { padding: 8px 0; }
+    .rc-timeline-item { display: flex; gap: 16px; position: relative; padding-bottom: 24px; }
+    .rc-timeline-item:last-child { padding-bottom: 0; }
+    .rc-timeline-track { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
+    .rc-timeline-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ocean); border: 3px solid rgba(49,109,255,0.2); z-index: 1; flex-shrink: 0; }
+    .rc-timeline-line { width: 2px; flex: 1; background: var(--line); margin-top: 4px; }
+    .rc-timeline-item:last-child .rc-timeline-line { display: none; }
+    .rc-timeline-content { flex: 1; }
+    .rc-timeline-date { font-size: 12px; font-weight: 700; color: var(--ocean); margin-bottom: 2px; }
+    .rc-timeline-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+    .rc-timeline-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-options { display: flex; flex-direction: column; gap: 10px; }
+    .rc-option { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .rc-option:hover { background: rgba(255,255,255,0.85); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .rc-option-body { flex: 1; }
+    .rc-option-title { font-size: 15px; font-weight: 700; }
+    .rc-option-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-option-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+    .rc-option.selected { border-color: var(--ocean); background: rgba(49,109,255,0.06); }
+    .rc-option.selected .rc-option-arrow { color: var(--ocean); opacity: 1; }
+    .rc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .rc-card { padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--slate); font-weight: 700; }
+    .rc-card-value { font-size: 26px; font-weight: 800; margin-top: 6px; line-height: 1; }
+    .rc-card-desc { font-size: 13px; color: var(--slate); margin-top: 6px; line-height: 1.4; }
+    .rc-table { width: 100%; border-collapse: collapse; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--slate); font-weight: 700; text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--line); }
+    .rc-table td { font-size: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .rc-table tr:last-child td { border-bottom: none; }
+    .rc-steps { display: flex; flex-direction: column; }
+    .rc-step { display: flex; gap: 14px; padding: 14px 0; }
+    .rc-step-num { width: 32px; height: 32px; border-radius: 10px; background: var(--ocean); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+    .rc-step-body { flex: 1; padding-top: 4px; }
+    .rc-step-title { font-size: 15px; font-weight: 700; }
+    .rc-step-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-step + .rc-step { border-top: 1px solid var(--line); }
+    /* Tree / Funnel */
+    .rc-tree-levels { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 16px; }
+    .rc-tree-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .rc-tree-pill { padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--slate); opacity: 0.45; background: transparent; }
+    .rc-tree-pill.selected { opacity: 1; color: var(--ink); background: rgba(255,255,255,0.6); border-color: rgba(17,32,51,0.2); }
+    .rc-tree-arrow { color: var(--slate); opacity: 0.3; font-size: 18px; line-height: 1; }
+    .rc-tree-question { font-size: 17px; font-weight: 800; text-align: center; margin: 12px 0; }
+    .rc-tree-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .rc-tree-choice { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.15s; }
+    .rc-tree-choice:hover { background: rgba(255,255,255,0.85); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .rc-tree-choice-body { flex: 1; }
+    .rc-tree-choice-title { font-size: 15px; font-weight: 700; }
+    .rc-tree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-tree-choice-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
   </style>
 </head>
 <body class="fade-in">
@@ -173,10 +224,12 @@
     const overlay = $('sidebarOverlay');
     let sessionId = null, sending = false, msgCountBefore = 0;
 
-    const SYSTEM = `Respondé en español. Sos un asistente en una app web que tiene rendering especial.
+    const SYSTEM = `Respondé en español. Sos un asistente en una app web con componentes ricos de rendering.
 
-CAPACIDADES DE RENDERING DE LA UI:
-- La UI renderiza Chart.js automáticamente cuando escribís un bloque de código con lenguaje "chartjs". Ejemplo:
+COMPONENTES DISPONIBLES — usá bloques de código con estos lenguajes:
+
+## 1. \`\`\`chartjs — Gráficos
+Ejemplo:
 
 \`\`\`chartjs
 {"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30],"backgroundColor":["#316dff","#4a8af5","#6ba3f7"]}]},"options":{"responsive":true,"plugins":{"legend":{"display":true}}}}
@@ -211,7 +264,48 @@ EVOLUCIÓN EN EL TIEMPO (datos que cambian):
 REGLAS GENERALES:
 - Podés usar bash para ejecutar Python, buscar en la web, etc — usá tus herramientas normalmente.
 - Cuando el usuario pida un gráfico, SIEMPRE usá el bloque \`\`\`chartjs en vez de crear archivos HTML.
-- Podés combinar texto, herramientas y gráficos en la misma respuesta.`;
+## 2. \`\`\`timeline — Línea de tiempo
+Para eventos cronológicos. JSON con "items" array:
+\`\`\`timeline
+{"items":[{"date":"1816","title":"Independencia","desc":"Congreso de Tucumán"},{"date":"1853","title":"Constitución"}]}
+\`\`\`
+
+## 3. \`\`\`options — Opciones / Decisiones
+Para presentar opciones al usuario. Cada opción tiene título y descripción:
+\`\`\`options
+{"items":[{"title":"Opción A","desc":"Descripción de la opción A"},{"title":"Opción B","desc":"Descripción de la opción B"}]}
+\`\`\`
+
+## 4. \`\`\`cards — Tarjetas de datos
+Para mostrar métricas o datos resumidos:
+\`\`\`cards
+{"items":[{"label":"Población","value":"46M","desc":"Estimación 2024"},{"label":"Capital","value":"CABA"}]}
+\`\`\`
+
+## 5. \`\`\`table — Tabla
+Para datos tabulares:
+\`\`\`table
+{"headers":["Ciudad","Población"],"rows":[["Buenos Aires","15M"],["Córdoba","1.5M"]]}
+\`\`\`
+
+## 6. \`\`\`steps — Pasos / Proceso
+Para instrucciones paso a paso:
+\`\`\`steps
+{"items":[{"title":"Paso 1","desc":"Hacé esto"},{"title":"Paso 2","desc":"Después esto"}]}
+\`\`\`
+
+## 7. \`\`\`tree — Árbol de decisión / Exploración
+Para navegar opciones jerárquicas con niveles:
+\`\`\`tree
+{"levels":[{"label":"¿Qué te interesa?","options":["Naturaleza","Cultura","Aventura"],"selected":"Cultura"},{"label":"¿Qué tipo de cultura?","options":["Gastronomía","Museos","Arquitectura"]}],"question":"¿Querés profundizar?","choices":[{"title":"Gastronomía porteña","desc":"Parrillas, empanadas, y café"},{"title":"Tango y milongas","desc":"La danza más famosa de Argentina"}]}
+\`\`\`
+
+REGLAS GENERALES:
+- SIEMPRE usá estos bloques cuando la información lo amerite. NO crees archivos HTML.
+- NO pongas comentarios JS (//) dentro del JSON.
+- Podés combinar texto, herramientas y componentes ricos en la misma respuesta.
+- Cuando el usuario pida una línea de tiempo, usá \`\`\`timeline (NO chartjs con barras).
+- Cuando ofrezcas opciones o decisiones, usá \`\`\`options o \`\`\`tree.`;
 
     // ─── Sidebar ───
     function openSB() { sidebar.classList.add('open'); overlay.classList.add('open'); }
@@ -230,6 +324,66 @@ REGLAS GENERALES:
     // ─── Markdown renderer ───
     let chartId = 0;
     const pendingCharts = {};
+    const RICH_BLOCKS = ['chartjs', 'timeline', 'options', 'cards', 'table', 'steps', 'tree'];
+
+    function renderRichBlock(lang, json) {
+      try {
+        const data = JSON.parse(json);
+        if (lang === 'timeline') {
+          return `<div class="rc-timeline">${(data.items||[]).map(item => `
+            <div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>
+            <div class="rc-timeline-content"><div class="rc-timeline-date">${esc(item.date||'')}</div><div class="rc-timeline-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-timeline-desc">${esc(item.desc)}</div>` : ''}</div></div>`).join('')}</div>`;
+        }
+        if (lang === 'options') {
+          return `<div class="rc-options">${(data.items||[]).map(item => `
+            <div class="rc-option" onclick="this.classList.toggle('selected')"><div class="rc-option-body"><div class="rc-option-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-option-desc">${esc(item.desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`).join('')}</div>`;
+        }
+        if (lang === 'cards') {
+          return `<div class="rc-cards">${(data.items||[]).map(item => `
+            <div class="rc-card"><div class="rc-card-label">${esc(item.label||'')}</div><div class="rc-card-value">${esc(item.value||'')}</div>${item.desc ? `<div class="rc-card-desc">${esc(item.desc)}</div>` : ''}</div>`).join('')}</div>`;
+        }
+        if (lang === 'table') {
+          return `<table class="rc-table"><thead><tr>${(data.headers||[]).map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${(data.rows||[]).map(row => `<tr>${row.map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        }
+        if (lang === 'steps') {
+          return `<div class="rc-steps">${(data.items||[]).map((item, i) => `
+            <div class="rc-step"><div class="rc-step-num">${i+1}</div><div class="rc-step-body"><div class="rc-step-title">${esc(item.title||'')}</div>${item.desc ? `<div class="rc-step-desc">${esc(item.desc)}</div>` : ''}</div></div>`).join('')}</div>`;
+        }
+        if (lang === 'tree') {
+          let html = '<div>';
+          // Render level breadcrumbs
+          if (data.levels) {
+            html += '<div class="rc-tree-levels">';
+            for (const level of data.levels) {
+              html += '<div class="rc-tree-row">';
+              for (const opt of (level.options || [])) {
+                const sel = opt === level.selected ? ' selected' : '';
+                html += `<span class="rc-tree-pill${sel}">${esc(opt)}</span>`;
+              }
+              html += '</div><div class="rc-tree-arrow">↓</div>';
+            }
+            html += '</div>';
+          }
+          if (data.question) html += `<div class="rc-tree-question">${esc(data.question)}</div>`;
+          if (data.choices) {
+            html += '<div class="rc-tree-choices">';
+            for (const c of data.choices) {
+              html += `<div class="rc-tree-choice" onclick="this.style.borderColor='var(--ocean)';this.style.background='rgba(49,109,255,0.06)'"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">${esc(c.title||'')}</div>${c.desc ? `<div class="rc-tree-choice-desc">${esc(c.desc)}</div>` : ''}</div><div class="rc-tree-choice-arrow">→</div></div>`;
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+          return html;
+        }
+        if (lang === 'chartjs') {
+          const cid = 'chart-' + (chartId++);
+          pendingCharts[cid] = json;
+          return `<div style="margin:12px 0;border-radius:14px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${cid}" style="max-height:350px;"></canvas></div>`;
+        }
+      } catch (e) {
+        return `<div style="color:#ef4444;font-size:12px;padding:8px;">⚠️ Error: ${esc(e.message)}</div><pre style="font-size:11px;padding:8px;background:rgba(0,0,0,0.03);border-radius:8px;max-height:150px;overflow:auto;">${esc(json.slice(0,500))}</pre>`;
+      }
+    }
 
     function md(text) {
       try {
@@ -237,12 +391,11 @@ REGLAS GENERALES:
         const p = h.split('```');
         if (p.length >= 3) { h = ''; for (let i = 0; i < p.length; i++) { if (i%2===0) h += p[i]; else {
           const raw = p[i];
-          const isChart = raw.startsWith('chartjs\n') || raw.startsWith('chartjs\r');
-          if (isChart) {
-            const json = raw.replace(/^chartjs\s*\n?/, '').trim();
-            const cid = 'chart-' + (chartId++);
-            pendingCharts[cid] = json;
-            h += `<div style="margin:12px 0;border-radius:14px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${cid}" style="max-height:350px;"></canvas></div>`;
+          const langMatch = raw.match(/^(\w+)\s*\n/);
+          const lang = langMatch?.[1]?.toLowerCase();
+          if (lang && RICH_BLOCKS.includes(lang)) {
+            const json = raw.replace(/^\w+\s*\n/, '').trim();
+            h += renderRichBlock(lang, json);
           } else {
             const c = raw.replace(/^\w*\n/, '');
             h += `<pre style="margin:8px 0;padding:12px;border-radius:10px;background:#0f172a;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;"><code>${c}</code></pre>`;
