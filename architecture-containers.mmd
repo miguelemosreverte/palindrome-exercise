@@ -2,7 +2,7 @@ flowchart TB
     subgraph browser[Browser UI]
         index[index.html]
         auth[auth.html]
-        trialInfo[demo.html trial page]
+        trialInfo[demo.html trial entry]
         dashboard[dashboard.html]
         chat[chat.html]
         admin[admin.html]
@@ -20,7 +20,7 @@ flowchart TB
 
     subgraph domain[Domain / Shared Libs]
         libAuth[lib/auth.js]
-        libAccess[lib/access.js]
+        libWallet[lib/wallet.js]
         libUsage[lib/usage.js]
         libFirebase[lib/firebase.js]
         libChat[lib/chat-store.js]
@@ -33,20 +33,22 @@ flowchart TB
     browser --> api
     authApi --> libAuth
     authApi --> libFirebase
+    authApi --> libWallet
     inferApi --> libAuth
-    inferApi --> libAccess
+    inferApi --> libWallet
     inferApi --> libUsage
     inferApi --> llm
     paymentApi --> libAuth
     paymentApi --> libFirebase
     paymentApi --> mp
     webhookApi --> mp
-    webhookApi --> libAccess
+    webhookApi --> libWallet
     webhookApi --> libFirebase
     adminApi --> libAuth
     adminApi --> libUsage
+    adminApi --> libWallet
     adminApi --> libFirebase
     libAuth --> fb
-    libAccess --> fb
+    libWallet --> fb
     libUsage --> fb
     libChat --> fb

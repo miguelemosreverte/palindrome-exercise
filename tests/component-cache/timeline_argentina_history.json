@@ -1,0 +1,5 @@
+{
+  "prompt": "Hacé una línea de tiempo con los 5 eventos más importantes de la historia argentina.",
+  "response": "Hacé una línea de tiempo con los 5 eventos más importantes de la historia argentina.\n```timeline\n{\"items\":[{\"date\":\"1816\",\"title\":\"Declaración de Independencia\",\"desc\":\"El 9 de julio se proclamó la independencia formal de las Provincias Unidas del Río de la Plata respecto de España.\"},{\"date\":\"1853\",\"title\":\"Constitución Nacional\",\"desc\":\"Se sancionó la Constitución de la Nación Argentina, estableciendo el sistema federal y republicanismo.\"},{\"date\":\"1916\",\"title\":\"Ley Sáenz Peña\",\"desc\":\"Se implementó el voto secreto y obligatorio, garantizando elecciones democráticas.\"},{\"date\":\"1946\",\"title\":\"Primer gobierno de Perón\",\"desc\":\"Juan Domingo Perón asumió como presidente, iniciando un período de transformaciones sociales profundas.\"},{\"date\":\"1983\",\"title\":\"Retorno a la Democracia\",\"desc\":\"Tras la última dictadura militar, Raúl Alfonsín fue elegido presidente, restaurando el sistema democrático.\"}]}\n```",
+  "date": "2026-03-24T02:07:23.728Z"
+}

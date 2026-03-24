@@ -1,6 +1,6 @@
 flowchart TD
     U[Visitor / User] --> I[index.html]
-    U --> T[demo.html trial page]
+    U --> T[demo.html trial entry]
     U --> A[auth.html]
     U --> C[chat.html]
     U --> DB[dashboard.html]
@@ -24,21 +24,23 @@ flowchart TD
     ADMIN --> AUTH
     INF --> AUTH
 
-    INF --> ACCESS[lib/access.js]
-    ME --> ACCESS
-    W --> ACCESS
+    LOGIN --> WALLET[lib/wallet.js]
+    REG --> WALLET
+    INF --> WALLET
+    ME --> WALLET
+    W --> WALLET
+    ADMIN --> WALLET
 
     INF --> USAGE[lib/usage.js]
     ADMIN --> USAGE
 
     W --> FB[lib/firebase.js]
-    ACCESS --> FB
+    WALLET --> FB
     AUTH --> FB
     USAGE --> FB
     ADMIN --> FB
 
-    REG --> TW[Trial Wallet]
-    LOGIN --> TW
+    WALLET --> TW[Trial + Paid Wallet Logic]
     TW --> FB
 
     INF --> LLM[LLM Provider\nLLM_API_BASE / LLM_API_KEY]
