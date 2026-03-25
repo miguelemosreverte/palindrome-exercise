@@ -1,0 +1,133 @@
+{
+  "date": "2026-03-25T23:35:45.024Z",
+  "server": "https://opencode-production-42c2.up.railway.app",
+  "maxUsers": 20,
+  "results": {
+    "max_concurrent": {
+      "users_1": {
+        "users": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "wallTime": 1787,
+        "count": 1,
+        "min": 1787,
+        "max": 1787,
+        "avg": 1787,
+        "p50": 1787,
+        "p95": 1787,
+        "p99": 1787,
+        "errors": []
+      },
+      "users_2": {
+        "users": 2,
+        "succeeded": 2,
+        "failed": 0,
+        "wallTime": 1894,
+        "count": 2,
+        "min": 1788,
+        "max": 1894,
+        "avg": 1841,
+        "p50": 1788,
+        "p95": 1894,
+        "p99": 1894,
+        "errors": []
+      },
+      "users_5": {
+        "users": 5,
+        "succeeded": 5,
+        "failed": 0,
+        "wallTime": 1982,
+        "count": 5,
+        "min": 1751,
+        "max": 1981,
+        "avg": 1839,
+        "p50": 1804,
+        "p95": 1981,
+        "p99": 1981,
+        "errors": []
+      },
+      "users_10": {
+        "users": 10,
+        "succeeded": 10,
+        "failed": 0,
+        "wallTime": 2042,
+        "count": 10,
+        "min": 1690,
+        "max": 2042,
+        "avg": 1863,
+        "p50": 1835,
+        "p95": 2042,
+        "p99": 2042,
+        "errors": []
+      },
+      "users_15": {
+        "users": 15,
+        "succeeded": 15,
+        "failed": 0,
+        "wallTime": 2012,
+        "count": 15,
+        "min": 1849,
+        "max": 2011,
+        "avg": 1911,
+        "p50": 1906,
+        "p95": 2011,
+        "p99": 2011,
+        "errors": []
+      },
+      "users_20": {
+        "users": 20,
+        "succeeded": 20,
+        "failed": 0,
+        "wallTime": 2376,
+        "count": 20,
+        "min": 1701,
+        "max": 2376,
+        "avg": 1894,
+        "p50": 1877,
+        "p95": 2051,
+        "p99": 2376,
+        "errors": []
+      }
+    },
+    "rapid_fire": {
+      "messages": 10,
+      "totalTime": 16871,
+      "msgsPerMinute": 36,
+      "count": 10,
+      "min": 1568,
+      "max": 1832,
+      "avg": 1687,
+      "p50": 1673,
+      "p95": 1832,
+      "p99": 1832
+    },
+    "workspace_isolation": {
+      "available": true,
+      "createResult": "{\"data\":{\"name\":\"test-user-1774481736386\"},\"error\":[{\"expected\":\"string\",\"code\":\"invalid_type\",\"path\":[\"type\"],\"message\":\"Invalid input: expected string, received undefined\"},{\"expected\":\"string\",\"code\":\"invalid_type\",\"path\":[\"branch\"],\"message\":\"Invalid input: expected string, received undefined\"}]"
+    },
+    "session_overhead": {
+      "sessionsBefore": 100,
+      "sessionsAfter": 100,
+      "batchCreateTime": 389,
+      "perSessionCreate": 19,
+      "messageLatency": 2032
+    },
+    "heavy_execution": {
+      "users": 3,
+      "succeeded": 3,
+      "wallTime": 4738,
+      "individual": [
+        4738,
+        4563,
+        4537
+      ],
+      "count": 3,
+      "min": 4537,
+      "max": 4738,
+      "avg": 4613,
+      "p50": 4563,
+      "p95": 4738,
+      "p99": 4738
+    }
+  }
+}

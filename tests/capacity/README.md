@@ -52,21 +52,63 @@ node tests/capacity/benchmark.js execution
 
 Results are saved to `tests/capacity/results.json` with history of the last 10 runs.
 
-### Expected findings
+## Results (2026-03-25)
 
-| Dimension | Single OpenCode instance | Impact |
-|-----------|------------------------|--------|
-| Session creation | Fast (~100ms/session) | Users can onboard instantly |
-| Concurrent messages | Depends on LLM provider | Multiple users may experience delays |
-| Filesystem | Likely **SHARED** | Need per-user directories |
-| Code execution | Likely **serialized** | One user's script may block others |
+### Benchmark (`benchmark.js`)
+
+| Dimension | Result | Verdict |
+|-----------|--------|---------|
+| Session creation | 38ms/session (10 parallel) | ✓ Excellent |
+| Concurrent messages (3) | 1.1x baseline | ✓ Parallel |
+| Concurrent messages (5) | 1.6x baseline | ✓ Parallel |
+| Filesystem | User B reads User A's files | ❌ Shared |
+| Code execution | Slow script doesn't block fast user | ✓ Parallel |
+
+### Stress Test (`stress.js --users 20`)
+
+| Concurrent Users | Success Rate | Wall Time | Avg Latency | P95 |
+|-----------------|-------------|-----------|-------------|-----|
+| 1 | 1/1 | 1,787ms | 1,787ms | — |
+| 2 | 2/2 | 1,894ms | 1,841ms | 1,894ms |
+| 5 | 5/5 | 1,982ms | 1,839ms | 1,981ms |
+| 10 | 10/10 | 2,042ms | 1,863ms | 2,042ms |
+| 15 | 15/15 | 2,012ms | 1,911ms | 2,011ms |
+| **20** | **20/20** | **2,376ms** | **1,894ms** | **2,051ms** |
+
+**Key finding: 20 simultaneous users, 100% success, ~2s latency.** The instance scales almost linearly — adding more users barely increases latency (1.8s → 1.9s from 1 to 20 users).
+
+| Metric | Value |
+|--------|-------|
+| Sequential throughput | **~36 messages/minute** |
+| Concurrent Python execution (3 users) | **4.7s wall time** (parallel ✓) |
+| Session overhead (100 sessions) | **2,032ms latency** (no degradation) |
+| Session creation at scale | **19ms/session** |
+
+### Workspace API
+The `/experimental/workspace` API exists but requires a `type` parameter. Needs further investigation for per-user isolation.
+
+### Conclusions
+
+**One Railway instance can serve 20+ concurrent users** with ~2s response time. The bottleneck is NOT compute — it's the external LLM API latency (~1.8s baseline). The instance itself adds negligible overhead.
+
+**Estimated capacity per instance:**
+- Active concurrent chatters: **20-30**
+- Total registered users (not all active at once): **100-200**
+- Messages per minute: **~36** (sequential) or higher with concurrency
+- Sessions before degradation: **100+** (tested, no degradation)
+
+### Remaining issue: Filesystem isolation
+
+Users share `/tmp` and `/app`. Files created by one user are visible to all others.
 
 ### Scaling options (cheapest to most expensive)
 
-1. **Per-user directories** — Create `/home/{userId}/` per session, set `cwd` accordingly. Cheapest, solves file isolation, doesn't solve execution blocking.
+1. **Per-user directories** ($0) — Create `/home/{userId}/` per session, set `cwd`. Cheapest, solves file isolation, doesn't prevent intentional snooping.
 
-2. **OpenCode workspaces** — Use the `/experimental/workspace` API to create isolated workspaces per user. May solve both file isolation and execution.
+2. **OpenCode workspaces** ($0) — Use `/experimental/workspace` API. Needs investigation of the `type` parameter.
 
-3. **Multiple Railway instances** — Run N OpenCode containers, route users to them. Solves everything but costs N × container price.
+3. **User namespace + chroot** ($0) — Linux namespaces to isolate `/tmp` per session. Requires Docker privileges.
 
-4. **Per-user containers** — Spin up a container per user on demand, hibernate when idle. Best isolation, highest cost, most complex.
+4. **Multiple Railway instances** ($5-7/mo each) — Run N containers behind a load balancer, route users by hash. Gives N × capacity.
+
+5. **Per-user containers on demand** ($variable) — Spin up container per user, hibernate after idle. Best isolation, most complex.
