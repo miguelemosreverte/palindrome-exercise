@@ -92,7 +92,7 @@ const TESTS = {
    */
   async max_concurrent() {
     console.log('\n  ── Maximum Concurrent Users ──');
-    const levels = [1, 2, 5, 10, 15, 20].filter(n => n <= MAX_USERS);
+    const levels = [1, 5, 10, 20, 30, 50, 75, 100].filter(n => n <= MAX_USERS);
     const results = {};
 
     for (const n of levels) {
