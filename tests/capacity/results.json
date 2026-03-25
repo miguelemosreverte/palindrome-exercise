@@ -1,0 +1,123 @@
+{
+  "date": "2026-03-25T23:32:24.144Z",
+  "server": "https://opencode-production-42c2.up.railway.app",
+  "results": {
+    "sessions": {
+      "create_1": {
+        "count": 1,
+        "elapsed": 435,
+        "perSession": 435,
+        "allOk": true
+      },
+      "create_5": {
+        "count": 5,
+        "elapsed": 384,
+        "perSession": 77,
+        "allOk": true
+      },
+      "create_10": {
+        "count": 10,
+        "elapsed": 376,
+        "perSession": 38,
+        "allOk": true
+      },
+      "totalSessions": 94
+    },
+    "concurrent": {
+      "baseline": 1894,
+      "concurrent3": {
+        "elapsed": 2083,
+        "succeeded": 3,
+        "individual": [
+          1546,
+          2083,
+          2028
+        ]
+      },
+      "concurrent5": {
+        "elapsed": 2960,
+        "succeeded": 5
+      },
+      "parallelism3x": 1.1,
+      "parallelism5x": 1.56
+    },
+    "isolation": {
+      "marker": "ISOLATION_TEST_1774481525442",
+      "filePath": "/tmp/isolation_1774481525442.txt",
+      "userA_wrote": true,
+      "userB_canRead": true,
+      "isolated": false,
+      "verdict": "WARNING: All sessions share the same filesystem. Users can read/write each other's files.",
+      "recommendation": "Need per-user directories (/home/{userId}/) or separate containers per user"
+    },
+    "execution": {
+      "userA_elapsed": 6908,
+      "userB_elapsed": 3661,
+      "totalWallTime": 6908,
+      "userB_blocked": false,
+      "verdict": "Code execution is PARALLEL — users don't block each other"
+    }
+  },
+  "history": [
+    {
+      "date": "2026-03-25T23:32:24.144Z",
+      "results": {
+        "sessions": {
+          "create_1": {
+            "count": 1,
+            "elapsed": 435,
+            "perSession": 435,
+            "allOk": true
+          },
+          "create_5": {
+            "count": 5,
+            "elapsed": 384,
+            "perSession": 77,
+            "allOk": true
+          },
+          "create_10": {
+            "count": 10,
+            "elapsed": 376,
+            "perSession": 38,
+            "allOk": true
+          },
+          "totalSessions": 94
+        },
+        "concurrent": {
+          "baseline": 1894,
+          "concurrent3": {
+            "elapsed": 2083,
+            "succeeded": 3,
+            "individual": [
+              1546,
+              2083,
+              2028
+            ]
+          },
+          "concurrent5": {
+            "elapsed": 2960,
+            "succeeded": 5
+          },
+          "parallelism3x": 1.1,
+          "parallelism5x": 1.56
+        },
+        "isolation": {
+          "marker": "ISOLATION_TEST_1774481525442",
+          "filePath": "/tmp/isolation_1774481525442.txt",
+          "userA_wrote": true,
+          "userB_canRead": true,
+          "isolated": false,
+          "verdict": "WARNING: All sessions share the same filesystem. Users can read/write each other's files.",
+          "recommendation": "Need per-user directories (/home/{userId}/) or separate containers per user"
+        },
+        "execution": {
+          "userA_elapsed": 6908,
+          "userB_elapsed": 3661,
+          "totalWallTime": 6908,
+          "userB_blocked": false,
+          "verdict": "Code execution is PARALLEL — users don't block each other"
+        }
+      }
+    }
+  ]
+}
