@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// Catch all errors immediately
+process.on('uncaughtException', e => { console.error('UNCAUGHT:', e); });
+process.on('unhandledRejection', e => { console.error('UNHANDLED:', e); });
+console.log('Proxy starting... Node ' + process.version + ' PID ' + process.pid);
+console.log('ENV: INSTANCES=' + process.env.INSTANCES + ' PORT=' + process.env.PORT);
 /**
  * Multi-instance OpenCode proxy.
  *
