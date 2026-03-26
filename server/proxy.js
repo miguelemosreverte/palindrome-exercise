@@ -41,7 +41,7 @@ function startInstance(index) {
     XDG_CONFIG_HOME: `${dataDir}/.config`,
   };
 
-  const proc = spawn('opencode', [
+  const proc = spawn('/usr/local/bin/opencode', [
     'serve',
     '--port', String(port),
     '--hostname', '127.0.0.1',
