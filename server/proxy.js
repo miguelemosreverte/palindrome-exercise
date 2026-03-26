@@ -190,12 +190,12 @@ for (let i = 0; i < INSTANCES; i++) {
   instances.push(startInstance(i));
 }
 
-// Wait for instances to boot
-setTimeout(() => {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\nProxy listening on http://0.0.0.0:${PORT}`);
-    console.log(`Instances: ${instances.map(i => `#${i.index} :${i.port}`).join(', ')}`);
-    console.log(`CORS: ${CORS_ORIGINS.join(', ')}`);
-  });
-  healthLoop();
-}, 3000);
+// Start listening IMMEDIATELY so Railway health checks pass
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\nProxy listening on http://0.0.0.0:${PORT}`);
+  console.log(`Instances: ${instances.map(i => `#${i.index} :${i.port}`).join(', ')}`);
+  console.log(`CORS: ${CORS_ORIGINS.join(', ')}`);
+});
+
+// Start health checking after instances have time to boot
+setTimeout(healthLoop, 5000);
