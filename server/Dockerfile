@@ -10,8 +10,10 @@ RUN mkdir -p /workspaces /data /app && \
     for i in 0 1 2 3 4; do mkdir -p /workspaces/pool-$i /data/pool-$i; done && \
     chmod -R 777 /workspaces /data
 
-# Copy proxy — uses /usr/local/bin/opencode (confirmed in pilinux image)
+# Copy proxy and start script
 COPY proxy.js /app/proxy.js
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 WORKDIR /app
 
@@ -21,4 +23,4 @@ ENV INSTANCES=3
 ENV PORT=8080
 
 # Use the full opencode path from pilinux image
-CMD ["/usr/local/bin/node", "/app/proxy.js"]
+CMD ["/bin/sh", "/app/start.sh"]
