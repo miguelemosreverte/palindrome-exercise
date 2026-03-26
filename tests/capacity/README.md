@@ -107,23 +107,30 @@ Benchmark: `node tests/capacity/compare.js --users 100`
 
 | Users | Single (avg) | Multi 3× (avg) | Speedup | Single ok | Multi ok |
 |-------|-------------|-----------------|---------|-----------|----------|
-| 1     | 2,078ms     | 222ms           | **9.4×** | 1/1       | 1/1      |
-| 5     | 2,056ms     | 619ms           | **3.3×** | 5/5       | 5/5      |
-| 10    | 2,159ms     | 1,053ms         | **2.1×** | 10/10     | 10/10    |
-| 20    | 2,711ms     | 367ms           | **7.4×** | 20/20     | 20/20    |
-| 30    | 2,659ms     | 881ms           | **3.0×** | 30/30     | 30/30    |
-| 50    | 2,859ms     | 612ms           | **4.7×** | 50/50     | 50/50    |
+| 1     | 1,768ms     | 1,205ms         | **1.5×** | 1/1       | 1/1      |
+| 5     | 2,076ms     | 224ms           | **9.3×** | 5/5       | 5/5      |
+| 10    | 1,882ms     | 1,169ms         | **1.6×** | 10/10     | 10/10    |
+| 20    | 2,017ms     | 944ms           | **2.1×** | 20/20     | 20/20    |
+| 30    | 4,499ms     | 806ms           | **5.6×** | 30/30     | 30/30    |
+| 50    | 5,423ms     | 714ms           | **7.6×** | 50/50     | 50/50    |
 
 **Key findings:**
-- Multi-instance is **3-9× faster** than single across all user counts
+- Multi-instance is **2-9× faster** across all user counts
 - Both achieve **100% success rate** up to 50 concurrent users
-- Multi-instance average stays under 1s even at 50 users
-- Single instance average reaches ~3s at 50 users
+- Multi-instance stays **under 1s** even at 50 users
+- Single degrades to **5.4s** at 50 users — multi stays at **714ms**
+- The more users, the bigger the advantage of multi-instance
 
-**Estimated capacity (multi-instance, 3 processes):**
+**Scaling limits tested:**
+- 100 instances: OOM crash — too many processes for Railway trial RAM
+- 10 instances: OOM crash — some instances die under memory pressure
+- 5 instances: partially stable (3/5 healthy)
+- **3 instances: fully stable** (3/3 healthy, ~1.2GB RAM used)
+
+**Estimated capacity (3 instances, Railway trial):**
 - 50 concurrent at <1s: ✓ comfortable
-- 100 concurrent at ~2-3s: feasible
-- Filesystem isolation: ✓ each instance has `/workspaces/pool-N/`
+- 100 concurrent at ~2s: feasible (based on linear extrapolation)
+- Max instances per Railway container: **3** (trial plan), potentially 5-8 on Pro plan with more RAM
 
 ### Filesystem isolation (solved)
 

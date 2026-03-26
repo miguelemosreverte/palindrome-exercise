@@ -1,5 +1,5 @@
 {
-  "date": "2026-03-26T22:55:08.299Z",
+  "date": "2026-03-26T23:14:34.421Z",
   "maxUsers": 50,
   "single": {
     "url": "https://opencode-production-42c2.up.railway.app",
@@ -9,72 +9,72 @@
         "succeeded": 1,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2078,
-        "min": 2078,
-        "max": 2078,
-        "avg": 2078,
-        "p50": 2078,
-        "p95": 2078
+        "wallTime": 1768,
+        "min": 1768,
+        "max": 1768,
+        "avg": 1768,
+        "p50": 1768,
+        "p95": 1768
       },
       "5": {
         "users": 5,
         "succeeded": 5,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2086,
-        "min": 1990,
-        "max": 2085,
-        "avg": 2056,
-        "p50": 2077,
-        "p95": 2085
+        "wallTime": 2447,
+        "min": 1811,
+        "max": 2447,
+        "avg": 2076,
+        "p50": 2127,
+        "p95": 2447
       },
       "10": {
         "users": 10,
         "succeeded": 10,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2547,
-        "min": 1930,
-        "max": 2546,
-        "avg": 2159,
-        "p50": 2099,
-        "p95": 2546
+        "wallTime": 2033,
+        "min": 1716,
+        "max": 2033,
+        "avg": 1882,
+        "p50": 1881,
+        "p95": 2033
       },
       "20": {
         "users": 20,
         "succeeded": 20,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 3405,
-        "min": 1901,
-        "max": 3405,
-        "avg": 2711,
-        "p50": 2704,
-        "p95": 3126
+        "wallTime": 2292,
+        "min": 1656,
+        "max": 2292,
+        "avg": 2017,
+        "p50": 2035,
+        "p95": 2200
       },
       "30": {
         "users": 30,
         "succeeded": 30,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 3082,
-        "min": 2144,
-        "max": 3082,
-        "avg": 2659,
-        "p50": 2634,
-        "p95": 3075
+        "wallTime": 9677,
+        "min": 2234,
+        "max": 9676,
+        "avg": 4499,
+        "p50": 3922,
+        "p95": 9168
       },
       "50": {
         "users": 50,
         "succeeded": 50,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 3885,
-        "min": 1936,
-        "max": 3884,
-        "avg": 2859,
-        "p50": 2978,
-        "p95": 3707
+        "wallTime": 7292,
+        "min": 3133,
+        "max": 7292,
+        "avg": 5423,
+        "p50": 5647,
+        "p95": 5801
       }
     }
   },
@@ -87,72 +87,72 @@
         "succeeded": 1,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 222,
-        "min": 222,
-        "max": 222,
-        "avg": 222,
-        "p50": 222,
-        "p95": 222
+        "wallTime": 1205,
+        "min": 1205,
+        "max": 1205,
+        "avg": 1205,
+        "p50": 1205,
+        "p95": 1205
       },
       "5": {
         "users": 5,
         "succeeded": 5,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2342,
-        "min": 182,
-        "max": 2342,
-        "avg": 619,
-        "p50": 186,
-        "p95": 2342
+        "wallTime": 362,
+        "min": 188,
+        "max": 362,
+        "avg": 224,
+        "p50": 191,
+        "p95": 362
       },
       "10": {
         "users": 10,
         "succeeded": 10,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 4886,
-        "min": 187,
-        "max": 4885,
-        "avg": 1053,
+        "wallTime": 2796,
+        "min": 191,
+        "max": 2796,
+        "avg": 1169,
         "p50": 192,
-        "p95": 4885
+        "p95": 2796
       },
       "20": {
         "users": 20,
         "succeeded": 20,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 1529,
-        "min": 196,
-        "max": 1528,
-        "avg": 367,
-        "p50": 249,
-        "p95": 1502
+        "wallTime": 1627,
+        "min": 183,
+        "max": 1627,
+        "avg": 944,
+        "p50": 1357,
+        "p95": 1615
       },
       "30": {
         "users": 30,
         "succeeded": 30,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2216,
-        "min": 184,
-        "max": 2215,
-        "avg": 881,
-        "p50": 336,
-        "p95": 1990
+        "wallTime": 2324,
+        "min": 171,
+        "max": 2323,
+        "avg": 806,
+        "p50": 200,
+        "p95": 2227
       },
       "50": {
         "users": 50,
         "succeeded": 50,
         "failed": 0,
         "timeouts": 0,
-        "wallTime": 2094,
-        "min": 188,
-        "max": 2094,
-        "avg": 612,
-        "p50": 308,
-        "p95": 1835
+        "wallTime": 2106,
+        "min": 292,
+        "max": 2105,
+        "avg": 714,
+        "p50": 322,
+        "p95": 1682
       }
     }
   }
