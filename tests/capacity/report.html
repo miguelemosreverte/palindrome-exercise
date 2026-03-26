@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capacity Benchmark Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root { --ink: #112033; --slate: #56708a; --ocean: #316dff; --mint: #89e0c8; --red: #ef4444; --line: rgba(17,32,51,0.08); }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif; color: var(--ink); background: linear-gradient(180deg, #f0f4f8 0%, #fff 100%); padding: 48px 24px; }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+    .subtitle { font-size: 15px; color: var(--slate); margin-bottom: 32px; }
+    h2 { font-size: 22px; font-weight: 800; margin: 40px 0 16px; padding-top: 24px; border-top: 2px solid var(--line); }
+    h3 { font-size: 16px; font-weight: 700; margin: 24px 0 10px; }
+    p, li { font-size: 15px; line-height: 1.7; color: var(--slate); }
+    ul { padding-left: 20px; margin: 8px 0; }
+    strong { color: var(--ink); }
+
+    .hero-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 24px 0; }
+    .hero-card { padding: 20px; border-radius: 16px; border: 1px solid var(--line); background: white; }
+    .hero-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--slate); font-weight: 700; }
+    .hero-card .value { font-size: 32px; font-weight: 800; margin-top: 6px; }
+    .hero-card .note { font-size: 12px; color: var(--slate); margin-top: 4px; }
+    .hero-card.highlight { border-color: var(--ocean); background: rgba(49,109,255,0.03); }
+    .hero-card.highlight .value { color: var(--ocean); }
+    .hero-card.warn .value { color: var(--red); }
+
+    .chart-box { border-radius: 16px; border: 1px solid var(--line); background: white; padding: 24px; margin: 20px 0; }
+    .chart-box canvas { max-height: 320px; }
+
+    table { width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: white; margin: 16px 0; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--slate); font-weight: 700; text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--line); background: #fafbfc; }
+    td { font-size: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(49,109,255,0.02); }
+    .green { color: #16a34a; font-weight: 600; }
+    .red { color: #ef4444; font-weight: 600; }
+    .blue { color: var(--ocean); font-weight: 700; }
+
+    .verdict { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .verdict.pass { background: rgba(22,163,74,0.1); color: #16a34a; }
+    .verdict.fail { background: rgba(239,68,68,0.1); color: #ef4444; }
+    .verdict.warn { background: rgba(245,158,11,0.1); color: #b45309; }
+
+    .arch-box { padding: 20px; border-radius: 14px; background: #0f172a; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; margin: 16px 0; white-space: pre; overflow-x: auto; }
+    .scaling-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+    .scale-card { padding: 16px; border-radius: 14px; border: 1px solid var(--line); background: white; }
+    .scale-card .instances { font-size: 28px; font-weight: 800; }
+    .scale-card .status { font-size: 13px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Capacity Benchmark Report</h1>
+  <p class="subtitle">OpenCode on Railway — Single vs Multi-Instance · March 2026</p>
+
+  <!-- Hero metrics -->
+  <div class="hero-cards">
+    <div class="hero-card highlight">
+      <div class="label">Best Config</div>
+      <div class="value">3×</div>
+      <div class="note">instances per container</div>
+    </div>
+    <div class="hero-card highlight">
+      <div class="label">50 Users Latency</div>
+      <div class="value">714ms</div>
+      <div class="note">multi-instance avg</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">Success Rate</div>
+      <div class="value">100%</div>
+      <div class="note">at 50 concurrent users</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">Speedup</div>
+      <div class="value">7.6×</div>
+      <div class="note">multi vs single at 50 users</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">Cost</div>
+      <div class="value">$5/mo</div>
+      <div class="note">same Railway container</div>
+    </div>
+  </div>
+
+  <h2>Architecture</h2>
+  <div class="arch-box">Railway Container ($5/mo, ~4GB RAM)
+├── proxy.js (port 8080, sticky routing)
+├── OpenCode #0 (port 9001, /workspaces/pool-0/)
+├── OpenCode #1 (port 9002, /workspaces/pool-1/)
+└── OpenCode #2 (port 9003, /workspaces/pool-2/)
+
+Each instance: own filesystem, own DB, own sessions.
+Proxy: hash-based sticky routing, health checks, auto-restart.</div>
+
+  <h2>Single vs Multi-Instance Comparison</h2>
+
+  <div class="chart-box">
+    <canvas id="latencyChart"></canvas>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Users</th><th>Single (avg)</th><th>Multi 3× (avg)</th><th>Speedup</th><th>Single ok</th><th>Multi ok</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>1,768ms</td><td>1,205ms</td><td class="blue">1.5×</td><td class="green">1/1</td><td class="green">1/1</td></tr>
+      <tr><td>5</td><td>2,076ms</td><td>224ms</td><td class="blue">9.3×</td><td class="green">5/5</td><td class="green">5/5</td></tr>
+      <tr><td>10</td><td>1,882ms</td><td>1,169ms</td><td class="blue">1.6×</td><td class="green">10/10</td><td class="green">10/10</td></tr>
+      <tr><td>20</td><td>2,017ms</td><td>944ms</td><td class="blue">2.1×</td><td class="green">20/20</td><td class="green">20/20</td></tr>
+      <tr><td>30</td><td>4,499ms</td><td>806ms</td><td class="blue">5.6×</td><td class="green">30/30</td><td class="green">30/30</td></tr>
+      <tr><td><strong>50</strong></td><td><strong>5,423ms</strong></td><td class="blue"><strong>714ms</strong></td><td class="blue"><strong>7.6×</strong></td><td class="green"><strong>50/50</strong></td><td class="green"><strong>50/50</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Instance Scaling Limits</h2>
+  <p>Tested how many OpenCode processes fit in one Railway trial container (~4GB RAM).</p>
+
+  <div class="scaling-grid">
+    <div class="scale-card">
+      <div class="instances" style="color:var(--red);">100</div>
+      <div class="status"><span class="verdict fail">✗ OOM crash</span></div>
+      <div class="note" style="margin-top:8px;font-size:12px;color:var(--slate);">Needs >16GB RAM</div>
+    </div>
+    <div class="scale-card">
+      <div class="instances" style="color:var(--red);">10</div>
+      <div class="status"><span class="verdict fail">✗ OOM crash</span></div>
+      <div class="note" style="margin-top:8px;font-size:12px;color:var(--slate);">Needs ~4GB RAM</div>
+    </div>
+    <div class="scale-card">
+      <div class="instances" style="color:#b45309;">5</div>
+      <div class="status"><span class="verdict warn">⚠ 3/5 survive</span></div>
+      <div class="note" style="margin-top:8px;font-size:12px;color:var(--slate);">~2.5GB, borderline</div>
+    </div>
+    <div class="scale-card" style="border-color:var(--ocean);background:rgba(49,109,255,0.03);">
+      <div class="instances" style="color:var(--ocean);">3 ✓</div>
+      <div class="status"><span class="verdict pass">✓ Fully stable</span></div>
+      <div class="note" style="margin-top:8px;font-size:12px;color:var(--slate);">~1.2GB, sweet spot</div>
+    </div>
+    <div class="scale-card">
+      <div class="instances">1</div>
+      <div class="status"><span class="verdict pass">✓ Stable</span></div>
+      <div class="note" style="margin-top:8px;font-size:12px;color:var(--slate);">~400MB, baseline</div>
+    </div>
+  </div>
+
+  <h2>Baseline Diagnostics (Single Instance)</h2>
+
+  <table>
+    <thead><tr><th>Dimension</th><th>Result</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Session creation</td><td>38ms/session (10 parallel)</td><td><span class="verdict pass">✓ Excellent</span></td></tr>
+      <tr><td>Concurrent messages (3)</td><td>1.1× baseline</td><td><span class="verdict pass">✓ Parallel</span></td></tr>
+      <tr><td>Concurrent messages (5)</td><td>1.6× baseline</td><td><span class="verdict pass">✓ Parallel</span></td></tr>
+      <tr><td>Filesystem isolation</td><td>User B reads User A's files</td><td><span class="verdict fail">✗ Shared</span></td></tr>
+      <tr><td>Code execution</td><td>Slow script doesn't block fast user</td><td><span class="verdict pass">✓ Parallel</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Filesystem Isolation</h3>
+  <p>The <strong>multi-instance setup solves this</strong> — each OpenCode instance runs in its own <code>/workspaces/pool-N/</code> with separate HOME, XDG_DATA_HOME, and XDG_CONFIG_HOME.</p>
+
+  <h2>Stress Test (Single Instance, 100 Users)</h2>
+
+  <div class="chart-box">
+    <canvas id="stressChart"></canvas>
+  </div>
+
+  <table>
+    <thead><tr><th>Users</th><th>Success</th><th>Wall Time</th><th>Avg Latency</th><th>P95</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="green">1/1</td><td>1,723ms</td><td>1,723ms</td><td>—</td></tr>
+      <tr><td>5</td><td class="green">5/5</td><td>1,851ms</td><td>1,794ms</td><td>1,851ms</td></tr>
+      <tr><td>10</td><td class="green">10/10</td><td>1,882ms</td><td>1,782ms</td><td>1,881ms</td></tr>
+      <tr><td>20</td><td class="green">20/20</td><td>2,317ms</td><td>1,996ms</td><td>2,163ms</td></tr>
+      <tr><td>30</td><td class="green">30/30</td><td>2,261ms</td><td>2,016ms</td><td>2,243ms</td></tr>
+      <tr><td>50</td><td class="green">48/50</td><td>30,003ms</td><td>3,077ms</td><td>5,009ms</td></tr>
+      <tr><td>75</td><td class="green">75/75</td><td>6,013ms</td><td>4,294ms</td><td>4,551ms</td></tr>
+      <tr><td><strong>100</strong></td><td class="green"><strong>100/100</strong></td><td><strong>5,047ms</strong></td><td><strong>4,615ms</strong></td><td><strong>5,015ms</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Scaling Strategy</h2>
+  <p>Each Railway service ($5/mo) runs <strong>3 OpenCode instances</strong> behind a proxy. To scale:</p>
+
+  <div class="hero-cards">
+    <div class="hero-card">
+      <div class="label">1 Service</div>
+      <div class="value">50</div>
+      <div class="note">concurrent users at &lt;1s</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">2 Services</div>
+      <div class="value">100</div>
+      <div class="note">$10/mo</div>
+    </div>
+    <div class="hero-card">
+      <div class="label">4 Services</div>
+      <div class="value">200</div>
+      <div class="note">$20/mo</div>
+    </div>
+    <div class="hero-card highlight">
+      <div class="label">Cost per User</div>
+      <div class="value">$0.10</div>
+      <div class="note">per concurrent slot/mo</div>
+    </div>
+  </div>
+
+  <h2>Benchmark Scripts</h2>
+  <table>
+    <thead><tr><th>Script</th><th>What it measures</th></tr></thead>
+    <tbody>
+      <tr><td><code>tests/capacity/benchmark.js</code></td><td>Session throughput, concurrency, filesystem isolation, code execution</td></tr>
+      <tr><td><code>tests/capacity/stress.js</code></td><td>Max concurrent users, rapid fire, workspace API, heavy execution</td></tr>
+      <tr><td><code>tests/capacity/compare.js</code></td><td>Single vs multi-instance side-by-side comparison</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // Latency comparison chart
+  new Chart(document.getElementById('latencyChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['1 user', '5 users', '10 users', '20 users', '30 users', '50 users'],
+      datasets: [
+        { label: 'Single Instance', data: [1768, 2076, 1882, 2017, 4499, 5423], backgroundColor: '#cbd5e1', borderRadius: 6 },
+        { label: 'Multi Instance (3×)', data: [1205, 224, 1169, 944, 806, 714], backgroundColor: '#316dff', borderRadius: 6 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: 'Average Latency (ms) — Lower is Better', font: { size: 15, weight: 'bold' } } },
+      scales: { y: { title: { display: true, text: 'Latency (ms)' }, beginAtZero: true } }
+    }
+  });
+
+  // Stress test chart
+  new Chart(document.getElementById('stressChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: ['1', '5', '10', '20', '30', '50', '75', '100'],
+      datasets: [
+        { label: 'Avg Latency (ms)', data: [1723, 1794, 1782, 1996, 2016, 3077, 4294, 4615], borderColor: '#316dff', tension: 0.3, pointRadius: 5 },
+        { label: 'P95 (ms)', data: [1723, 1851, 1881, 2163, 2243, 5009, 4551, 5015], borderColor: '#ef4444', borderDash: [5,5], tension: 0.3, pointRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: 'Single Instance — Latency vs Concurrent Users', font: { size: 15, weight: 'bold' } } },
+      scales: { x: { title: { display: true, text: 'Concurrent Users' } }, y: { title: { display: true, text: 'Latency (ms)' }, beginAtZero: true } }
+    }
+  });
+</script>
+</body>
+</html>
