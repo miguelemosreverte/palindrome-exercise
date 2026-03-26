@@ -11,7 +11,7 @@
  *   node tests/e2e-opencode.js persistence       # run only persistence scenario
  */
 
-const OPENCODE = process.env.OPENCODE_URL || 'https://opencode-production-42c2.up.railway.app';
+const OPENCODE = process.env.OPENCODE_URL || 'https://palindrome-exercise-production.up.railway.app';
 
 // ─── API helpers ───
 

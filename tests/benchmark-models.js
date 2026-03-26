@@ -7,7 +7,7 @@
  *   node tests/benchmark-models.js --routing     # test routing prompt classification
  */
 
-const OC = process.env.OPENCODE_URL || 'https://opencode-production-42c2.up.railway.app';
+const OC = process.env.OPENCODE_URL || 'https://palindrome-exercise-production.up.railway.app';
 
 async function benchmark(providerID, modelID, name, prompt) {
   const session = await fetch(OC + '/session', {

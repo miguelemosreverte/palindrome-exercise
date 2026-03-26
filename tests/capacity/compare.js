@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SINGLE = 'https://opencode-production-42c2.up.railway.app';
+const SINGLE = 'https://palindrome-exercise-production.up.railway.app';
 const MULTI = 'https://palindrome-exercise-production.up.railway.app';
 const RESULTS_FILE = path.join(__dirname, 'compare-results.json');
 const MAX_USERS = parseInt(process.argv.find(a => a.match(/--users/))?.[1] || process.argv[process.argv.indexOf('--users') + 1]) || 50;

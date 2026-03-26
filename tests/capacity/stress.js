@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const OC = process.env.OPENCODE_URL || 'https://opencode-production-42c2.up.railway.app';
+const OC = process.env.OPENCODE_URL || 'https://palindrome-exercise-production.up.railway.app';
 const RESULTS_FILE = path.join(__dirname, 'stress-results.json');
 const MAX_USERS = parseInt(process.argv.find(a => a.startsWith('--users'))?.split('=')?.[1] || process.argv[process.argv.indexOf('--users') + 1]) || 10;
 

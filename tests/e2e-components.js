@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const OC = process.env.OPENCODE_URL || 'https://opencode-production-42c2.up.railway.app';
+const OC = process.env.OPENCODE_URL || 'https://palindrome-exercise-production.up.railway.app';
 const CACHE_DIR = path.join(__dirname, 'component-cache');
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
