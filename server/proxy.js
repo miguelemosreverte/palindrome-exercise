@@ -46,12 +46,13 @@ function startInstance(index) {
     XDG_CONFIG_HOME: `${dataDir}/.config`,
   };
 
+  const corsArgs = CORS_ORIGINS.flatMap(o => ['--cors', o]);
   const proc = spawn('opencode', [
     'serve',
     '--port', String(port),
     '--hostname', '127.0.0.1',
     '--print-logs',
-    '--cors', ...CORS_ORIGINS,
+    ...corsArgs,
   ], {
     cwd: workdir,
     env,

@@ -2,25 +2,19 @@ FROM ghcr.io/pilinux/opencode:1.2.26
 
 USER root
 
-# Install Python for code execution
-RUN apt-get update && apt-get install -y python3 curl && rm -rf /var/lib/apt/lists/* || true
+# Create directories
+RUN mkdir -p /app /tmp/workspace-0 /tmp/workspace-1 /tmp/workspace-2 /tmp/workspace-3 /tmp/workspace-4 \
+             /tmp/data-0 /tmp/data-1 /tmp/data-2 /tmp/data-3 /tmp/data-4 && \
+    chmod -R 777 /tmp
 
-# Create workspace and data directories
-RUN mkdir -p /workspaces /data /app && \
-    for i in 0 1 2 3 4; do mkdir -p /workspaces/pool-$i /data/pool-$i; done && \
-    chmod -R 777 /workspaces /data
-
-# Copy proxy and start script
+# Copy proxy
 COPY proxy.js /app/proxy.js
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
-WORKDIR /app
 
 EXPOSE 8080
 
 ENV INSTANCES=3
 ENV PORT=8080
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Use the full opencode path from pilinux image
-CMD ["/bin/sh", "/app/start.sh"]
+# Use the opencode wrapper which knows how to find the right binary
+CMD ["node", "/app/proxy.js"]
