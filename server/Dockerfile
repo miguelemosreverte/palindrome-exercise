@@ -1,18 +1,23 @@
 FROM node:22-slim
 
-# Install OpenCode
+# Install OpenCode + Python
 RUN npm install -g opencode@latest
-
-# Install Python (for OpenCode's code execution)
 RUN apt-get update && apt-get install -y python3 python3-pip curl git && rm -rf /var/lib/apt/lists/*
 
-# Create user workspaces
-RUN mkdir -p /workspaces
+# Create workspace and data directories
+RUN mkdir -p /workspaces /data /app
 
-WORKDIR /workspaces
+# Copy proxy
+COPY proxy.js /app/proxy.js
 
-# Expose the web UI port
+WORKDIR /app
+
+# Expose the proxy port
 EXPOSE 8080
 
-# Start OpenCode web server, listening on all interfaces
-CMD ["opencode", "web", "--port", "8080", "--hostname", "0.0.0.0"]
+# Default: 3 instances
+ENV INSTANCES=3
+ENV PORT=8080
+
+# Start the proxy (which starts N OpenCode instances)
+CMD ["node", "/app/proxy.js"]
