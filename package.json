@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "vercel-build": "cp -r web/* . && node -e \"const fs=require('fs');let h=fs.readFileSync('miniapp.html','utf8');const c=fs.readFileSync('web/components.js','utf8');h=h.replace('<script>/* components.js is inlined below — edit web/components.js and rebuild */</script>','<script>'+c+'</script>');fs.writeFileSync('miniapp.html',h)\""
+    "vercel-build": "cp -r web/* ."
   },
   "dependencies": {
     "@opencode-ai/sdk": "^1.3.0",
