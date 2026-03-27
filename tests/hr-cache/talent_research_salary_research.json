@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser to go to google.com and search for \"Scala developer salary Argentina 2026 USD\". Read the results. Output a ```table block with: {\"headers\":[\"Seniority\",\"Salary Range (USD)\",\"Source\"],\"rows\":[[\"Junior\",\"$XX-$XX\",\"source\"],[\"Mid\",\"...\"],[\"Senior\",\"...\"],[\"Lead\",\"...\"]]}",
+  "text": "Based on my research from multiple sources including Glassdoor, Howdy, Talently, Salancy surveys, and ScalaJobs.com, here's the salary data for Scala developers in Argentina for 2026:\n\n```table\n{\n  \"headers\": [\"Seniority\", \"Salary Range (USD)\", \"Source\"],\n  \"rows\": [\n    [\"Junior\", \"$16,000-$28,000\", \"Howdy, Talently, Salancy\"],\n    [\"Mid\", \"$40,000-$65,000\", \"Interpolated from survey data\"],\n    [\"Senior\", \"$60,000-$100,000\", \"Glassdoor Buenos Aires, Talently\"],\n    [\"Lead\", \"$85,000-$170,000\", \"Glassdoor Buenos Aires specialists\"]\n  ]\n}\n```",
+  "date": "2026-03-27T21:20:55.193Z"
+}

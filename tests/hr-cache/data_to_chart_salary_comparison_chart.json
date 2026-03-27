@@ -1,0 +1,5 @@
+{
+  "prompt": "Given these average Scala developer salaries by seniority in Argentina:\n- Junior: $25,000/yr\n- Mid: $45,000/yr\n- Senior: $70,000/yr\n- Lead: $95,000/yr\n- Architect: $120,000/yr\n\nGenerate a ```chartjs bar chart showing salaries by level. Use a blue gradient. Output ONLY the ```chartjs block.",
+  "text": "```chartjs\n{\n  \"type\": \"bar\",\n  \"data\": {\n    \"labels\": [\"Junior\", \"Mid\", \"Senior\", \"Lead\", \"Architect\"],\n    \"datasets\": [\n      {\n        \"label\": \"Annual Salary (USD)\",\n        \"data\": [25000, 45000, 70000, 95000, 120000],\n        \"backgroundColor\": [\n          \"#E3F2FD\",\n          \"#90CAF9\",\n          \"#42A5F5\",\n          \"#1E88E5\",\n          \"#1565C0\"\n        ],\n        \"borderColor\": \"#0D47A1\",\n        \"borderWidth\": 1\n      }\n    ]\n  },\n  \"options\": {\n    \"responsive\": true,\n    \"plugins\": {\n      \"title\": {\n        \"display\": true,\n        \"text\": \"Scala Developer Salaries by Seniority\"\n      }\n    },\n    \"scales\": {\n      \"y\": {\n        \"beginAtZero\": true\n      }\n    }\n  }\n}\n```",
+  "date": "2026-03-27T21:21:13.743Z"
+}

@@ -1,0 +1,5 @@
+{
+  "prompt": "Given this talent distribution data for LATAM Scala developers:\n- Argentina: 45%\n- Brazil: 25%\n- Colombia: 15%\n- Chile: 10%\n- Other: 5%\n\nGenerate a ```chartjs pie chart showing this distribution. Use nice colors. Output ONLY the ```chartjs block.",
+  "text": "```chartjs\n{\n  \"type\": \"pie\",\n  \"data\": {\n    \"labels\": [\"Argentina\", \"Brazil\", \"Colombia\", \"Chile\", \"Other\"],\n    \"datasets\": [\n      {\n        \"data\": [45, 25, 15, 10, 5],\n        \"backgroundColor\": [\n          \"#FF6B6B\",\n          \"#4ECDC4\",\n          \"#45B7D1\",\n          \"#FFA07A\",\n          \"#98D8C8\"\n        ],\n        \"borderColor\": \"#FFFFFF\",\n        \"borderWidth\": 2\n      }\n    ]\n  },\n  \"options\": {\n    \"responsive\": true,\n    \"plugins\": {\n      \"legend\": {\n        \"position\": \"bottom\"\n      },\n      \"title\": {\n        \"display\": true,\n        \"text\": \"LATAM Scala Developer Talent Distribution\"\n      }\n    }\n  }\n}\n```",
+  "date": "2026-03-27T21:21:01.194Z"
+}
