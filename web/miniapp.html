@@ -507,40 +507,41 @@
       listenStatus();
     }
 
-    // SSE for messages
+    // SSE for messages — single source of truth, no separate fetch
     function listenMessages() {
       var url = FIREBASE_URL + '/mercadopago-bridge/bridge-messages/' + sessionId + '.json';
-      // Initial load
-      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        if (data) {
-          var keys = Object.keys(data).sort();
-          for (var i = 0; i < keys.length; i++) {
-            addMessage(keys[i], data[keys[i]]);
-          }
-          scrollBottom();
-        }
-      });
-      // SSE stream
-      var es = new EventSource(url + '?orderBy="$key"&limitToLast=1');
+      var es = new EventSource(url);
       es.addEventListener('put', function(e) {
         try {
           var payload = JSON.parse(e.data);
           if (!payload.data) return;
           if (payload.path === '/') {
-            var keys = Object.keys(payload.data);
+            // Initial dump — render all messages sorted by key
+            var keys = Object.keys(payload.data).sort();
             for (var i = 0; i < keys.length; i++) {
               addMessage(keys[i], payload.data[keys[i]]);
             }
           } else {
+            // New message
             var key = payload.path.replace('/', '');
             addMessage(key, payload.data);
           }
           scrollBottom();
         } catch (err) { console.error('SSE parse error', err); }
       });
+      es.addEventListener('patch', function(e) {
+        try {
+          var payload = JSON.parse(e.data);
+          if (payload.data && payload.path) {
+            var key = payload.path.replace('/', '');
+            addMessage(key, payload.data);
+            scrollBottom();
+          }
+        } catch (err) {}
+      });
       es.onerror = function() {
-        setTimeout(function() { listenMessages(); }, 5000);
         es.close();
+        setTimeout(function() { listenMessages(); }, 3000);
       };
     }
 
