@@ -235,9 +235,20 @@
     });
 
     async function init() {
-      const res = await fetch(API_BASE + '/api/bridge/sessions', { method: 'POST' });
-      const data = await res.json();
-      sessionId = data.sessionId;
+      // Reuse existing session from ~/.bridge/session or localStorage
+      const fs = window.bridge && window.bridge.readSession ? window.bridge.readSession() : null;
+      const stored = localStorage.getItem('bridge-desktop-session');
+
+      if (stored) {
+        sessionId = stored;
+      } else if (fs) {
+        sessionId = fs;
+      } else {
+        const res = await fetch(API_BASE + '/api/bridge/sessions', { method: 'POST' });
+        const data = await res.json();
+        sessionId = data.sessionId;
+      }
+      localStorage.setItem('bridge-desktop-session', sessionId);
 
       document.getElementById('session-label').textContent = 'Session: ' + sessionId.slice(0, 8) + '...';
 
