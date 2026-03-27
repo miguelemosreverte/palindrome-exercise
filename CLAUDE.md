@@ -70,6 +70,20 @@ Content-Type: application/json
 - **On errors that need attention** → use `error`
 - **On success** → use `success`
 
+## Bridge Agent (autonomous Telegram bot)
+
+Spawns a living AI agent that listens to Telegram messages and responds naturally using Claude CLI:
+
+```bash
+./scripts/bridge-agent.sh
+```
+
+No API key needed — uses `claude --dangerously-skip-permissions` under the hood. The agent:
+- Sends a startup greeting about the project and recent work
+- Listens for incoming Telegram messages every 2 seconds
+- Responds naturally via the Bridge API
+- Has full project context (CLAUDE.md, git log)
+
 ## Global Daemon
 
 The daemon runs in the background and manages multiple projects across repos.
