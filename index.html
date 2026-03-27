@@ -342,9 +342,18 @@
           </div>
 
           <div class="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <a href="/download" class="inline-flex items-center justify-center rounded-full bg-ocean px-8 py-3.5 text-sm font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0]">
-              Descargar para Mac
+            <a href="/download" class="inline-flex items-center justify-center rounded-full bg-ocean px-8 py-3.5 text-sm font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0]" id="bridge-download-btn">
+              Descargar Bridge
             </a>
+            <script>
+              (function(){
+                var ua = navigator.userAgent.toLowerCase();
+                var btn = document.getElementById('bridge-download-btn');
+                if (ua.includes('mac')) btn.textContent = 'Descargar para Mac';
+                else if (ua.includes('win')) btn.textContent = 'Descargar para Windows';
+                else if (ua.includes('linux')) btn.textContent = 'Descargar para Linux';
+              })();
+            </script>
             <a href="/bridge" class="inline-flex items-center justify-center rounded-full border border-slate/15 bg-white/80 px-8 py-3.5 text-sm font-semibold text-ink transition hover:-translate-y-[1px]">
               Usar version web
             </a>

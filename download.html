@@ -1,161 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bridge — Download Desktop App</title>
+  <title>Bridge — Descargar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sky: "#bcecff", mist: "#dff7f2", cream: "#f7f6ef", shell: "#fffdf8",
+            ink: "#112033", slate: "#56708a", ocean: "#316dff", mint: "#89e0c8", coral: "#ff9f6e"
+          },
+          fontFamily: { sans: ["Instrument Sans", "system-ui", "sans-serif"] },
+          boxShadow: { cloud: "0 20px 50px rgba(75, 133, 178, 0.14)" }
+        }
+      }
+    };
+  </script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: #0a0a0a; color: #e0e0e0;
-      min-height: 100vh;
-    }
-    nav {
-      padding: 16px 32px; border-bottom: 1px solid #1a1a1a;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    nav .logo { font-size: 1.2rem; font-weight: 700; color: #fff; }
-    nav a { color: #7c7cf8; text-decoration: none; margin-left: 24px; font-size: 0.9rem; }
-    nav a:hover { color: #9e9eff; }
-
-    .hero {
-      text-align: center; padding: 80px 20px 40px;
-      max-width: 700px; margin: 0 auto;
-    }
-    .hero h1 {
-      font-size: 3rem; font-weight: 800; color: #fff;
-      line-height: 1.1; margin-bottom: 16px;
-    }
-    .hero h1 span { color: #7c7cf8; }
-    .hero p {
-      font-size: 1.15rem; color: #888; line-height: 1.6;
-      max-width: 500px; margin: 0 auto 40px;
-    }
-
-    .download-cards {
-      display: flex; gap: 16px; justify-content: center;
-      flex-wrap: wrap; padding: 0 20px;
-    }
-    .card {
-      background: #111; border: 1px solid #222; border-radius: 12px;
-      padding: 28px 32px; width: 200px; text-align: center;
-      transition: border-color 0.2s;
-    }
-    .card:hover { border-color: #7c7cf8; }
-    .card .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .card h3 { font-size: 1rem; color: #fff; margin-bottom: 4px; }
-    .card p { font-size: 0.8rem; color: #666; margin-bottom: 16px; }
-    .card a {
-      display: inline-block; padding: 10px 24px; border-radius: 8px;
-      background: #7c7cf8; color: white; text-decoration: none;
-      font-weight: 600; font-size: 0.9rem;
-    }
-    .card a:hover { background: #6a6af0; }
-    .card a.soon {
-      background: #222; color: #555; cursor: default;
-    }
-
-    .steps {
-      max-width: 600px; margin: 60px auto; padding: 0 20px;
-    }
-    .steps h2 {
-      text-align: center; font-size: 1.5rem; color: #fff; margin-bottom: 32px;
-    }
-    .step {
-      display: flex; gap: 16px; margin-bottom: 24px; align-items: flex-start;
-    }
-    .step-num {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: #7c7cf8; color: white; display: flex;
-      align-items: center; justify-content: center;
-      font-weight: 700; font-size: 1rem; flex-shrink: 0;
-    }
-    .step-content h3 { font-size: 1rem; color: #fff; margin-bottom: 4px; }
-    .step-content p { font-size: 0.9rem; color: #888; line-height: 1.5; }
-
-    .web-fallback {
-      text-align: center; padding: 40px 20px; border-top: 1px solid #1a1a1a;
-      margin-top: 40px;
-    }
-    .web-fallback p { color: #666; margin-bottom: 12px; }
-    .web-fallback a {
-      color: #7c7cf8; text-decoration: none; font-weight: 600;
-    }
-
-    footer {
-      text-align: center; padding: 32px; color: #333; font-size: 0.8rem;
+      font-family: "Instrument Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.7), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(137,224,200,0.2), transparent 28%),
+        linear-gradient(180deg, #bcecff 0%, #d8f5f1 42%, #f7f6ef 100%);
     }
   </style>
 </head>
-<body>
-  <nav>
-    <div class="logo">Bridge</div>
-    <div>
-      <a href="/bridge.html">Web Version</a>
-      <a href="/download.html">Download</a>
+<body class="min-h-screen text-ink">
+  <header class="relative z-10">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10">
+      <div>
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-slate/80">Bridge</p>
+        <p class="mt-1 text-2xl font-extrabold tracking-tight">Descargar</p>
+      </div>
+      <a href="/" class="text-sm font-semibold text-slate hover:text-ink transition">Volver</a>
     </div>
-  </nav>
+  </header>
 
-  <div class="hero">
-    <h1>Your agent,<br>in your <span>pocket</span>.</h1>
-    <p>Download Bridge for your desktop. Scan a QR code with your phone. Get real-time updates from your AI agent on Telegram.</p>
-  </div>
+  <main class="relative mx-auto max-w-2xl px-4 py-12 sm:py-20 text-center">
+    <div class="absolute left-[10%] top-[20%] h-64 w-64 rounded-full bg-white/20 blur-3xl"></div>
 
-  <div class="download-cards">
-    <div class="card">
-      <div class="icon">🍎</div>
-      <h3>macOS</h3>
-      <p>Apple Silicon & Intel</p>
-      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-mac.dmg">Download .dmg</a>
+    <h1 class="text-4xl font-extrabold leading-tight tracking-[-0.04em] sm:text-5xl">
+      Tu agente,<br>en tu <span class="text-ocean">bolsillo</span>.
+    </h1>
+    <p class="mt-4 text-lg text-slate leading-8 max-w-lg mx-auto">
+      Descarga Bridge, escanea un QR, y recibe actualizaciones de tu agente IA en Telegram.
+    </p>
+
+    <!-- Primary download button — auto-detects OS -->
+    <div class="mt-10" id="download-primary">
+      <a id="download-btn" href="#" class="inline-flex items-center justify-center gap-3 rounded-full bg-ocean px-10 py-4 text-base font-semibold text-white shadow-cloud transition hover:-translate-y-[1px] hover:bg-[#245cf0]">
+        <span id="download-icon"></span>
+        <span id="download-label">Descargar Bridge</span>
+      </a>
+      <p class="mt-3 text-xs text-slate" id="download-meta"></p>
     </div>
-    <div class="card">
-      <div class="icon">🪟</div>
-      <h3>Windows</h3>
-      <p>Windows 10+</p>
-      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-win.exe">Download .exe</a>
-    </div>
-    <div class="card">
-      <div class="icon">🐧</div>
-      <h3>Linux</h3>
-      <p>Ubuntu, Fedora, etc.</p>
-      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-linux.AppImage">Download .AppImage</a>
-    </div>
-  </div>
 
-  <div class="steps">
-    <h2>How it works</h2>
-
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-content">
-        <h3>Download & open Bridge</h3>
-        <p>Install the desktop app. It starts instantly — no account needed.</p>
+    <!-- Steps -->
+    <div class="mt-16 grid gap-5 sm:grid-cols-3 text-left">
+      <div class="rounded-[1.5rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-ocean text-white text-sm font-bold">1</div>
+        <h3 class="mt-3 text-sm font-bold text-ink">Instala y abre</h3>
+        <p class="mt-1 text-xs text-slate leading-5">Abre el instalador. La app arranca al instante, sin crear cuenta.</p>
+      </div>
+      <div class="rounded-[1.5rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-ocean text-white text-sm font-bold">2</div>
+        <h3 class="mt-3 text-sm font-bold text-ink">Escanea el QR</h3>
+        <p class="mt-1 text-xs text-slate leading-5">Apunta la camara de tu celular al codigo QR. Telegram se abre solo.</p>
+      </div>
+      <div class="rounded-[1.5rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-ocean text-white text-sm font-bold">3</div>
+        <h3 class="mt-3 text-sm font-bold text-ink">Listo</h3>
+        <p class="mt-1 text-xs text-slate leading-5">Recibe notificaciones, estados y chatea con tu agente desde el celular.</p>
       </div>
     </div>
 
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-content">
-        <h3>Scan the QR code</h3>
-        <p>A QR code appears on screen. Point your phone's camera at it. Telegram opens automatically.</p>
+    <!-- Other platforms -->
+    <div class="mt-12 rounded-[1.5rem] border border-white/75 bg-white/60 p-6 shadow-cloud backdrop-blur-xl text-left" id="other-platforms">
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-slate/80">Otras plataformas</p>
+      <div class="mt-4 grid gap-3 sm:grid-cols-3">
+        <a id="link-mac" href="https://github.com/miguelemosreverte/palindrome-exercise/releases/download/v1.0.0/Bridge-1.0.0-arm64.dmg"
+           class="flex items-center gap-3 rounded-xl border border-slate/10 bg-white/80 px-4 py-3 text-sm font-semibold text-ink transition hover:-translate-y-[1px]">
+          <span class="text-xl">&#63743;</span> macOS (.dmg)
+        </a>
+        <a id="link-win" href="#" onclick="alert('Proximamente');return false;"
+           class="flex items-center gap-3 rounded-xl border border-slate/10 bg-white/80 px-4 py-3 text-sm font-semibold text-slate transition hover:-translate-y-[1px]">
+          <span class="text-xl">&#8862;</span> Windows — pronto
+        </a>
+        <a id="link-linux" href="#" onclick="alert('Proximamente');return false;"
+           class="flex items-center gap-3 rounded-xl border border-slate/10 bg-white/80 px-4 py-3 text-sm font-semibold text-slate transition hover:-translate-y-[1px]">
+          <span class="text-xl">&#9881;</span> Linux — pronto
+        </a>
       </div>
     </div>
 
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-content">
-        <h3>You're connected</h3>
-        <p>That's it. Your Telegram chat is now linked to your desktop. You'll get agent status updates, can send commands, and chat — all from your phone.</p>
-      </div>
+    <!-- Web fallback -->
+    <div class="mt-8">
+      <p class="text-sm text-slate">No queres instalar nada?</p>
+      <a href="/bridge" class="mt-1 inline-block text-sm font-semibold text-ocean hover:underline">Usar la version web &rarr;</a>
     </div>
-  </div>
+  </main>
 
-  <div class="web-fallback">
-    <p>Don't want to install anything?</p>
-    <a href="/bridge.html">Use the web version instead →</a>
-  </div>
+  <script>
+    const MAC_URL = 'https://github.com/miguelemosreverte/palindrome-exercise/releases/download/v1.0.0/Bridge-1.0.0-arm64.dmg';
 
-  <footer>Bridge — Open source desktop ↔ phone bridge for AI agents</footer>
+    const ua = navigator.userAgent.toLowerCase();
+    const isMac = ua.includes('mac');
+    const isWin = ua.includes('win');
+    const isLinux = ua.includes('linux');
+
+    const btn = document.getElementById('download-btn');
+    const label = document.getElementById('download-label');
+    const meta = document.getElementById('download-meta');
+
+    if (isMac) {
+      btn.href = MAC_URL;
+      label.textContent = 'Descargar para macOS';
+      meta.textContent = 'Bridge v1.0.0 — macOS (Apple Silicon) — 94 MB';
+      // Hide mac from "other platforms"
+      document.getElementById('link-mac').style.display = 'none';
+    } else if (isWin) {
+      btn.href = '#';
+      btn.onclick = function() { alert('Version Windows disponible pronto. Usa la version web por ahora.'); return false; };
+      label.textContent = 'Windows — proximamente';
+      meta.innerHTML = 'Mientras tanto, <a href="/bridge" class="text-ocean font-semibold">usa la version web</a>';
+      document.getElementById('link-win').style.display = 'none';
+    } else if (isLinux) {
+      btn.href = '#';
+      btn.onclick = function() { alert('Version Linux disponible pronto. Usa la version web por ahora.'); return false; };
+      label.textContent = 'Linux — proximamente';
+      meta.innerHTML = 'Mientras tanto, <a href="/bridge" class="text-ocean font-semibold">usa la version web</a>';
+      document.getElementById('link-linux').style.display = 'none';
+    } else {
+      // Mobile — redirect to web version
+      label.textContent = 'Abrir version web';
+      btn.href = '/bridge';
+      meta.textContent = 'La app de escritorio esta disponible para Mac, Windows y Linux.';
+      document.getElementById('other-platforms').style.display = 'none';
+    }
+  </script>
 </body>
 </html>
