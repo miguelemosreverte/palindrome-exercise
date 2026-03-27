@@ -431,6 +431,13 @@
     }
     .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+    /* Install banner */
+    .install-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: var(--ocean); color: white;
+      font-size: 13px; font-weight: 500;
+    }
+
     /* Pairing screen */
     .pairing-screen {
       flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -454,6 +461,12 @@
   </style>
 </head>
 <body>
+  <!-- iOS install banner -->
+  <div class="install-banner" id="installBanner" style="display:none;">
+    <span>Tap <strong style="font-size:18px;">⬆︎</strong> then <strong>Add to Home Screen</strong> to install</span>
+    <button onclick="this.parentElement.style.display='none';localStorage.setItem('bridge-install-dismissed','1')" style="background:none;border:none;color:var(--ocean);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px;">OK</button>
+  </div>
+
   <!-- Status bar -->
   <div class="status-bar">
     <div class="status-dot" id="statusDot"></div>
@@ -500,6 +513,14 @@
 
     var API_BASE = 'https://palindrome-exercise.vercel.app';
     var FIREBASE_URL = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
+    // Show iOS install banner if in Safari (not standalone, not Telegram, not dismissed)
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    var isTelegram = !!(tg && tg.initData);
+    if (isIOS && !isStandalone && !isTelegram && !localStorage.getItem('bridge-install-dismissed')) {
+      document.getElementById('installBanner').style.display = 'flex';
+    }
+
     // Session: URL param > localStorage > empty (show pairing)
     var sessionId = new URLSearchParams(window.location.search).get('session')
       || localStorage.getItem('bridge-session') || '';
@@ -595,7 +616,7 @@
         fetch(API_BASE + '/api/bridge/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sessionId, from: username, content: 'Hi! Just connected from the app.' }),
+          body: JSON.stringify({ sessionId: sessionId, from: username, content: 'Just connected from the mobile app. Give me a quick project status: what was recently shipped, what are we working on, and what are the next steps?' }),
         });
       }
     }
