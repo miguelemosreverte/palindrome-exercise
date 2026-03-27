@@ -1,0 +1,50 @@
+flowchart TD
+    U[Visitor / User] --> I[index.html]
+    U --> T[demo.html trial entry]
+    U --> A[auth.html]
+    U --> C[chat.html]
+    U --> DB[dashboard.html]
+    U --> AD[admin.html]
+    U --> S[success.html]
+
+    I --> MPAPI[/api/create-preference.js/]
+    MPAPI --> MP[Mercado Pago]
+    MP --> W[/api/webhook.js/]
+
+    A --> LOGIN[/api/auth/login.js/]
+    A --> REG[/api/auth/register.js/]
+    DB --> ME[/api/auth/me.js/]
+    AD --> ADMIN[/api/admin/summary.js/]
+
+    C --> INF[/api/infer.js/]
+
+    LOGIN --> AUTH[lib/auth.js]
+    REG --> AUTH
+    ME --> AUTH
+    ADMIN --> AUTH
+    INF --> AUTH
+
+    LOGIN --> WALLET[lib/wallet.js]
+    REG --> WALLET
+    INF --> WALLET
+    ME --> WALLET
+    W --> WALLET
+    ADMIN --> WALLET
+
+    INF --> USAGE[lib/usage.js]
+    ADMIN --> USAGE
+
+    W --> FB[lib/firebase.js]
+    WALLET --> FB
+    AUTH --> FB
+    USAGE --> FB
+    ADMIN --> FB
+
+    WALLET --> TW[Trial + Paid Wallet Logic]
+    TW --> FB
+
+    INF --> LLM[LLM Provider\nLLM_API_BASE / LLM_API_KEY]
+    C --> WS[server/chat-server.js\nunfinished / separate realtime path]
+    WS --> LLM
+
+    FB --> RTDB[(Firebase RTDB)]

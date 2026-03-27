@@ -1,0 +1,18 @@
+flowchart LR
+    user[User]
+    admin[Admin / Operator]
+
+    subgraph app[This Web App]
+        landing[Landing / Trial / Wallet / Chat]
+    end
+
+    mp[Mercado Pago]
+    fb[(Firebase RTDB)]
+    llm[LLM Provider]
+
+    user --> landing
+    admin --> landing
+    landing --> mp
+    mp --> landing
+    landing --> fb
+    landing --> llm

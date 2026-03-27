@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compra confirmada</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32'%3E%3Cstop offset='0%25' stop-color='%23316dff'/%3E%3Cstop offset='100%25' stop-color='%2389e0c8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 21V11l4 4 4-4 4 4 4-4v10' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Pago confirmado y entrega digital en proceso.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Acceso a IA</div>
+        <div class="brand-title">Wallet aprobado</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-pill" href="/dashboard.html">Wallet</a>
+      </div>
+    </nav>
+
+    <main class="page-grid">
+      <section class="hero-copy stack">
+        <div class="eyebrow">Compra aprobada</div>
+        <h1>Tu saldo está casi listo.</h1>
+        <p>
+          Estamos verificando el estado del pago y esperando la confirmación final. Apenas quede aprobado,
+          vas a ver en esta pantalla el acceso interno para usar el endpoint seguro del producto.
+        </p>
+        <div class="stats">
+          <div class="card stat-card">
+            <div class="stat-label">Estado</div>
+            <div class="stat-value" id="stateValue">Verificando</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Entrega</div>
+            <div class="stat-value">Digital</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Canal</div>
+            <div class="stat-value">Mercado Pago</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-panel stack">
+        <div id="loading" class="status show pending">Confirmando pago...</div>
+        <div id="successBox" style="display:none" class="stack">
+          <div class="section-kicker">Acceso listo</div>
+          <pre class="output" id="accessToken"></pre>
+          <div class="helper">Guardá esta clave de acceso. No entregamos la API key global del proveedor al usuario final.</div>
+          <div class="section-kicker">Endpoint seguro</div>
+          <pre class="output" id="proxySnippet"></pre>
+        </div>
+        <div id="error" class="status error"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const FIREBASE_RTDB = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
+    const NAMESPACE = 'mercadopago-bridge/payments';
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref') || localStorage.getItem('payment_ref');
+
+    if (!ref) {
+      showError('No encontramos la referencia del pago. Iniciá una nueva compra.');
+    } else {
+      pollPayment(ref);
+    }
+
+    async function pollPayment(paymentRef) {
+      const maxAttempts = 30;
+      let attempts = 0;
+
+      const interval = setInterval(async () => {
+        attempts += 1;
+        try {
+          const res = await fetch(`${FIREBASE_RTDB}/${NAMESPACE}/${paymentRef}.json`);
+          const data = await res.json();
+
+          if (data && data.status === 'approved' && data.access_token) {
+            clearInterval(interval);
+            showSuccess(data.access_token);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            showError('La confirmación está demorando más de lo esperado. Si ya pagaste, volvé a intentar en unos minutos.');
+          }
+        } catch (err) {
+          clearInterval(interval);
+          showError(`Error al consultar el estado del pago: ${err.message}`);
+        }
+      }, 2000);
+    }
+
+    function showSuccess(accessToken) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('successBox').style.display = 'grid';
+      document.getElementById('accessToken').textContent = accessToken;
+      document.getElementById('proxySnippet').textContent =
+`POST ${window.location.origin}/api/infer
+Headers:
+  Content-Type: application/json
+  X-Access-Token: ${accessToken}
+
+Body:
+{
+  "model": "Qwen/Qwen3-32B-TEE",
+  "messages": [
+    { "role": "user", "content": "Hola, decime que puedo hacer con este acceso." }
+  ]
+}`;
+      document.getElementById('stateValue').textContent = 'Aprobado';
+      localStorage.setItem('app_access_token', accessToken);
+      localStorage.removeItem('payment_ref');
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').className = 'status show error';
+      document.getElementById('error').textContent = msg;
+      document.getElementById('stateValue').textContent = 'Demorado';
+    }
+  </script>
+</body>
+</html>

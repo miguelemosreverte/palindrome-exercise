@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingresar o crear cuenta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Cuenta para activar la prueba gratis, ver tu wallet y seguir tu uso.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Acceso a IA</div>
+        <div class="brand-title">Cuenta y wallet</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+      </div>
+    </nav>
+
+    <main class="split-grid section">
+      <section class="stack">
+        <div class="eyebrow">Beneficio</div>
+        <h1 class="section-title">Entrá para activar tu prueba y ver tu wallet.</h1>
+        <p class="copy">
+          Al crear una cuenta recibís una prueba gratis de 7 días dentro del producto real. Desde ahí ves tu wallet, tu historial y cuánto consumiste antes de cargar saldo.
+        </p>
+        <div class="card-grid">
+          <div class="card tile">
+            <div class="section-kicker">Prueba inicial</div>
+            <h3>7 días completos</h3>
+            <p>No hay vista separada: entrás directo al chat, con historial y seguimiento desde el primer minuto.</p>
+          </div>
+          <div class="card tile">
+            <div class="section-kicker">Wallet</div>
+            <h3>Wallet y uso</h3>
+            <p>Ves cuánto te queda, cuándo vence la prueba y cuándo conviene cargar saldo para seguir.</p>
+          </div>
+          <div class="card tile">
+            <div class="section-kicker">Back office</div>
+            <h3>Seguimiento real</h3>
+            <p>Si tu cuenta es admin, también accedés al back office con usuarios, wallet, pagos y consumo.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <div class="glass-panel">
+          <div class="section-kicker">Crear cuenta</div>
+          <form id="registerForm">
+            <label>Email
+              <input type="email" name="email" required placeholder="tu@email.com">
+            </label>
+            <label>Contraseña
+              <input type="password" name="password" required minlength="8" placeholder="Minimo 8 caracteres">
+            </label>
+            <button class="button" type="submit">Crear cuenta</button>
+          </form>
+        </div>
+
+        <div class="glass-panel">
+          <div class="section-kicker">Ingresar</div>
+          <form id="loginForm">
+            <label>Email o usuario
+              <input type="text" name="email" required placeholder="tu@email.com o admin">
+            </label>
+            <label>Contraseña
+              <input type="password" name="password" required placeholder="Tu contraseña">
+            </label>
+            <button class="button secondary" type="submit">Ingresar</button>
+          </form>
+          <div class="helper">Acceso admin local: usuario <code>admin</code> y contraseña <code>admin</code>.</div>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.checkAutoRedirect();
+    const statusNode = document.getElementById('status');
+
+    async function handleAuth(event, path) {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+
+      try {
+        const data = await AppBridge.apiFetch(path, {
+          method: 'POST',
+          body: JSON.stringify({
+            email: form.get('email'),
+            password: form.get('password'),
+          }),
+        });
+
+        AppBridge.setToken(data.token);
+        AppBridge.setUser(data.user);
+        AppBridge.setUserRole(data.role);
+        AppBridge.setStatus(statusNode, 'success', 'Cuenta lista. Redirigiendo...');
+        setTimeout(() => {
+          window.location.href = data.role === 'admin' ? '/admin.html' : '/dashboard.html';
+        }, 500);
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', error.message);
+      }
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/register'));
+    document.getElementById('loginForm').addEventListener('submit', (event) => handleAuth(event, '/api/auth/login'));
+  </script>
+
+</body>
+</html>

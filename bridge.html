@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bridge — Connect Your Phone</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      max-width: 500px;
+      padding: 40px;
+    }
+    h1 { font-size: 2rem; margin-bottom: 8px; color: #fff; }
+    .subtitle { color: #888; margin-bottom: 32px; }
+    #qr-container {
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    #qr-container canvas { display: block; }
+    .session-id {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 24px;
+      word-break: break-all;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .status.waiting { background: #1a1a2e; color: #7c7cf8; }
+    .status.connected { background: #0a2e0a; color: #4caf50; }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    .waiting .dot { background: #7c7cf8; }
+    .connected .dot { background: #4caf50; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    #messages {
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+      text-align: left;
+      margin-top: 16px;
+    }
+    .msg {
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: #1a1a2e;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .msg .time { color: #666; font-size: 0.75rem; }
+    .controls { margin-top: 16px; }
+    button {
+      background: #7c7cf8;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+    button:hover { background: #6a6af0; }
+    .instructions {
+      margin-top: 32px;
+      padding: 16px;
+      background: #111;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 0.85rem;
+      color: #999;
+      line-height: 1.6;
+    }
+    .instructions strong { color: #ccc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔗 Bridge</h1>
+    <p class="subtitle">Scan with your phone to connect</p>
+
+    <div id="qr-container">
+      <canvas id="qr"></canvas>
+    </div>
+
+    <div class="session-id" id="session-id">Creating session...</div>
+
+    <div class="status waiting" id="status">
+      <span class="dot"></span>
+      <span id="status-text">Waiting for phone...</span>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="controls">
+      <button onclick="sendPing()">Send Ping</button>
+    </div>
+
+    <div class="instructions">
+      <strong>How to connect:</strong><br>
+      1. Open your phone's camera<br>
+      2. Point at the QR code above<br>
+      3. Tap the link that appears<br>
+      4. You're connected! Messages appear in real-time.
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let sessionId = null;
+    let eventSource = null;
+
+    async function init() {
+      // Create session
+      const res = await fetch(`${API_BASE}/api/bridge/sessions`, { method: 'POST' });
+      const data = await res.json();
+      sessionId = data.sessionId;
+
+      document.getElementById('session-id').textContent = `Session: ${sessionId.slice(0, 8)}...`;
+
+      // Generate QR code
+      const connectUrl = `https://t.me/AgenteGauchoBot?start=${sessionId}`;
+      QRCode.toCanvas(document.getElementById('qr'), connectUrl, {
+        width: 280,
+        margin: 0,
+        color: { dark: '#000', light: '#fff' },
+      });
+
+      // Connect SSE
+      connectSSE();
+    }
+
+    function connectSSE() {
+      eventSource = new EventSource(
+        `${API_BASE}/api/bridge/connect?session=${sessionId}&role=desktop`
+      );
+
+      eventSource.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'peer_joined' && msg.role === 'mobile') {
+          document.getElementById('status').className = 'status connected';
+          document.getElementById('status-text').textContent = 'Phone connected!';
+        }
+        if (msg.type === 'peer_left' && msg.role === 'mobile') {
+          document.getElementById('status').className = 'status waiting';
+          document.getElementById('status-text').textContent = 'Phone disconnected';
+        }
+
+        addMessage(msg);
+      };
+
+      eventSource.onerror = () => {
+        setTimeout(connectSSE, 3000);
+      };
+    }
+
+    function addMessage(msg) {
+      if (msg.type === 'connected') return;
+      const div = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'msg';
+      const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+      el.innerHTML = `<span class="time">${time}</span> <strong>${msg.from || msg.type}:</strong> ${msg.content || msg.type}`;
+      div.prepend(el);
+    }
+
+    async function sendPing() {
+      await fetch(`${API_BASE}/api/bridge/connect?session=${sessionId}&role=desktop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'ping', content: 'Ping from desktop! 🏓' }),
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

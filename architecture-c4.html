@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Views</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f6ef;
+      --ink: #112033;
+      --slate: #5e708a;
+      --line: rgba(17, 32, 51, 0.12);
+      --panel: rgba(255, 255, 255, 0.78);
+      --shadow: 0 18px 50px rgba(17, 32, 51, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Instrument Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(137, 224, 200, 0.28), transparent 28%),
+        radial-gradient(circle at top right, rgba(49, 109, 255, 0.12), transparent 24%),
+        var(--bg);
+    }
+    .shell {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+    .header {
+      margin-bottom: 26px;
+    }
+    .kicker {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.28em;
+      color: var(--slate);
+      font-weight: 700;
+    }
+    h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(36px, 6vw, 72px);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+    }
+    .lead {
+      margin: 0;
+      max-width: 900px;
+      color: var(--slate);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: auto;
+      padding: 20px;
+    }
+    .panel-head {
+      margin-bottom: 12px;
+    }
+    .panel-head h2 {
+      margin: 8px 0 4px;
+      font-size: 28px;
+      line-height: 1.05;
+    }
+    .panel-head p {
+      margin: 0;
+      color: var(--slate);
+      line-height: 1.6;
+      font-size: 14px;
+      max-width: 840px;
+    }
+    .mermaid {
+      min-width: 1100px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div class="kicker">Architecture</div>
+      <h1>C4-Style Project Views</h1>
+      <p class="lead">This version splits the system into multiple diagrams that are easier to explain to another person: system context, containers, components, and the main wallet-driven user flow. Wallet orchestration is centralized in <code>lib/wallet.js</code>.</p>
+    </div>
+
+    <div class="stack">
+      <section class="panel">
+        <div class="panel-head">
+          <div class="kicker">Level 1</div>
+          <h2>System Context</h2>
+          <p>Who uses the system and which external systems it depends on.</p>
+        </div>
+        <pre class="mermaid">
+flowchart LR
+    user[User]
+    admin[Admin / Operator]
+
+    subgraph app[This Web App]
+        landing[Landing / Trial / Wallet / Chat]
+    end
+
+    mp[Mercado Pago]
+    fb[(Firebase RTDB)]
+    llm[LLM Provider]
+
+    user --> landing
+    admin --> landing
+    landing --> mp
+    mp --> landing
+    landing --> fb
+    landing --> llm
+        </pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="kicker">Level 2</div>
+          <h2>Containers</h2>
+          <p>The major deployable/runtime pieces: browser pages, API routes, shared libraries, storage, and external services.</p>
+        </div>
+        <pre class="mermaid">
+flowchart TB
+    subgraph browser[Browser UI]
+        index[index.html]
+        auth[auth.html]
+        trialInfo[demo.html trial entry]
+        dashboard[dashboard.html]
+        chat[chat.html]
+        admin[admin.html]
+        success[success.html]
+        shared[app.js + styles.css]
+    end
+
+    subgraph api[Vercel API Routes]
+        authApi[/api/auth/*/]
+        inferApi[/api/infer.js/]
+        paymentApi[/api/create-preference.js/]
+        webhookApi[/api/webhook.js/]
+        adminApi[/api/admin/summary.js/]
+    end
+
+    subgraph domain[Domain / Shared Libs]
+        libAuth[lib/auth.js]
+        libWallet[lib/wallet.js]
+        libUsage[lib/usage.js]
+        libFirebase[lib/firebase.js]
+        libChat[lib/chat-store.js]
+    end
+
+    mp[Mercado Pago]
+    fb[(Firebase RTDB)]
+    llm[LLM Provider]
+
+    browser --> api
+    authApi --> libAuth
+    authApi --> libFirebase
+    authApi --> libWallet
+    inferApi --> libAuth
+    inferApi --> libWallet
+    inferApi --> libUsage
+    inferApi --> llm
+    paymentApi --> libAuth
+    paymentApi --> libFirebase
+    paymentApi --> mp
+    webhookApi --> mp
+    webhookApi --> libWallet
+    webhookApi --> libFirebase
+    adminApi --> libAuth
+    adminApi --> libUsage
+    adminApi --> libWallet
+    adminApi --> libFirebase
+    libAuth --> fb
+    libWallet --> fb
+    libUsage --> fb
+    libChat --> fb
+        </pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="kicker">Level 3</div>
+          <h2>Components</h2>
+          <p>The key business subsystems your friend probably cares about: auth, wallet, trial access, quota control, usage tracking, chat, and admin introspection.</p>
+        </div>
+        <pre class="mermaid">
+flowchart TB
+    subgraph product[Product Experience]
+        landing[Landing]
+        authUi[Auth]
+        walletUi[Wallet / Billing]
+        chatUi[Full Chat]
+        backoffice[Admin Back Office]
+    end
+
+    subgraph billingCore[Billing & Access Core]
+        trial[Trial Wallet Provisioning]
+        checkout[Checkout Preference]
+        webhook[Payment Webhook]
+        walletCore[Wallet Ledger / lib/wallet.js]
+        entitlement[Quota / Wallet Control]
+        usage[Usage Metering]
+    end
+
+    subgraph identity[Identity Core]
+        login[Login]
+        register[Register]
+        session[Signed Auth Token]
+        adminRole[Admin Role]
+    end
+
+    subgraph storage[Persistence]
+        users[Users]
+        payments[Wallet Records + Payments]
+        usageStore[Usage Events + Summaries]
+        chats[Chats]
+    end
+
+    subgraph integrations[External Integrations]
+        mercado[Mercado Pago]
+        provider[LLM Provider]
+    end
+
+    authUi --> login
+    authUi --> register
+    login --> session
+    register --> session
+    session --> adminRole
+    login --> users
+    register --> users
+    register --> trial
+    login --> trial
+    trial --> payments
+
+    chatUi --> entitlement
+    chatUi --> usage
+    chatUi --> chats
+    chatUi --> provider
+
+    walletUi --> payments
+    walletUi --> usageStore
+    walletUi --> walletCore
+    walletUi --> entitlement
+
+    backoffice --> users
+    backoffice --> payments
+    backoffice --> usageStore
+    backoffice --> chats
+    backoffice --> walletCore
+
+    landing --> checkout
+    checkout --> mercado
+    mercado --> webhook
+    webhook --> walletCore
+    walletCore --> payments
+        </pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="kicker">Level 4-ish</div>
+          <h2>Main Runtime Flow</h2>
+          <p>For product discussion, a flow diagram is more useful than a code-class diagram here.</p>
+        </div>
+        <pre class="mermaid">
+flowchart LR
+    A[1. Visitor arrives] --> B[2. Create account or log in]
+    B --> C[3. Trial wallet is provisioned]
+    C --> D{4. Trial or paid balance available?}
+    D -- Yes --> E[5. User enters full chat]
+    E --> F[6. Backend calls LLM provider]
+    F --> G[7. Usage is recorded in Firebase]
+    G --> H[8. Wallet spend is updated]
+    H --> I[9. Admin sees usage, wallet, payments, and users]
+    D -- No --> J[5. User lands in wallet dashboard]
+    J --> K[6. Checkout via Mercado Pago]
+    K --> L[7. Webhook confirms payment]
+    L --> M[8. Paid wallet becomes available]
+    M --> E
+        </pre>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#ffffff',
+        primaryTextColor: '#112033',
+        primaryBorderColor: '#d8dee7',
+        lineColor: '#5e708a',
+        secondaryColor: '#eef6f4',
+        tertiaryColor: '#f6f7fb',
+        fontFamily: 'Instrument Sans, sans-serif'
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Back office</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="topbar">Operations back office for users, usage, budget, payments, and Firebase state.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Operations</div>
+        <div class="brand-title">Back Office</div>
+      </div>
+      <div class="nav-links">
+        <span class="account-chip" id="navEmail" data-user-label>Account</span>
+        <button class="nav-pill" type="button" data-logout>Log out</button>
+      </div>
+    </nav>
+
+    <main class="section stack">
+      <section class="glass-panel">
+        <div class="panel-header">
+          <div>
+            <div class="section-kicker">Global spend</div>
+            <h1 class="panel-title" id="budgetHeroValue">USD 10</h1>
+            <div class="copy" id="budgetHeroCopy">Loading global budget...</div>
+          </div>
+          <div class="panel-price">
+            <div class="section-kicker">Utilization</div>
+            <div class="amount" id="utilizationValue">0%</div>
+          </div>
+        </div>
+        <div class="hero-metric">
+          <div class="card stat-card">
+            <div class="stat-label">Top up</div>
+            <div class="stat-value" id="budgetValue">USD 10</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Spent</div>
+            <div class="stat-value" id="spentValue">USD 0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Remaining</div>
+            <div class="stat-value" id="remainingValue">USD 0</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Requests</div>
+            <div class="stat-value" id="requestsValue">0</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="card stat-card">
+          <div class="stat-label">Users</div>
+          <div class="stat-value" id="usersValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Payments</div>
+          <div class="stat-value" id="paymentsValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Wallets</div>
+          <div class="stat-value" id="walletsValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Chats</div>
+          <div class="stat-value" id="chatsValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Usage events</div>
+          <div class="stat-value" id="eventsValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Chars in</div>
+          <div class="stat-value" id="promptTotalValue">0</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Chars out</div>
+          <div class="stat-value" id="responseTotalValue">0</div>
+        </div>
+      </section>
+
+      <section class="split-grid">
+        <article class="card tile">
+          <div class="section-kicker">Spend vs remaining</div>
+          <div class="chart-shell">
+            <canvas id="budgetChart" height="220"></canvas>
+            <div class="chart-empty" id="budgetChartEmpty">No spend data yet. This panel will show budget burn once usage is recorded.</div>
+          </div>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Payment statuses</div>
+          <div class="chart-shell">
+            <canvas id="paymentsChart" height="220"></canvas>
+            <div class="chart-empty" id="paymentsChartEmpty">No payment events yet. Status distribution will appear after the first checkout attempts.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="split-grid">
+        <article class="card tile">
+          <div class="section-kicker">Usage by day</div>
+          <div class="chart-shell">
+            <canvas id="usageChart" height="220"></canvas>
+            <div class="chart-empty" id="usageChartEmpty">No usage events yet. Daily activity will appear once users start prompting models.</div>
+          </div>
+        </article>
+        <article class="card tile">
+          <div class="section-kicker">Top users by spend</div>
+          <div class="chart-shell">
+            <canvas id="usersChart" height="220"></canvas>
+            <div class="chart-empty" id="usersChartEmpty">No user spend yet. This panel will rank the heaviest users once requests are tracked.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="admin-layout">
+        <aside class="sidebar-panel">
+          <div class="section-kicker">Find user</div>
+          <input id="userSearch" type="text" placeholder="Email or user id" autocomplete="off">
+          <div class="helper">Type to filter by email or user id. Pick one to inspect usage, payments, chats, and access in place.</div>
+          <div class="user-list" id="userList"></div>
+        </aside>
+
+        <div class="stack">
+          <section class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="section-kicker">Selected user</div>
+                <h2 class="panel-title" id="selectedEmail">Nothing selected</h2>
+              </div>
+              <div class="panel-price">
+                <div class="section-kicker">Last login</div>
+                <div class="amount" style="font-size:28px" id="selectedLogin">-</div>
+              </div>
+            </div>
+
+            <div class="detail-grid" style="margin-top:24px">
+              <div class="card stat-card">
+                <div class="stat-label">Requests</div>
+                <div class="stat-value" id="selectedRequests">0</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-label">Chars in</div>
+                <div class="stat-value" id="selectedPrompt">0</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-label">USD used</div>
+                <div class="stat-value" id="selectedCost">USD 0</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-label">Wallet remaining</div>
+                <div class="stat-value" id="selectedCredit">USD 0</div>
+              </div>
+            </div>
+
+            <div class="split-grid" style="margin-top:20px">
+              <article class="card tile">
+                <div class="section-kicker">Activity</div>
+                <h3 id="selectedLastUsed">No activity</h3>
+                <p id="selectedMeta" class="copy">Select a user to inspect payments, chats, usage, and access tokens.</p>
+              </article>
+              <article class="card tile">
+                <div class="section-kicker">Access</div>
+                <pre class="output" id="selectedTokens">No access tokens.</pre>
+              </article>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Requests</th>
+              <th>Chars in</th>
+              <th>Chars out</th>
+              <th>Estimated USD</th>
+              <th>Last use</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable"></tbody>
+        </table>
+      </section>
+
+      <section class="glass-panel stack">
+        <div class="panel-header">
+          <div>
+            <div class="section-kicker">Payments activity</div>
+            <h2 class="panel-title" style="font-size:34px">Checkout and balance records</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>User</th>
+                <th>Wallet</th>
+                <th>Status</th>
+                <th>Credit</th>
+                <th>Spent</th>
+                <th>Expires</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="glass-panel stack">
+        <div class="panel-header">
+          <div>
+            <div class="section-kicker">Chats</div>
+            <h2 class="panel-title" style="font-size:34px">Recent chat threads</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>User</th>
+                <th>Model</th>
+                <th>Messages</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="chatsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="split-grid">
+        <article class="glass-panel stack">
+          <div class="section-kicker">Usage by user</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Requests</th>
+                  <th>Chars in</th>
+                  <th>Chars out</th>
+                  <th>Estimated USD</th>
+                  <th>Last use</th>
+                </tr>
+              </thead>
+              <tbody id="usageUsersTable"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="glass-panel stack">
+          <div class="section-kicker">Wallet records</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Active</th>
+                  <th>Expired</th>
+                  <th>Credit issued</th>
+                  <th>Estimated spent</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="walletTable"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="glass-panel stack">
+        <div class="section-kicker">Firebase overview</div>
+        <div class="card-grid" id="firebaseOverview"></div>
+      </section>
+
+      <details class="accordion">
+        <summary>Raw Firebase dump</summary>
+        <div class="accordion-body"><pre class="output" id="firebaseJson"></pre></div>
+      </details>
+
+      <div id="status" class="status"></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.bindAuthLinks();
+    const statusNode = document.getElementById('status');
+    let adminData;
+    let filteredUsers = [];
+    let selectedUserId = null;
+    let charts = [];
+
+    function destroyCharts() {
+      charts.forEach((chart) => chart.destroy());
+      charts = [];
+    }
+
+    function buildDailyUsage(events) {
+      const byDay = {};
+      Object.values(events || {}).forEach((event) => {
+        const day = new Date(event.created_at || Date.now()).toISOString().slice(0, 10);
+        byDay[day] = (byDay[day] || 0) + Number(event.estimated_cost_usd || 0);
+      });
+      return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+    }
+
+    function buildPaymentStatuses(payments) {
+      const counts = {};
+      Object.values(payments || {}).forEach((payment) => {
+        const key = payment.status || 'unknown';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return counts;
+    }
+
+    function formatAdminDate(ts) {
+      if (!ts) return 'No activity';
+      return new Date(ts).toLocaleString('en-US');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function setChartEmptyState(chartId, message, show) {
+      const canvas = document.getElementById(chartId);
+      const emptyNode = document.getElementById(`${chartId}Empty`);
+      if (canvas) {
+        canvas.style.display = show ? 'none' : 'block';
+      }
+      if (emptyNode) {
+        emptyNode.textContent = message;
+        emptyNode.classList.toggle('show', show);
+      }
+    }
+
+    function renderJsonBlock(id, value, emptyMessage) {
+      const hasData =
+        value &&
+        ((Array.isArray(value) && value.length > 0) ||
+          (!Array.isArray(value) && typeof value === 'object' && Object.keys(value).length > 0));
+      document.getElementById(id).textContent = hasData
+        ? JSON.stringify(value, null, 2)
+        : emptyMessage;
+    }
+
+    function renderEmptyRow(colspan, message) {
+      return `<tr><td class="empty-table" colspan="${colspan}">${escapeHtml(message)}</td></tr>`;
+    }
+
+    function renderPaymentsTable(payments) {
+      const entries = Object.entries(payments || {})
+        .map(([ref, payment]) => ({ ref, ...payment }))
+        .sort((a, b) => Number(b.updated_at || b.created_at || 0) - Number(a.updated_at || a.created_at || 0));
+
+      document.getElementById('paymentsTable').innerHTML = entries.length
+        ? entries.map((payment) => `
+            <tr>
+              <td>${escapeHtml(payment.ref || '-')}</td>
+              <td>${escapeHtml(payment.email || payment.user_id || 'Anonymous')}</td>
+              <td>${escapeHtml(payment.wallet_kind || payment.source || 'paid')}</td>
+              <td>${escapeHtml(payment.status || 'unknown')}</td>
+              <td>${escapeHtml(AppBridge.formatUsd(payment.credit_limit_usd || 0))}</td>
+              <td>${escapeHtml(AppBridge.formatUsd(payment.spent_estimated_usd || 0))}</td>
+              <td>${escapeHtml(formatAdminDate(payment.expires_at))}</td>
+              <td>${escapeHtml(formatAdminDate(payment.updated_at || payment.created_at || payment.date_approved))}</td>
+            </tr>
+          `).join('')
+        : renderEmptyRow(8, 'No payment records yet.');
+    }
+
+    function renderChatsTable(chats) {
+      const entries = Object.entries(chats || {})
+        .map(([chatId, chat]) => ({ chat_id: chatId, ...chat }))
+        .sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0));
+
+      document.getElementById('chatsTable').innerHTML = entries.length
+        ? entries.map((chat) => `
+            <tr>
+              <td>${escapeHtml(chat.title || 'Untitled chat')}</td>
+              <td>${escapeHtml(chat.owner_email || chat.owner_id || 'Unknown')}</td>
+              <td>${escapeHtml(chat.model || 'Not set')}</td>
+              <td>${escapeHtml((chat.messages || []).length)}</td>
+              <td>${escapeHtml(formatAdminDate(chat.updated_at || chat.created_at))}</td>
+            </tr>
+          `).join('')
+        : renderEmptyRow(5, 'No chat threads yet.');
+    }
+
+    function renderUsageUsersTable(usageUsers) {
+      const entries = Object.entries(usageUsers || {})
+        .map(([userId, usage]) => ({ user_id: userId, ...usage }))
+        .sort((a, b) => Number(b.estimated_cost_usd || 0) - Number(a.estimated_cost_usd || 0));
+
+      document.getElementById('usageUsersTable').innerHTML = entries.length
+        ? entries.map((usage) => `
+            <tr>
+              <td>${escapeHtml(usage.email || usage.user_id || 'Unknown')}</td>
+              <td>${escapeHtml(usage.requests || 0)}</td>
+              <td>${escapeHtml(usage.prompt_chars || 0)}</td>
+              <td>${escapeHtml(usage.response_chars || 0)}</td>
+              <td>${escapeHtml(AppBridge.formatUsd(usage.estimated_cost_usd || 0))}</td>
+              <td>${escapeHtml(formatAdminDate(usage.last_used_at))}</td>
+            </tr>
+          `).join('')
+        : renderEmptyRow(6, 'No user usage summaries yet.');
+    }
+
+    function renderWalletBreakdownTable(breakdown, totals) {
+      const rows = [
+        {
+          type: 'Trial wallets',
+          active: breakdown.active_trial_wallets || 0,
+          expired: breakdown.expired_wallets || 0,
+          credit: 'Trial credit policy',
+          spent: 'Tracked in usage',
+          notes: 'Provisioned automatically at signup or first login.',
+        },
+        {
+          type: 'Paid wallets',
+          active: breakdown.active_paid_wallets || 0,
+          expired: 0,
+          credit: AppBridge.formatUsd(totals.credit_limit_usd || 0),
+          spent: AppBridge.formatUsd(totals.credit_spent_usd || 0),
+          notes: 'Created from approved Mercado Pago purchases.',
+        },
+        {
+          type: 'Coupon wallets',
+          active: breakdown.active_coupon_wallets || 0,
+          expired: 0,
+          credit: 'Coupon based',
+          spent: 'Tracked in usage',
+          notes: 'Promotional or manually granted balance.',
+        },
+      ];
+
+      document.getElementById('walletTable').innerHTML = rows.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.type)}</td>
+          <td>${escapeHtml(row.active)}</td>
+          <td>${escapeHtml(row.expired)}</td>
+          <td>${escapeHtml(row.credit)}</td>
+          <td>${escapeHtml(row.spent)}</td>
+          <td>${escapeHtml(row.notes)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderFirebaseOverview(data) {
+      const cards = [
+        {
+          kicker: 'Users',
+          title: data.totals.users,
+          copy: `${data.counts.usage_users || 0} users have tracked usage summaries.`,
+        },
+        {
+          kicker: 'Wallets',
+          title: data.counts.wallet_records,
+          copy: `${data.wallet_breakdown.active_wallets || 0} active wallets across trial, paid, and coupon access.`,
+        },
+        {
+          kicker: 'Chats',
+          title: data.counts.chat_threads,
+          copy: `${data.counts.chat_threads || 0} chat threads stored in Firebase.`,
+        },
+        {
+          kicker: 'Usage events',
+          title: data.counts.usage_events,
+          copy: `${escapeHtml(AppBridge.formatUsd(data.totals.estimated_cost_usd || 0))} estimated total usage cost tracked so far.`,
+        },
+        {
+          kicker: 'Trial wallets',
+          title: data.wallet_breakdown.trial_wallets,
+          copy: `${data.wallet_breakdown.expired_wallets || 0} trial wallets have already expired.`,
+        },
+        {
+          kicker: 'Budget remaining',
+          title: AppBridge.formatUsd(data.budget.estimated_remaining_usd || 0),
+          copy: `Global topped-up budget is ${AppBridge.formatUsd(data.budget.topped_up_usd || 0)}.`,
+        },
+      ];
+
+      document.getElementById('firebaseOverview').innerHTML = cards.map((card) => `
+        <article class="card overview-card">
+          <div class="section-kicker">${escapeHtml(card.kicker)}</div>
+          <h3>${escapeHtml(card.title)}</h3>
+          <p>${escapeHtml(card.copy)}</p>
+        </article>
+      `).join('');
+    }
+
+    function renderCharts(data) {
+      destroyCharts();
+
+      const budgetCtx = document.getElementById('budgetChart');
+      const paymentsCtx = document.getElementById('paymentsChart');
+      const usageCtx = document.getElementById('usageChart');
+      const usersCtx = document.getElementById('usersChart');
+
+      const budgetValues = [Number(data.budget.estimated_spent_usd || 0), Math.max(Number(data.budget.estimated_remaining_usd || 0), 0)];
+      if (budgetValues.some((value) => value > 0)) {
+        setChartEmptyState('budgetChart', '', false);
+        charts.push(new Chart(budgetCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Spent', 'Remaining'],
+            datasets: [{
+              data: budgetValues,
+              backgroundColor: ['#316dff', '#89e0c8'],
+              borderWidth: 0,
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+          },
+        }));
+      } else {
+        setChartEmptyState('budgetChart', 'No spend data yet. This panel will show budget burn once usage is recorded.', true);
+      }
+
+      const paymentStatuses = buildPaymentStatuses(data.payments);
+      if (Object.keys(paymentStatuses).length > 0) {
+        setChartEmptyState('paymentsChart', '', false);
+        charts.push(new Chart(paymentsCtx, {
+          type: 'bar',
+          data: {
+            labels: Object.keys(paymentStatuses),
+            datasets: [{
+              label: 'Payments',
+              data: Object.values(paymentStatuses),
+              backgroundColor: ['#316dff', '#89e0c8', '#ff9f6e', '#112033'],
+              borderRadius: 10,
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
+          },
+        }));
+      } else {
+        setChartEmptyState('paymentsChart', 'No payment events yet. Status distribution will appear after the first checkout attempts.', true);
+      }
+
+      const dailyUsage = buildDailyUsage(data.usage_events);
+      if (dailyUsage.length > 0) {
+        setChartEmptyState('usageChart', '', false);
+        charts.push(new Chart(usageCtx, {
+          type: 'line',
+          data: {
+            labels: dailyUsage.map(([day]) => day),
+            datasets: [{
+              label: 'Estimated USD',
+              data: dailyUsage.map(([, value]) => Number(value.toFixed(6))),
+              borderColor: '#316dff',
+              backgroundColor: 'rgba(49,109,255,0.18)',
+              fill: true,
+              tension: 0.3,
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
+          },
+        }));
+      } else {
+        setChartEmptyState('usageChart', 'No usage events yet. Daily activity will appear once users start prompting models.', true);
+      }
+
+      const topUsers = [...data.users]
+        .sort((a, b) => (b.estimated_cost_usd || 0) - (a.estimated_cost_usd || 0))
+        .filter((user) => Number(user.estimated_cost_usd || 0) > 0)
+        .slice(0, 8);
+      if (topUsers.length > 0) {
+        setChartEmptyState('usersChart', '', false);
+        charts.push(new Chart(usersCtx, {
+          type: 'bar',
+          data: {
+            labels: topUsers.map((user) => (user.email || user.user_id || '').slice(0, 18)),
+            datasets: [{
+              label: 'Estimated USD',
+              data: topUsers.map((user) => user.estimated_cost_usd || 0),
+              backgroundColor: '#112033',
+              borderRadius: 10,
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } },
+          },
+        }));
+      } else {
+        setChartEmptyState('usersChart', 'No user spend yet. This panel will rank the heaviest users once requests are tracked.', true);
+      }
+    }
+
+    function updateSelectedUser(user) {
+      if (!user) {
+        document.getElementById('selectedEmail').textContent = 'Nothing selected';
+        document.getElementById('selectedLogin').textContent = '-';
+        document.getElementById('selectedRequests').textContent = '0';
+        document.getElementById('selectedPrompt').textContent = '0';
+        document.getElementById('selectedCost').textContent = 'USD 0';
+        document.getElementById('selectedCredit').textContent = 'USD 0';
+        document.getElementById('selectedLastUsed').textContent = 'No activity';
+        document.getElementById('selectedMeta').textContent = 'Select a user to inspect payments, chats, usage, and access tokens.';
+        document.getElementById('selectedTokens').textContent = 'No access tokens.';
+        return;
+      }
+
+      document.getElementById('selectedEmail').textContent = user.email || user.user_id;
+      document.getElementById('selectedLogin').textContent = formatAdminDate(user.last_login_at);
+      document.getElementById('selectedRequests').textContent = user.requests || 0;
+      document.getElementById('selectedPrompt').textContent = user.prompt_chars || 0;
+      document.getElementById('selectedCost').textContent = AppBridge.formatUsd(user.estimated_cost_usd || 0);
+      document.getElementById('selectedCredit').textContent = AppBridge.formatUsd(user.credit_remaining_usd || 0);
+      document.getElementById('selectedLastUsed').textContent = formatAdminDate(user.last_used_at);
+      document.getElementById('selectedMeta').textContent =
+        `Payments: ${user.payments_count || 0} · Chats: ${user.chats_count || 0} · User ID: ${user.user_id}`;
+      document.getElementById('selectedTokens').textContent =
+        (user.access_tokens && user.access_tokens.length)
+          ? user.access_tokens.join('\n')
+          : 'No access tokens.';
+    }
+
+    function renderUserList() {
+      const list = document.getElementById('userList');
+      if (!filteredUsers.length) {
+        list.innerHTML = '<div class="helper">No matching users yet. Try another email or user id.</div>';
+        return;
+      }
+      list.innerHTML = filteredUsers.map((user) => `
+        <button type="button" class="user-row ${user.user_id === selectedUserId ? 'active' : ''}" data-user-id="${user.user_id}">
+          <div style="font-weight:800">${user.email || user.user_id}</div>
+          <div class="helper">Requests: ${user.requests || 0} · ${AppBridge.formatUsd(user.estimated_cost_usd || 0)}</div>
+        </button>
+      `).join('');
+
+      list.querySelectorAll('[data-user-id]').forEach((node) => {
+        node.addEventListener('click', () => {
+          selectedUserId = node.getAttribute('data-user-id');
+          const user = adminData.users.find((entry) => entry.user_id === selectedUserId);
+          updateSelectedUser(user);
+          renderUserList();
+        });
+      });
+    }
+
+    function filterUsers(query) {
+      const q = String(query || '').trim().toLowerCase();
+      filteredUsers = adminData.users.filter((user) =>
+        !q ||
+        String(user.email || '').toLowerCase().includes(q) ||
+        String(user.user_id || '').toLowerCase().includes(q)
+      );
+      renderUserList();
+    }
+
+    async function loadAdmin() {
+      try {
+        const data = await AppBridge.apiFetch('/api/admin/summary');
+        adminData = data;
+        document.getElementById('navEmail').textContent = AppBridge.getUser()?.email || 'admin';
+        const setText = (id, value) => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.textContent = value;
+          }
+        };
+
+        setText('usersValue', data.totals.users);
+        setText('requestsValue', data.totals.requests);
+        setText('spentValue', AppBridge.formatUsd(data.budget.estimated_spent_usd));
+        setText('remainingValue', AppBridge.formatUsd(data.budget.estimated_remaining_usd));
+        setText('paymentsValue', data.counts.payments);
+        setText('walletsValue', data.counts.wallet_records);
+        setText('chatsValue', data.counts.chat_threads);
+        setText('eventsValue', data.counts.usage_events);
+        setText('promptTotalValue', data.totals.prompt_chars || 0);
+        setText('responseTotalValue', data.totals.response_chars || 0);
+        setText('budgetValue', AppBridge.formatUsd(data.budget.topped_up_usd));
+        setText('budgetHeroValue', AppBridge.formatUsd(data.budget.estimated_spent_usd));
+        setText(
+          'budgetHeroCopy',
+          data.counts.usage_events
+            ? `Estimated spend ${AppBridge.formatUsd(data.budget.estimated_spent_usd)} out of ${AppBridge.formatUsd(data.budget.topped_up_usd)}. Remaining: ${AppBridge.formatUsd(data.budget.estimated_remaining_usd)}.`
+            : `No tracked usage yet. Budget remains untouched at ${AppBridge.formatUsd(data.budget.topped_up_usd)} until the first payment-approved request is recorded.`
+        );
+        setText('utilizationValue', `${data.budget.utilization_pct}%`);
+
+        const rows = data.users.map((user) => `
+          <tr>
+            <td>${user.email || 'No email'}</td>
+            <td>${user.requests || 0}</td>
+            <td>${user.prompt_chars || 0}</td>
+            <td>${user.response_chars || 0}</td>
+            <td>${AppBridge.formatUsd(user.estimated_cost_usd || 0)}</td>
+            <td>${formatAdminDate(user.last_used_at)}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('usersTable').innerHTML = rows || '<tr><td colspan="6">No users with tracked activity yet.</td></tr>';
+        renderPaymentsTable(data.payments);
+        renderChatsTable(data.chats);
+        renderUsageUsersTable(data.usage_users);
+        renderWalletBreakdownTable(data.wallet_breakdown, data.totals);
+        renderFirebaseOverview(data);
+        renderJsonBlock('firebaseJson', data.raw_firebase, 'No Firebase records found under the configured app root yet.');
+        renderCharts(data);
+        filteredUsers = [...data.users];
+        if (filteredUsers.length) {
+          selectedUserId = filteredUsers[0].user_id;
+          updateSelectedUser(filteredUsers[0]);
+        } else {
+          selectedUserId = null;
+          updateSelectedUser(null);
+        }
+        renderUserList();
+      } catch (error) {
+        AppBridge.setStatus(statusNode, 'error', `Could not load the back office: ${error.message}`);
+      }
+    }
+
+    document.getElementById('userSearch').addEventListener('input', (event) => {
+      if (!adminData) return;
+      filterUsers(event.target.value);
+    });
+
+    loadAdmin();
+  </script>
+</body>
+</html>

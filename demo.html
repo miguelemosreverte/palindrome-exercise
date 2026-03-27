@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba gratis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">Prueba gratis de 7 días para entrar directo al producto.</div>
+  <div class="shell">
+    <nav class="nav">
+      <div>
+        <div class="brand-kicker">Prueba gratis</div>
+        <div class="brand-title">Empezar con wallet</div>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/auth.html" data-auth-link>Ingresar</a>
+      </div>
+    </nav>
+
+    <main class="split-grid section">
+      <section class="glass-panel">
+        <div class="section-kicker">Entrá al producto completo</div>
+        <h1 class="panel-title" style="font-size:42px">Prueba gratis dentro del producto completo.</h1>
+        <p class="copy" style="margin-top:14px">
+          La prueba gratuita ahora se hace dentro de la aplicación real. Creás tu cuenta, recibís un wallet de prueba por 7 días y usás el chat completo desde el primer minuto.
+        </p>
+        <div style="margin-top:20px; display:flex; flex-wrap:wrap; gap:12px;">
+          <a class="button" href="/auth.html">Crear cuenta y empezar</a>
+          <a class="button secondary" href="/dashboard.html">Ver wallet</a>
+        </div>
+        <div class="helper">
+          Si tu prueba vence o te quedás sin saldo, desde el dashboard podés cargar wallet y seguir sin cambiar de flujo.
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="stack">
+        <div class="card tile">
+          <div class="section-kicker">Qué incluye</div>
+          <pre class="output" id="resultBox">- Chat completo
+- Historial por usuario
+- Wallet y consumo
+- Vista administrativa
+- Upgrade a saldo pago sin cambiar de cuenta</pre>
+        </div>
+        <div class="card tile">
+          <div class="section-kicker">Después de la prueba</div>
+          <div class="small-title" id="usageCost">Wallet</div>
+          <p class="copy" id="usageCopy">Cuando termina la prueba, el producto te lleva al wallet para cargar saldo y seguir usando el chat.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    AppBridge.bindAuthLinks();
+  </script>
+</body>
+</html>

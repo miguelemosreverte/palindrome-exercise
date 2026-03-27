@@ -1,0 +1,54 @@
+flowchart TB
+    subgraph browser[Browser UI]
+        index[index.html]
+        auth[auth.html]
+        trialInfo[demo.html trial entry]
+        dashboard[dashboard.html]
+        chat[chat.html]
+        admin[admin.html]
+        success[success.html]
+        shared[app.js + styles.css]
+    end
+
+    subgraph api[Vercel API Routes]
+        authApi[/api/auth/*/]
+        inferApi[/api/infer.js/]
+        paymentApi[/api/create-preference.js/]
+        webhookApi[/api/webhook.js/]
+        adminApi[/api/admin/summary.js/]
+    end
+
+    subgraph domain[Domain / Shared Libs]
+        libAuth[lib/auth.js]
+        libWallet[lib/wallet.js]
+        libUsage[lib/usage.js]
+        libFirebase[lib/firebase.js]
+        libChat[lib/chat-store.js]
+    end
+
+    mp[Mercado Pago]
+    fb[(Firebase RTDB)]
+    llm[LLM Provider]
+
+    browser --> api
+    authApi --> libAuth
+    authApi --> libFirebase
+    authApi --> libWallet
+    inferApi --> libAuth
+    inferApi --> libWallet
+    inferApi --> libUsage
+    inferApi --> llm
+    paymentApi --> libAuth
+    paymentApi --> libFirebase
+    paymentApi --> mp
+    webhookApi --> mp
+    webhookApi --> libWallet
+    webhookApi --> libFirebase
+    adminApi --> libAuth
+    adminApi --> libUsage
+    adminApi --> libWallet
+    adminApi --> libFirebase
+    libAuth --> fb
+    libWallet --> fb
+    libUsage --> fb
+    libChat --> fb

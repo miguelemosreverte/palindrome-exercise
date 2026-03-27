@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat — Acceso a Modelos</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32'%3E%3Cstop offset='0%25' stop-color='%23316dff'/%3E%3Cstop offset='100%25' stop-color='%2389e0c8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 21V11l4 4 4-4 4 4 4-4v10' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body { overflow: hidden; height: 100dvh; display: flex; margin: 0; }
+    .chat-scroll::-webkit-scrollbar { width: 6px; }
+    .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(86,112,138,0.2); border-radius: 3px; }
+    .msg-fade { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Sidebar */
+    .chat-sidebar { width: 280px; background: rgba(255,255,255,0.55); backdrop-filter: blur(16px); border-right: 1px solid rgba(255,255,255,0.75); display: flex; flex-direction: column; flex-shrink: 0; z-index: 50; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; background: transparent; }
+    .chat-header { height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.5); backdrop-filter: blur(10px); flex-shrink: 0; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 32px 20px 140px; display: flex; flex-direction: column; gap: 6px; }
+    .msg-row { max-width: 780px; width: 100%; margin: 0 auto; }
+    .msg-user { display: flex; justify-content: flex-end; }
+    .msg-user-bubble { background: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.8); box-shadow: var(--shadow-soft); border-radius: 20px 20px 6px 20px; padding: 12px 18px; max-width: 85%; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .msg-assistant { display: flex; gap: 12px; align-items: flex-start; padding: 4px 0; }
+    .msg-badge { width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, var(--ocean), var(--mint)); flex-shrink: 0; margin-top: 2px; }
+    .msg-content { min-width: 0; flex: 1; font-size: 15px; line-height: 1.65; }
+    .msg-content p { margin: 0 0 8px; }
+
+    /* Tool blocks */
+    .tool-block { margin: 10px 0; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: rgba(255,255,255,0.4); }
+    .tool-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 12px; font-weight: 700; color: var(--slate); cursor: pointer; user-select: none; }
+    .tool-head:hover { background: rgba(0,0,0,0.02); }
+    .tool-head .ico { width: 16px; text-align: center; flex-shrink: 0; }
+    .tool-head .name { text-transform: uppercase; letter-spacing: 0.08em; }
+    .tool-head .desc { font-weight: 500; opacity: 0.7; text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .tool-head .st { margin-left: auto; font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .tool-head .st.ok { color: #16a34a; }
+    .tool-head .st.err { color: #ef4444; }
+    .tool-head .st.run { color: var(--ocean); animation: pulse 1.2s infinite; }
+    .tool-body { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.55; }
+    .tool-body.term { background: #0f172a; color: #cbd5e1; padding: 12px 14px; }
+    .tool-body.term .cmd { color: #86efac; font-weight: 600; margin-bottom: 6px; display: flex; gap: 6px; }
+    .tool-body.term .cmd::before { content: '$'; color: #4ade80; }
+    .tool-body.term .out { color: #e2e8f0; white-space: pre-wrap; word-break: break-word; }
+    .tool-body.term .err-text { color: #fca5a5; }
+    .tool-body.file { padding: 12px 14px; }
+    .tool-body.file .path { color: var(--ocean); font-weight: 600; margin-bottom: 4px; }
+    .tool-body.diff { padding: 0; }
+    .tool-body.diff .line-add { background: rgba(34,197,94,0.1); color: #166534; padding: 1px 14px; }
+    .tool-body.diff .line-del { background: rgba(239,68,68,0.1); color: #991b1b; padding: 1px 14px; text-decoration: line-through; opacity: 0.7; }
+    .tool-body.search { padding: 12px 14px; }
+    .tool-body.search .result { margin-bottom: 10px; }
+    .tool-body.search .result-title { font-family: 'Instrument Sans', sans-serif; font-weight: 700; font-size: 13px; color: var(--ocean); }
+    .tool-body.search .result-url { font-size: 11px; color: var(--slate); opacity: 0.6; }
+    .tool-body.search .result-snippet { font-family: 'Instrument Sans', sans-serif; font-size: 13px; color: var(--ink); line-height: 1.5; margin-top: 2px; }
+
+    /* Reasoning */
+    .reasoning-block { margin: 6px 0; }
+    .reasoning-block summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--slate); opacity: 0.6; padding: 4px 0; user-select: none; }
+    .reasoning-block .reasoning-text { font-size: 13px; line-height: 1.6; color: var(--slate); padding: 4px 0 8px; }
+
+    /* Step indicator */
+    .step-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--slate); opacity: 0.5; padding: 2px 0; font-weight: 600; }
+
+    /* Composer */
+    .composer-wrap { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px 20px; background: linear-gradient(to top, rgba(247,246,239,0.95) 60%, transparent); z-index: 5; display: flex; justify-content: center; }
+    .composer { width: 100%; max-width: 780px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.75); background: rgba(255,255,255,0.7); box-shadow: var(--shadow-soft); backdrop-filter: blur(10px); padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+    .composer-model-row { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+    .composer-model-row svg { width: 14px; height: 14px; color: var(--slate); opacity: 0.4; }
+    .composer-model-row select { background: transparent; border: none; padding: 4px 0; font-size: 12px; font-weight: 700; color: var(--ink); cursor: pointer; outline: none; border-radius: 0; flex: 1; }
+    .composer-input-row { display: flex; align-items: flex-end; gap: 8px; }
+    .composer-input-row textarea { flex: 1; border: none; background: transparent; padding: 6px 4px; min-height: 36px; max-height: 200px; resize: none; font-size: 15px; outline: none; color: var(--ink); border-radius: 0; }
+    .send-btn { width: 32px; height: 32px; border-radius: 10px; background: var(--ocean); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+    .send-btn:hover { transform: scale(1.05); }
+    .send-btn:disabled { background: rgba(86,112,138,0.2); cursor: not-allowed; transform: none; }
+    .send-btn.stopping { background: #ef4444; }
+    .composer-hint { padding: 0 4px; font-size: 10px; color: var(--slate); opacity: 0.3; font-weight: 600; }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.2); backdrop-filter: blur(4px); z-index: 40; }
+    .sidebar-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; color: var(--slate); font-size: 13px; font-weight: 600; transition: all 0.15s; text-decoration: none; border: none; background: none; cursor: pointer; width: 100%; text-align: left; }
+    .sidebar-nav-item:hover { background: rgba(255,255,255,0.6); color: var(--ink); }
+    .sidebar-nav-item svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; }
+    .sidebar-history-item { width: 100%; text-align: left; padding: 10px 14px; border-radius: 14px; border: none; background: transparent; cursor: pointer; font: inherit; color: var(--slate); transition: all 0.15s; }
+    .sidebar-history-item:hover { background: rgba(255,255,255,0.6); color: var(--ink); }
+    .sidebar-history-item.active { background: rgba(255,255,255,0.8); box-shadow: 0 2px 8px rgba(0,0,0,0.04); color: var(--ink); }
+    .sidebar-history-title { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-history-date { font-size: 10px; opacity: 0.5; margin-top: 2px; }
+    @media (max-width: 768px) {
+      .chat-sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
+      .chat-sidebar.open { transform: translateX(0); }
+      .sidebar-overlay.open { display: block; }
+    }
+    /* Rich components */
+    .rc-timeline { padding: 8px 0; }
+    .rc-timeline-item { display: flex; gap: 16px; position: relative; padding-bottom: 24px; }
+    .rc-timeline-item:last-child { padding-bottom: 0; }
+    .rc-timeline-track { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; }
+    .rc-timeline-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ocean); border: 3px solid rgba(49,109,255,0.2); z-index: 1; flex-shrink: 0; }
+    .rc-timeline-line { width: 2px; flex: 1; background: var(--line); margin-top: 4px; }
+    .rc-timeline-item:last-child .rc-timeline-line { display: none; }
+    .rc-timeline-content { flex: 1; }
+    .rc-timeline-date { font-size: 12px; font-weight: 700; color: var(--ocean); margin-bottom: 2px; }
+    .rc-timeline-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+    .rc-timeline-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-options { display: flex; flex-direction: column; gap: 10px; }
+    .rc-option { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .rc-option:hover { background: rgba(255,255,255,0.85); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .rc-option-body { flex: 1; }
+    .rc-option-title { font-size: 15px; font-weight: 700; }
+    .rc-option-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-option-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+    .rc-option.selected { border-color: var(--ocean); background: rgba(49,109,255,0.06); }
+    .rc-option.selected .rc-option-arrow { color: var(--ocean); opacity: 1; }
+    .rc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .rc-card { padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--slate); font-weight: 700; }
+    .rc-card-value { font-size: 26px; font-weight: 800; margin-top: 6px; line-height: 1; }
+    .rc-card-desc { font-size: 13px; color: var(--slate); margin-top: 6px; line-height: 1.4; }
+    .rc-table { width: 100%; border-collapse: collapse; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: rgba(255,255,255,0.5); }
+    .rc-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--slate); font-weight: 700; text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--line); }
+    .rc-table td { font-size: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .rc-table tr:last-child td { border-bottom: none; }
+    .rc-steps { display: flex; flex-direction: column; }
+    .rc-step { display: flex; gap: 14px; padding: 14px 0; }
+    .rc-step-num { width: 32px; height: 32px; border-radius: 10px; background: var(--ocean); color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+    .rc-step-body { flex: 1; padding-top: 4px; }
+    .rc-step-title { font-size: 15px; font-weight: 700; }
+    .rc-step-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-step + .rc-step { border-top: 1px solid var(--line); }
+    /* Tree / Funnel */
+    .rc-tree-levels { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 16px; }
+    .rc-tree-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .rc-tree-pill { padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--slate); opacity: 0.45; background: transparent; }
+    .rc-tree-pill.selected { opacity: 1; color: var(--ink); background: rgba(255,255,255,0.6); border-color: rgba(17,32,51,0.2); }
+    .rc-tree-arrow { color: var(--slate); opacity: 0.3; font-size: 18px; line-height: 1; }
+    .rc-tree-question { font-size: 17px; font-weight: 800; text-align: center; margin: 12px 0; }
+    .rc-tree-choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .rc-tree-choice { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.15s; }
+    .rc-tree-choice:hover { background: rgba(255,255,255,0.85); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .rc-tree-choice-body { flex: 1; }
+    .rc-tree-choice-title { font-size: 15px; font-weight: 700; }
+    .rc-tree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-tree-choice-arrow { color: var(--slate); opacity: 0.4; font-size: 18px; }
+    /* Progressive tree */
+    .ptree { margin: 8px 0; }
+    .ptree-breadcrumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+    .ptree-crumb { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(49,109,255,0.2); background: rgba(49,109,255,0.06); color: var(--ocean); transition: all 0.15s; }
+    .ptree-crumb:hover { background: rgba(49,109,255,0.12); }
+    .ptree-sep { color: var(--slate); opacity: 0.3; font-size: 14px; }
+    .ptree-question { font-size: 17px; font-weight: 800; margin-bottom: 12px; animation: fadeUp 0.2s ease-out; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .ptree-choices { display: flex; flex-direction: column; gap: 8px; animation: fadeUp 0.2s ease-out; }
+    .ptree-choice { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+    .ptree-choice:hover { background: rgba(255,255,255,0.9); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+    .ptree-choice-body { flex: 1; }
+    .ptree-choice-title { font-size: 15px; font-weight: 700; }
+    .ptree-choice-desc { font-size: 13px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .ptree-choice-arrow { color: var(--slate); opacity: 0.3; font-size: 16px; }
+    .ptree-choice.leaf .ptree-choice-arrow { color: var(--ocean); opacity: 0.6; }
+    .ptree-result { padding: 18px; border-radius: 14px; border: 1px solid rgba(49,109,255,0.15); background: rgba(49,109,255,0.04); animation: fadeUp 0.2s ease-out; }
+  </style>
+</head>
+<body class="fade-in">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="chat-sidebar" id="sidebar">
+    <div style="padding: 20px 16px; border-bottom: 1px solid var(--line);">
+      <a href="/" style="font-size: 18px; font-weight: 800; color: var(--ink);">Modelos IA</a>
+      <button id="newChatBtn" style="margin-top: 14px; width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 14px; background: var(--ocean); color: white; border: none; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">
+        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Nuevo chat
+      </button>
+    </div>
+    <div style="flex: 1; overflow-y: auto; padding: 14px 10px;" class="chat-scroll">
+      <div style="padding: 0 14px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--slate); opacity: 0.5; font-weight: 700;">Sesiones</div>
+      <div id="historyList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+    </div>
+    <div style="padding: 10px; border-top: 1px solid var(--line);">
+      <button onclick="location.href='/'" class="sidebar-nav-item">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Inicio
+      </button>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <header class="chat-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button id="toggleSidebar" style="padding: 6px; border-radius: 8px; border: none; background: none; cursor: pointer; color: var(--slate);">
+          <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span id="chatTitle" style="font-size: 14px; font-weight: 800;">Nuevo chat</span>
+      </div>
+      <span id="statusInfo" style="font-size: 11px; font-weight: 600; color: var(--slate); opacity: 0.5;"></span>
+    </header>
+
+    <div class="chat-messages chat-scroll" id="messages">
+      <div class="msg-row" style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;opacity:0.3;">
+          <div style="font-size:30px;font-weight:800;">Empezá un chat</div>
+          <p style="margin-top:8px;font-size:14px;color:var(--slate);">Elegí un modelo y escribí un mensaje.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div id="chatStatus" style="max-width:780px;width:100%;margin:0 auto 6px;"></div>
+      <div class="composer">
+        <div class="composer-model-row">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.6-6.4l-1.4 1.4M6 6L4.6 4.6m0 14.8L6 18m12 0l1.4 1.4"/></svg>
+          <select id="modelSelect"><option>Cargando modelos...</option></select>
+        </div>
+        <div class="composer-input-row">
+          <textarea id="promptInput" placeholder="Escribí un mensaje..." rows="1"></textarea>
+          <button class="send-btn" id="sendBtn" title="Enviar">
+            <svg id="sendIcon" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <svg id="stopIcon" style="width:16px;height:16px;display:none;" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+        </div>
+        <div class="composer-hint">Enter para enviar · Shift+Enter nueva línea</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const OC = 'https://palindrome-exercise-production.up.railway.app';
+    const $ = id => document.getElementById(id);
+    const messagesNode = $('messages');
+    const historyList = $('historyList');
+    const chatTitle = $('chatTitle');
+    const statusInfo = $('statusInfo');
+    const chatStatus = $('chatStatus');
+    const modelSelect = $('modelSelect');
+    const promptInput = $('promptInput');
+    const sendBtn = $('sendBtn');
+    const sidebar = $('sidebar');
+    const overlay = $('sidebarOverlay');
+    let sessionId = null, sending = false, msgCountBefore = 0;
+
+
+    const SYSTEM = `Respondé en español. Sos un asistente en una app web con componentes ricos de rendering.
+
+COMPONENTES DISPONIBLES — usá bloques de código con estos lenguajes:
+
+## 1. \`\`\`chartjs — Gráficos
+Ejemplo:
+
+\`\`\`chartjs
+{"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Datos","data":[10,20,30],"backgroundColor":["#316dff","#4a8af5","#6ba3f7"]}]},"options":{"responsive":true,"plugins":{"legend":{"display":true}}}}
+\`\`\`
+
+REGLAS PARA \`\`\`chartjs:
+- JSON puro adentro. NO crees archivos HTML. NO pongas comentarios JS (//) en el JSON.
+- Paleta por defecto: #316dff, #4a8af5, #6ba3f7, #89bff9, #a8d4fb, #c7e6fd
+- Siempre incluí "options":{"responsive":true}
+
+PATRONES CORRECTOS POR TIPO DE DATO:
+
+TIMELINE / LÍNEA DE TIEMPO (eventos con años):
+- Usá "type":"scatter" con eje X = año, eje Y = 0 (todos en la misma línea)
+- Labels de los eventos en tooltips
+- Ejemplo:
+\`\`\`chartjs
+{"type":"scatter","data":{"datasets":[{"label":"Eventos","data":[{"x":1816,"y":0},{"x":1853,"y":0},{"x":1976,"y":0}],"backgroundColor":"#316dff","pointRadius":8}]},"options":{"responsive":true,"scales":{"x":{"title":{"display":true,"text":"Año"},"type":"linear","min":1800,"max":2030},"y":{"display":false}},"plugins":{"tooltip":{"callbacks":{}}}}}
+\`\`\`
+Para timelines, NUNCA uses barras con años como data (se ven barras de 0 a 2000 que no tienen sentido).
+
+COMPARACIÓN DE VALORES (poblaciones, ventas, etc):
+- "type":"bar" vertical o con "indexAxis":"y" para horizontal
+- data = los valores numéricos reales
+
+DISTRIBUCIÓN / PORCENTAJES:
+- "type":"pie" o "type":"doughnut"
+
+EVOLUCIÓN EN EL TIEMPO (datos que cambian):
+- "type":"line"
+
+REGLAS GENERALES:
+- Podés usar bash para ejecutar Python, buscar en la web, etc — usá tus herramientas normalmente.
+- Cuando el usuario pida un gráfico, SIEMPRE usá el bloque \`\`\`chartjs en vez de crear archivos HTML.
+## 2. \`\`\`timeline — Línea de tiempo
+Para eventos cronológicos. JSON con "items" array:
+\`\`\`timeline
+{"items":[{"date":"1816","title":"Independencia","desc":"Congreso de Tucumán"},{"date":"1853","title":"Constitución"}]}
+\`\`\`
+
+## 3. \`\`\`options — Opciones / Decisiones
+Para presentar opciones al usuario. Cada opción tiene título y descripción:
+\`\`\`options
+{"items":[{"title":"Opción A","desc":"Descripción de la opción A"},{"title":"Opción B","desc":"Descripción de la opción B"}]}
+\`\`\`
+
+## 4. \`\`\`cards — Tarjetas de datos
+Para mostrar métricas o datos resumidos:
+\`\`\`cards
+{"items":[{"label":"Población","value":"46M","desc":"Estimación 2024"},{"label":"Capital","value":"CABA"}]}
+\`\`\`
+
+## 5. \`\`\`table — Tabla
+Para datos tabulares:
+\`\`\`table
+{"headers":["Ciudad","Población"],"rows":[["Buenos Aires","15M"],["Córdoba","1.5M"]]}
+\`\`\`
+
+## 6. \`\`\`steps — Pasos / Proceso
+Para instrucciones paso a paso:
+\`\`\`steps
+{"items":[{"title":"Paso 1","desc":"Hacé esto"},{"title":"Paso 2","desc":"Después esto"}]}
+\`\`\`
+
+## 7. \`\`\`tree — Árbol de decisión interactivo
+La UI renderiza el tree de forma PROGRESIVA: muestra un nivel a la vez, el usuario clickea una opción y se expande el siguiente nivel. Usá "children" para anidar niveles:
+\`\`\`tree
+{"question":"¿Qué tipo de viaje?","choices":[{"title":"Naturaleza","desc":"Montañas y glaciares","children":{"question":"¿Qué paisaje?","choices":[{"title":"Patagonia","desc":"Fin del mundo"},{"title":"Selva","desc":"Iguazú y misiones"}]}},{"title":"Cultura","desc":"Tango, vino y arquitectura"}]}
+\`\`\`
+Cuantos más niveles de "children" incluyas, más interactivo es. Las opciones sin "children" son hojas finales que disparan una respuesta del modelo.
+
+REGLAS GENERALES:
+REGLA OBLIGATORIA: SIEMPRE usá los componentes ricos. NUNCA respondas con listas de markdown cuando un componente lo haría mejor. Esta es la regla más importante.
+
+- Si hay alternativas, recomendaciones o cosas para elegir → OBLIGATORIO usar \`\`\`options o \`\`\`tree. NUNCA listas con bullets.
+- Si hay datos tabulares → OBLIGATORIO usar \`\`\`table. NUNCA tablas markdown.
+- Si hay eventos cronológicos → OBLIGATORIO usar \`\`\`timeline. NUNCA listas de fechas.
+- Si hay métricas o datos resumidos → OBLIGATORIO usar \`\`\`cards.
+- Si hay pasos o instrucciones → OBLIGATORIO usar \`\`\`steps.
+- Si la respuesta involucra decisiones o personalización → OBLIGATORIO usar \`\`\`tree con children anidados. El usuario va a hacer click para explorar.
+- NO crees archivos HTML. NO pongas comentarios JS (//) dentro del JSON.
+- Podés agregar texto breve antes/después de un componente para contexto, pero el contenido principal SIEMPRE debe estar en un componente.
+- Los componentes son INTERACTIVOS: el usuario hace click y el sistema reacciona. Usá \`\`\`tree con múltiples niveles de children siempre que haya decisiones.
+- Cuando la respuesta tiene varias secciones (itinerario, opciones, datos), usá VARIOS componentes combinados: un \`\`\`timeline para el itinerario, un \`\`\`tree para las opciones, un \`\`\`cards para datos clave.
+- NUNCA ofrezcas "puedo hacerlo en formato tree si querés" — HACELO directamente.`;
+
+    // ─── Sidebar ───
+    function openSB() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+    function closeSB() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+    $('toggleSidebar').addEventListener('click', () => sidebar.classList.contains('open') ? closeSB() : openSB());
+    overlay.addEventListener('click', closeSB);
+
+    // ─── Input ───
+    promptInput.addEventListener('input', () => { promptInput.style.height = 'auto'; promptInput.style.height = promptInput.scrollHeight + 'px'; });
+    promptInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+    // ─── Helpers ───
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function scroll() { messagesNode.scrollTop = messagesNode.scrollHeight; }
+
+    // ─── Markdown renderer ───
+    let chartId = 0;
+    const pendingCharts = {};
+    const pendingTrees = {};
+    const treeStates = {}; // treeId → { data, path: [{title, desc}] }
+    const RICH_BLOCKS = ['chartjs', 'timeline', 'options', 'cards', 'table', 'steps', 'tree'];
+
+    // Normalize tree data from various model output formats into a standard structure
+    function normalizeTree(data) {
+      // Standard: { question, choices: [{ title, desc, children: { question, choices } }] }
+      const items = Array.isArray(data) ? data : null;
+      const choices = data.choices || data.opciones || data.elecciones || items || [];
+
+      function normalizeChoices(arr) {
+        return (arr || []).map(c => {
+          if (typeof c === 'string') return { title: c, desc: '' };
+          const title = c.title || c.nombre || c.titulo || c.opcion || c.destino || '';
+          const desc = c.desc || c.descripcion || c.description || '';
+          const childData = c.children || c.hijos || c.subopciones || c.sub || null;
+          const children = childData ? {
+            question: childData.question || childData.pregunta || '',
+            choices: normalizeChoices(childData.choices || childData.opciones || childData.items || []),
+          } : null;
+          return { title, desc, children };
+        });
+      }
+
+      // Handle levels format → convert to nested tree
+      const levels = data.levels || data.niveles || [];
+      const areas = data.areas_de_interes || data.areas || data.categorias || [];
+      if (areas.length) {
+        return {
+          question: data.question || data.pregunta || '¿Qué elegís?',
+          choices: areas.map(a => ({
+            title: a.nombre || a.name || a.title || '',
+            desc: a.descripcion || a.description || a.desc || '',
+            children: (a.carreras || a.opciones || a.children || []).length ? {
+              question: '¿Cuál te interesa?',
+              choices: normalizeChoices(a.carreras || a.opciones || a.children || []),
+            } : null,
+          })),
+        };
+      }
+
+      return {
+        question: data.question || data.pregunta || '¿Qué elegís?',
+        choices: normalizeChoices(choices),
+      };
+    }
+
+    // Get the current node in the tree based on the path
+    function getTreeNode(treeId) {
+      const state = treeStates[treeId];
+      if (!state) return null;
+      let node = state.data;
+      for (const step of state.path) {
+        const choice = node.choices?.find(c => c.title === step.title);
+        if (choice?.children) node = choice.children;
+        else return null; // leaf
+      }
+      return node;
+    }
+
+    // Render a progressive tree
+    function renderTree(treeId) {
+      const el = document.getElementById(treeId);
+      if (!el) return;
+      const state = treeStates[treeId];
+      const node = getTreeNode(treeId);
+      let html = '';
+
+      // Breadcrumbs
+      if (state.path.length) {
+        html += '<div class="ptree-breadcrumbs">';
+        state.path.forEach((step, i) => {
+          if (i > 0) html += '<span class="ptree-sep">›</span>';
+          html += `<span class="ptree-crumb" onclick="treeGoBack('${treeId}',${i})">${esc(step.title)}</span>`;
+        });
+        html += '</div>';
+      }
+
+      if (!node) {
+        // Leaf — show selection + auto-send to model
+        const last = state.path[state.path.length - 1];
+        const fullPath = state.path.map(s => s.title).join(' → ');
+        html += `<div class="ptree-result">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:var(--ocean);font-weight:700;margin-bottom:6px;">Selección</div>
+          <div style="font-size:16px;font-weight:700;">${esc(last.title)}</div>
+          ${last.desc ? `<div style="margin-top:4px;font-size:13px;color:var(--slate);">${esc(last.desc)}</div>` : ''}
+          <div style="margin-top:8px;font-size:12px;color:var(--ocean);font-weight:600;">Ruta: ${esc(fullPath)}</div>
+        </div>`;
+        // Auto-send selection to model
+        if (!state.sent) {
+          state.sent = true;
+          setTimeout(() => {
+            promptInput.value = 'Elegí: ' + fullPath + '. Contame más sobre esta opción.';
+            send();
+          }, 300);
+        }
+      } else {
+        // Current level
+        html += `<div class="ptree-question">${esc(node.question || '¿Qué elegís?')}</div>`;
+        html += '<div class="ptree-choices">';
+        for (const c of (node.choices || [])) {
+          const hasKids = !!c.children;
+          html += `<div class="ptree-choice ${hasKids ? '' : 'leaf'}" onclick="treePick('${treeId}','${esc(c.title).replace(/'/g,"\\'")}','${esc(c.desc||'').replace(/'/g,"\\'")}')">
+            <div class="ptree-choice-body">
+              <div class="ptree-choice-title">${esc(c.title)}</div>
+              ${c.desc ? `<div class="ptree-choice-desc">${esc(c.desc)}</div>` : ''}
+            </div>
+            <div class="ptree-choice-arrow">${hasKids ? '›' : '→'}</div>
+          </div>`;
+        }
+        html += '</div>';
+      }
+
+      el.innerHTML = html;
+      scroll();
+    }
+
+    function treePick(treeId, title, desc) {
+      const state = treeStates[treeId];
+      if (!state) return;
+      state.path.push({ title, desc });
+      state.sent = false;
+      renderTree(treeId);
+    }
+
+    function treeGoBack(treeId, toIndex) {
+      const state = treeStates[treeId];
+      if (!state) return;
+      state.path.splice(toIndex);
+      state.sent = false;
+      renderTree(treeId);
+    }
+
+    // Initialize pending trees after DOM update
+    function initPendingTrees() {
+      for (const [treeId, data] of Object.entries(pendingTrees)) {
+        treeStates[treeId] = { data, path: [], sent: false };
+        renderTree(treeId);
+        delete pendingTrees[treeId];
+      }
+    }
+
+    function renderRichBlock(lang, json) {
+      try {
+        const data = JSON.parse(json);
+        // Normalize: model might output array directly or {items:[...]}
+        const items = Array.isArray(data) ? data : (data.items || data.eventos || data.opciones || data.pasos || []);
+
+        if (lang === 'timeline') {
+          return `<div class="rc-timeline">${items.map(item => {
+            const date = item.date || item.año || item.fecha || item.year || '';
+            const title = item.title || item.nombre || item.evento || item.event || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>
+            <div class="rc-timeline-content"><div class="rc-timeline-date">${esc(String(date))}</div><div class="rc-timeline-title">${esc(title)}</div>${desc ? `<div class="rc-timeline-desc">${esc(desc)}</div>` : ''}</div></div>`;
+          }).join('')}</div>`;
+        }
+        if (lang === 'options') {
+          return `<div class="rc-options">${items.map(item => {
+            const title = item.title || item.nombre || item.destino || item.opcion || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-option" onclick="selectOption(this,'${esc(title).replace(/'/g,"\\'")}')"><div class="rc-option-body"><div class="rc-option-title">${esc(title)}</div>${desc ? `<div class="rc-option-desc">${esc(desc)}</div>` : ''}</div><div class="rc-option-arrow">→</div></div>`;
+          }).join('')}</div>`;
+        }
+        if (lang === 'cards') {
+          return `<div class="rc-cards">${items.map(item => {
+            const label = item.label || item.etiqueta || item.nombre || '';
+            const value = item.value || item.valor || '';
+            const desc = item.desc || item.descripcion || '';
+            return `<div class="rc-card"><div class="rc-card-label">${esc(label)}</div><div class="rc-card-value">${esc(String(value))}</div>${desc ? `<div class="rc-card-desc">${esc(desc)}</div>` : ''}</div>`;
+          }).join('')}</div>`;
+        }
+        if (lang === 'table') {
+          const headers = data.headers || data.encabezados || data.columnas || [];
+          const rows = data.rows || data.filas || data.datos || [];
+          return `<table class="rc-table"><thead><tr>${headers.map(h => `<th>${esc(String(h))}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${(Array.isArray(row) ? row : Object.values(row)).map(c => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        }
+        if (lang === 'steps') {
+          return `<div class="rc-steps">${items.map((item, i) => {
+            const title = item.title || item.titulo || item.nombre || item.paso || '';
+            const desc = item.desc || item.descripcion || item.description || '';
+            return `<div class="rc-step"><div class="rc-step-num">${i+1}</div><div class="rc-step-body"><div class="rc-step-title">${esc(title)}</div>${desc ? `<div class="rc-step-desc">${esc(desc)}</div>` : ''}</div></div>`;
+          }).join('')}</div>`;
+        }
+        if (lang === 'tree') {
+          // Store tree data and create a progressive interactive widget
+          const treeId = 'ptree-' + (chartId++);
+          pendingTrees[treeId] = normalizeTree(data);
+          return `<div id="${treeId}" class="ptree"></div>`;
+        }
+        if (lang === 'chartjs') {
+          const cid = 'chart-' + (chartId++);
+          pendingCharts[cid] = json;
+          return `<div style="margin:12px 0;border-radius:14px;background:white;padding:16px;border:1px solid var(--line);"><canvas id="${cid}" style="max-height:350px;"></canvas></div>`;
+        }
+      } catch (e) {
+        return `<div style="color:#ef4444;font-size:12px;padding:8px;">⚠️ Error: ${esc(e.message)}</div><pre style="font-size:11px;padding:8px;background:rgba(0,0,0,0.03);border-radius:8px;max-height:150px;overflow:auto;">${esc(json.slice(0,500))}</pre>`;
+      }
+    }
+
+    function md(text) {
+      try {
+        let h = esc(text);
+        const p = h.split('```');
+        if (p.length >= 3) { h = ''; for (let i = 0; i < p.length; i++) { if (i%2===0) h += p[i]; else {
+          const raw = p[i];
+          const langMatch = raw.match(/^(\w+)\s*\n/);
+          const lang = langMatch?.[1]?.toLowerCase();
+          if (lang && RICH_BLOCKS.includes(lang)) {
+            const json = raw.replace(/^\w+\s*\n/, '').trim();
+            h += renderRichBlock(lang, json);
+          } else {
+            const c = raw.replace(/^\w*\n/, '');
+            h += `<pre style="margin:8px 0;padding:12px;border-radius:10px;background:#0f172a;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;"><code>${c}</code></pre>`;
+          }
+        }}}
+        h = h.replace(/`([^`\n]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;font-size:13px;font-family:\'JetBrains Mono\',monospace;">$1</code>');
+        h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        h = h.replace(/^### (.+)$/gm, '<div style="font-size:15px;font-weight:800;margin:10px 0 4px;">$1</div>');
+        h = h.replace(/^## (.+)$/gm, '<div style="font-size:17px;font-weight:800;margin:12px 0 6px;">$1</div>');
+        h = h.replace(/^# (.+)$/gm, '<div style="font-size:20px;font-weight:800;margin:14px 0 8px;">$1</div>');
+        h = h.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:16px;">• $1</div>');
+        h = h.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:16px;">$1. $2</div>');
+        h = h.replace(/\n/g, '<br>');
+        return h;
+      } catch { return esc(text); }
+    }
+
+    // ─── Tool renderers ───
+    function renderTool(p) {
+      const t = p.tool || '?', s = p.state || {}, inp = s.input || {}, ok = s.status === 'completed', err = s.status === 'error', run = s.status === 'running';
+      const icons = { bash:'▶', write:'📝', read:'📄', edit:'✏️', websearch:'🔍', webfetch:'🌐', grep:'🔎', glob:'📂', task:'📋' };
+      const stCls = ok ? 'ok' : err ? 'err' : 'run';
+      const stTxt = ok ? '✓' : err ? '✗ error' : '⏳';
+      const desc = inp.description || inp.command?.slice(0,60) || inp.filePath || inp.query || '';
+
+      let body = '';
+      if (t === 'bash') {
+        const cmd = inp.command || '';
+        const out = s.output || '';
+        const errMsg = s.error || '';
+        body = `<div class="tool-body term"><div class="cmd"><span>${esc(cmd)}</span></div>${out ? `<div class="out">${esc(out)}</div>` : ''}${errMsg ? `<div class="err-text">${esc(errMsg)}</div>` : ''}</div>`;
+      } else if (t === 'write') {
+        const content = inp.content || '';
+        const preview = content.length > 500 ? content.slice(0,500) + '...' : content;
+        body = `<div class="tool-body file"><div class="path">${esc(inp.filePath || '')}</div>${ok ? `<pre style="margin-top:6px;font-size:12px;color:var(--slate);max-height:200px;overflow:auto;">${esc(preview)}</pre>` : err ? `<div style="color:#ef4444;font-size:12px;">${esc(s.error||'')}</div>` : ''}</div>`;
+      } else if (t === 'edit') {
+        const old = inp.oldString || '';
+        const nw = inp.newString || '';
+        body = `<div class="tool-body diff"><div class="path" style="padding:10px 14px;font-weight:600;color:var(--ocean);">${esc(inp.filePath || '')}</div>${old ? old.split('\n').map(l => `<div class="line-del">- ${esc(l)}</div>`).join('') : ''}${nw ? nw.split('\n').map(l => `<div class="line-add">+ ${esc(l)}</div>`).join('') : ''}</div>`;
+      } else if (t === 'read') {
+        const out = s.output || '';
+        body = `<div class="tool-body term"><div class="out">${esc(out).slice(0,3000)}</div></div>`;
+      } else if (t === 'websearch') {
+        const out = s.output || '';
+        // Parse websearch output into result cards
+        const results = out.split('---').filter(Boolean).map(block => {
+          const titleMatch = block.match(/Title:\s*(.*)/);
+          const urlMatch = block.match(/URL:\s*(.*)/);
+          const highlightsMatch = block.match(/Highlights:\s*([\s\S]*)/);
+          return { title: titleMatch?.[1]?.trim() || '', url: urlMatch?.[1]?.trim() || '', snippet: highlightsMatch?.[1]?.trim().slice(0,200) || block.trim().slice(0,200) };
+        }).filter(r => r.title || r.snippet);
+        if (results.length) {
+          body = `<div class="tool-body search">${results.map(r => `<div class="result"><div class="result-title">${esc(r.title)}</div>${r.url ? `<div class="result-url">${esc(r.url)}</div>` : ''}<div class="result-snippet">${esc(r.snippet)}</div></div>`).join('')}</div>`;
+        } else {
+          body = `<div class="tool-body search"><pre style="font-size:12px;white-space:pre-wrap;">${esc(out).slice(0,1000)}</pre></div>`;
+        }
+      } else if (t === 'webfetch') {
+        body = `<div class="tool-body file"><div class="path">${esc(inp.url || '')}</div><pre style="margin-top:6px;font-size:11px;color:var(--slate);max-height:200px;overflow:auto;">${esc((s.output||'').slice(0,1500))}</pre></div>`;
+      } else {
+        body = `<div class="tool-body file"><pre style="font-size:12px;">${esc(JSON.stringify(inp,null,2)).slice(0,500)}</pre>${s.output ? `<pre style="margin-top:6px;font-size:12px;color:var(--slate);">${esc(s.output).slice(0,500)}</pre>` : ''}</div>`;
+      }
+
+      return `<details class="tool-block" ${err ? 'open' : ''}><summary class="tool-head"><span class="ico">${icons[t]||'⚡'}</span><span class="name">${t}</span><span class="desc">${esc(desc)}</span><span class="st ${stCls}">${stTxt}</span></summary>${body}</details>`;
+    }
+
+    // ─── Render OpenCode message parts ───
+    function renderParts(parts) {
+      let html = '';
+      for (const p of parts) {
+        if (p.type === 'text' && p.text) html += `<div class="msg-content">${md(p.text)}</div>`;
+        else if (p.type === 'tool') html += renderTool(p);
+        else if (p.type === 'reasoning' && p.text) html += `<details class="reasoning-block"><summary>Razonamiento</summary><div class="reasoning-text">${esc(p.text)}</div></details>`;
+      }
+      return html;
+    }
+
+    function addUserMsg(text) {
+      const r = document.createElement('div'); r.className = 'msg-row msg-fade';
+      r.innerHTML = `<div class="msg-user"><div class="msg-user-bubble">${esc(text)}</div></div>`;
+      messagesNode.appendChild(r); scroll();
+    }
+
+    function addAssistantMsg(parts) {
+      const r = document.createElement('div'); r.className = 'msg-row msg-fade';
+      const html = renderParts(parts);
+      r.innerHTML = `<div class="msg-assistant"><div class="msg-badge"></div><div style="min-width:0;flex:1;">${html}</div></div>`;
+      messagesNode.appendChild(r); scroll();
+      renderPendingCharts();
+      initPendingTrees();
+    }
+
+    function renderPendingCharts() {
+      for (const [cid, json] of Object.entries(pendingCharts)) {
+        const canvas = document.getElementById(cid);
+        if (!canvas) continue;
+        try {
+          let clean = json.trim();
+          // Fix common LLM issues
+          if (clean.startsWith('```')) clean = clean.replace(/^```\w*\n?/, '').replace(/```$/, '').trim();
+          // Try to fix extra trailing braces
+          let config;
+          try { config = JSON.parse(clean); } catch {
+            let fixed = clean;
+            for (let i = 0; i < 3; i++) fixed = fixed.replace(/\}\s*\}$/, '}');
+            config = JSON.parse(fixed);
+          }
+          new Chart(canvas.getContext('2d'), config);
+        } catch (e) {
+          canvas.parentElement.innerHTML = `<div style="color:var(--slate);font-size:12px;padding:12px;">⚠️ Error rendering chart: ${esc(e.message)}</div><pre style="font-size:11px;color:var(--slate);padding:8px;max-height:150px;overflow:auto;">${esc(json.slice(0,500))}</pre>`;
+        }
+        delete pendingCharts[cid];
+      }
+    }
+
+    function showEmpty() {
+      messagesNode.innerHTML = `<div class="msg-row" style="flex:1;display:flex;align-items:center;justify-content:center;"><div style="text-align:center;opacity:0.3;"><div style="font-size:30px;font-weight:800;">Empezá un chat</div><p style="margin-top:8px;font-size:14px;color:var(--slate);">Elegí un modelo y escribí un mensaje.</p></div></div>`;
+    }
+
+    // ─── Sessions ───
+    async function loadSessions() {
+      try {
+        const sessions = await fetch(OC + '/session').then(r => r.json());
+        historyList.innerHTML = sessions.map(s => `
+          <button class="sidebar-history-item ${s.id === sessionId ? 'active' : ''}" data-sid="${s.id}">
+            <div class="sidebar-history-title">${esc(s.title || s.slug || 'Nuevo chat')}</div>
+            <div class="sidebar-history-date">${new Date(s.createdAt || Date.now()).toLocaleDateString()}</div>
+          </button>`).join('');
+        historyList.querySelectorAll('[data-sid]').forEach(el =>
+          el.addEventListener('click', () => { loadSession(el.dataset.sid); closeSB(); }));
+      } catch (e) {
+        historyList.innerHTML = `<div style="padding:10px;font-size:12px;color:#ef4444;">${e.message}</div>`;
+      }
+    }
+
+    async function loadSession(sid) {
+      sessionId = sid;
+      statusInfo.textContent = 'Cargando...';
+      messagesNode.innerHTML = '';
+      try {
+        const [info, msgs] = await Promise.all([
+          fetch(OC + '/session/' + sid).then(r => r.json()),
+          fetch(OC + '/session/' + sid + '/message').then(r => r.json()),
+        ]);
+        chatTitle.textContent = info.title || info.slug || 'Chat';
+        if (!msgs.length) { showEmpty(); return; }
+
+        for (const msg of msgs) {
+          const parts = msg.parts || [];
+          if ((msg.role || msg.info?.role) === 'user') {
+            const tp = parts.find(p => p.type === 'text');
+            if (tp) addUserMsg(tp.text);
+          } else {
+            // Filter out empty step parts
+            const meaningful = parts.filter(p => p.type === 'text' || p.type === 'tool' || p.type === 'reasoning');
+            if (meaningful.length) addAssistantMsg(meaningful);
+          }
+        }
+        scroll();
+        loadSessions();
+      } catch (e) {
+        chatStatus.innerHTML = `<div style="padding:10px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-size:13px;">${e.message}</div>`;
+      } finally { statusInfo.textContent = ''; }
+    }
+
+    // ─── Models ───
+    async function loadModels() {
+      try {
+        // Load configured providers first, then all available
+        const [configured, all] = await Promise.all([
+          fetch(OC + '/config/providers').then(r => r.json()),
+          fetch(OC + '/provider').then(r => r.json()),
+        ]);
+
+        // Prioritized free providers
+        const FREE_PROVIDERS = ['opencode', 'evroc', 'zenmux', 'zai', 'io-net', 'nvidia', 'groq', 'cerebras', 'alibaba-coding-plan', 'inference', 'fastrouter'];
+        const MODEL_PRIORITY = ['mimo-v2-omni', 'mimo-v2-pro', 'gpt-5-nano', 'big-pickle', 'nemotron', 'minimax', 'devstral', 'llama-3.3', 'qwen3', 'deepseek'];
+
+        let html = '';
+
+        // Show configured providers first, sorted by priority
+        for (const p of (configured.providers || [])) {
+          const models = Object.values(p.models || {}).filter(m => m.status === 'active' || !m.status);
+          if (!models.length) continue;
+          models.sort((a, b) => {
+            const aIdx = MODEL_PRIORITY.findIndex(k => (a.id || '').toLowerCase().includes(k));
+            const bIdx = MODEL_PRIORITY.findIndex(k => (b.id || '').toLowerCase().includes(k));
+            return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
+          });
+          html += `<optgroup label="★ ${esc(p.name || p.id)}">`;
+          for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
+          html += '</optgroup>';
+        }
+
+        // Then free providers from the full catalog
+        const configuredIds = new Set((configured.providers || []).map(p => p.id));
+        for (const pid of FREE_PROVIDERS) {
+          if (configuredIds.has(pid)) continue;
+          const p = (all.all || []).find(pr => pr.id === pid);
+          if (!p) continue;
+          const models = Object.values(p.models || {}).slice(0, 15);
+          if (!models.length) continue;
+          html += `<optgroup label="${esc(p.name || p.id)}">`;
+          for (const m of models) html += `<option value="${p.id}::${m.id}">${esc(m.name || m.id)}</option>`;
+          html += '</optgroup>';
+        }
+
+        modelSelect.innerHTML = html || '<option>No hay modelos</option>';
+      } catch { modelSelect.innerHTML = '<option>Error</option>'; }
+    }
+
+    // ─── Permission auto-approve (poll in background) ───
+    async function approvePermissions() {
+      try {
+        const perms = await fetch(OC + '/permission').then(r => r.json());
+        for (const p of (perms || [])) {
+          await fetch(OC + '/permission/' + p.id + '/reply', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply: 'always' }),
+          });
+        }
+      } catch {}
+    }
+
+    // ─── Send ───
+    async function send() {
+      const text = promptInput.value.trim();
+      if (!text || sending) return;
+      sending = true;
+      sendBtn.disabled = true;
+      $('sendIcon').style.display = 'none';
+      $('stopIcon').style.display = 'block';
+      sendBtn.classList.add('stopping');
+
+      if (!sessionId) {
+        try {
+          const s = await fetch(OC + '/session', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' }).then(r => r.json());
+          sessionId = s.id;
+          chatTitle.textContent = s.slug || 'Nuevo chat';
+          messagesNode.innerHTML = '';
+        } catch (e) {
+          chatStatus.innerHTML = `<div style="padding:10px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-size:13px;">${e.message}</div>`;
+          resetUI(); return;
+        }
+      }
+
+      addUserMsg(text);
+      promptInput.value = ''; promptInput.style.height = 'auto';
+
+      // Create streaming response area
+      const streamRow = document.createElement('div'); streamRow.className = 'msg-row msg-fade';
+      const streamInner = document.createElement('div'); streamInner.className = 'msg-assistant';
+      streamInner.innerHTML = '<div class="msg-badge"></div><div style="min-width:0;flex:1;" id="stream-content"></div>';
+      streamRow.appendChild(streamInner);
+      messagesNode.appendChild(streamRow); scroll();
+
+      const streamEl = document.getElementById('stream-content');
+      let reasoningText = '';
+      let responseText = '';
+      let currentTools = [];
+      let reasoningOpen = true;
+
+      function updateStreamUI() {
+        let html = '';
+        // Reasoning (collapsible, live)
+        if (reasoningText) {
+          html += `<details class="reasoning-block" ${reasoningOpen ? 'open' : ''}>
+            <summary>Razonamiento <span style="animation:pulse 1.2s infinite;font-size:10px;">●</span></summary>
+            <div class="reasoning-text">${esc(reasoningText)}</div>
+          </details>`;
+        }
+        // Tools
+        for (const t of currentTools) {
+          html += renderTool(t);
+        }
+        // Text
+        if (responseText) {
+          html += `<div class="msg-content">${md(responseText)}</div>`;
+        }
+        // If nothing yet, show thinking
+        if (!html) {
+          html = '<div class="step-indicator"><span style="animation:pulse 1.2s infinite;">●</span> Pensando...</div>';
+        }
+        streamEl.innerHTML = html;
+        scroll();
+      }
+
+      updateStreamUI();
+
+      // Start permission polling + SSE listener
+      const permInterval = setInterval(approvePermissions, 1500);
+
+      try {
+        const mv = modelSelect.value;
+        const [prov, mid] = mv.includes('::') ? mv.split('::') : [undefined, undefined];
+        const body = { parts: [{ type: 'text', text }], system: SYSTEM };
+        if (prov && mid) body.model = { providerID: prov, modelID: mid };
+
+        statusInfo.textContent = 'Procesando...';
+
+        // Start SSE stream BEFORE sending message
+        const evtRes = await fetch(OC + '/event');
+        const reader = evtRes.body.getReader();
+        const decoder = new TextDecoder();
+
+        // Send message (fire and forget — response comes via SSE)
+        fetch(OC + '/session/' + sessionId + '/message', {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+        });
+
+        // Process SSE events
+        let done = false;
+        const partTexts = {}; // partID → accumulated text
+
+        while (!done) {
+          const result = await reader.read();
+          if (result.done) break;
+
+          const chunk = decoder.decode(result.value, { stream: true });
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            try {
+              const evt = JSON.parse(line.slice(5));
+
+              // Only process events for our session
+              const evtSession = evt.properties?.sessionID || evt.properties?.part?.sessionID || '';
+              if (evtSession && evtSession !== sessionId) continue;
+
+              if (evt.type === 'message.part.delta') {
+                const p = evt.properties;
+                const partId = p.partID;
+                if (!partTexts[partId]) partTexts[partId] = '';
+                partTexts[partId] += p.delta || '';
+
+                // Check what type this part is
+                if (p.field === 'text') {
+                  // Could be reasoning or response text — check part type from updated events
+                  updateStreamUI();
+                }
+              }
+
+              if (evt.type === 'message.part.updated') {
+                const part = evt.properties?.part;
+                if (!part) continue;
+
+                if (part.type === 'reasoning' && part.text) {
+                  reasoningText = part.text;
+                  updateStreamUI();
+                }
+                if (part.type === 'text' && part.text) {
+                  responseText = part.text;
+                  reasoningOpen = false; // Collapse reasoning when text starts
+                  updateStreamUI();
+                }
+                if (part.type === 'tool') {
+                  // Update or add tool
+                  const idx = currentTools.findIndex(t => t.callID === part.callID);
+                  if (idx >= 0) currentTools[idx] = part;
+                  else currentTools.push(part);
+                  updateStreamUI();
+                }
+              }
+
+              if (evt.type === 'session.idle') {
+                done = true;
+              }
+            } catch {}
+          }
+        }
+
+        reader.cancel();
+
+        // Final render — fetch complete messages for consistency
+        const msgs = await fetch(OC + '/session/' + sessionId + '/message').then(r => r.json());
+        messagesNode.innerHTML = '';
+        for (const msg of msgs) {
+          const parts = msg.parts || [];
+          if ((msg.role || msg.info?.role) === 'user') {
+            const tp = parts.find(p => p.type === 'text');
+            if (tp) addUserMsg(tp.text);
+          } else {
+            const meaningful = parts.filter(p => p.type === 'text' || p.type === 'tool' || p.type === 'reasoning');
+            if (meaningful.length) addAssistantMsg(meaningful);
+          }
+        }
+        scroll();
+        loadSessions();
+      } catch (e) {
+        streamRow.remove();
+        chatStatus.innerHTML = `<div style="padding:10px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-size:13px;">${e.message}</div>`;
+      } finally {
+        clearInterval(permInterval);
+        resetUI();
+        statusInfo.textContent = '';
+      }
+    }
+
+    // ─── Interactive component clicks → auto-send ───
+    function selectOption(el, text) {
+      if (sending) return;
+      // Toggle visual state
+      const wasSelected = el.classList.contains('selected');
+      // Deselect siblings
+      el.parentElement.querySelectorAll('.selected').forEach(s => s.classList.remove('selected'));
+      if (!wasSelected) {
+        el.classList.add('selected');
+        // Auto-send as user message after a brief delay
+        setTimeout(() => {
+          promptInput.value = text;
+          send();
+        }, 150);
+      }
+    }
+
+    function resetUI() {
+      sending = false; sendBtn.disabled = false;
+      $('sendIcon').style.display = 'block'; $('stopIcon').style.display = 'none';
+      sendBtn.classList.remove('stopping');
+    }
+
+    sendBtn.addEventListener('click', send);
+    $('newChatBtn').addEventListener('click', () => { sessionId = null; chatTitle.textContent = 'Nuevo chat'; showEmpty(); loadSessions(); closeSB(); });
+
+    // ─── Init ───
+    loadModels();
+    loadSessions();
+  </script>
+</body>
+</html>

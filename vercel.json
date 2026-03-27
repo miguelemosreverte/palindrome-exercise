@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/miniapp.html", "destination": "/miniapp.html" },
     { "source": "/connect", "destination": "/connect.html" },
     { "source": "/bridge", "destination": "/bridge.html" },
     { "source": "/download", "destination": "/download.html" }
