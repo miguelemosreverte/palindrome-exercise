@@ -235,72 +235,67 @@ Introduce yourself in under 500 chars. Mention what was recently shipped and sug
   fi
 }
 
-# ─── Poll and respond ───
+# ─── Firebase SSE stream ───
 
-poll_and_respond() {
-  curl -s "$API_BASE/api/bridge/messages?session=$SESSION" 2>/dev/null | \
-    python3 -c "
-import json, sys, os
+FIREBASE_URL="https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app"
+FB_ROOT="mercadopago-bridge"
 
-seen_file = '$SEEN_FILE'
-initialized = '$INITIALIZED'
+handle_message() {
+  local msg_json="$1"
+  local from content
+  from=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('from','user'))" 2>/dev/null)
+  content=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('content',''))" 2>/dev/null)
 
-try:
-    data = json.load(sys.stdin)
-except:
-    sys.exit(0)
+  # Skip agent/system messages
+  [ "$from" = "agent" ] || [ "$from" = "system" ] && return
+  [ -z "$content" ] && return
 
-msgs = data.get('messages', [])
-if not msgs:
-    sys.exit(0)
-
-try:
-    with open(seen_file) as f:
-        seen = set(f.read().splitlines())
-except:
-    seen = set()
-
-new_msgs = []
-for msg in msgs:
-    key = (msg.get('timestamp','') + ':' + msg.get('content',''))[:200]
-    if key in seen:
-        continue
-    seen.add(key)
-    if msg.get('from') in ('agent', 'system'):
-        continue
-    if initialized == 'true':
-        new_msgs.append(msg)
-
-with open(seen_file, 'w') as f:
-    f.write('\n'.join(seen))
-
-for msg in new_msgs:
-    print(json.dumps(msg))
-" 2>/dev/null | while IFS= read -r line; do
-    FROM=$(echo "$line" | python3 -c "import sys,json;print(json.load(sys.stdin).get('from','user'))" 2>/dev/null)
-    CONTENT=$(echo "$line" | python3 -c "import sys,json;print(json.load(sys.stdin).get('content',''))" 2>/dev/null)
-
-    if [ -n "$CONTENT" ]; then
-      echo "[$FROM] $CONTENT"
-      RESPONSE=$(ask_agent "$FROM says: $CONTENT")
-      if [ -n "$RESPONSE" ]; then
-        echo "[agent] $RESPONSE"
-        send_bridge "notify" "$RESPONSE"
-      fi
-    fi
-  done
+  echo "[$from] $content"
+  local response
+  response=$(ask_agent "$from says: $content")
+  if [ -n "$response" ]; then
+    echo "[agent] $response"
+    send_bridge "notify" "$response"
+  fi
 }
 
-echo "Listening for messages..."
+echo "Listening for messages via Firebase SSE..."
 
-while true; do
-  poll_and_respond
+# Send greeting first
+startup_greeting &
 
-  if [ "$INITIALIZED" = "false" ]; then
-    INITIALIZED=true
-    echo "Initialized. Sending startup greeting..."
-    startup_greeting &
-  fi
+# Use python to handle SSE stream (handles multi-line JSON correctly)
+curl -sN -H "Accept: text/event-stream" \
+  "$FIREBASE_URL/$FB_ROOT/bridge-messages/$SESSION.json" 2>/dev/null | \
+python3 -u -c "
+import sys, json
 
-  sleep 2
+buf = ''
+skip_initial = True
+
+for raw_line in sys.stdin:
+    line = raw_line.rstrip('\n')
+    if line.startswith('data: '):
+        buf = line[6:]
+    elif line == '' and buf:
+        # End of SSE event — parse accumulated data
+        try:
+            event = json.loads(buf)
+            path = event.get('path','')
+            data = event.get('data')
+            if path == '/':
+                skip_initial = False
+            elif data and isinstance(data, dict) and data.get('content') and not skip_initial:
+                if data.get('from') not in ('agent', 'system'):
+                    print(json.dumps(data), flush=True)
+        except:
+            pass
+        buf = ''
+    elif buf:
+        buf += line
+" 2>/dev/null | while IFS= read -r msg; do
+  handle_message "$msg"
 done
+
+echo "SSE stream ended, restarting..."
+exec "$0" "$@"
