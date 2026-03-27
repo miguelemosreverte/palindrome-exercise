@@ -4,6 +4,7 @@ const { readPath, writePath, pushPath } = require('../../lib/firebase');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PAIRS_PATH = 'mercadopago-bridge/bridge-pairs';
 const MSGS_PATH = 'mercadopago-bridge/bridge-messages';
+const APPROVALS_PATH = 'mercadopago-bridge/bridge-approvals';
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,6 +12,69 @@ module.exports = async function handler(req, res) {
 
   try {
     var update = req.body;
+
+    // Handle callback queries (inline keyboard button presses)
+    if (update && update.callback_query) {
+      var cb = update.callback_query;
+      var cbData = cb.data || '';
+      var cbChatId = String(cb.message.chat.id);
+      var cbMessageId = cb.message.message_id;
+      var cbUsername = cb.from.username || cb.from.first_name || 'User';
+
+      // Parse callback_data: "approve:{approvalId}" or "deny:{approvalId}"
+      var parts = cbData.split(':');
+      var decision = parts[0]; // "approve" or "deny"
+      var approvalId = parts.slice(1).join(':');
+
+      if (approvalId && (decision === 'approve' || decision === 'deny')) {
+        // Find session for this chat
+        var cbPairs = await readPath(PAIRS_PATH);
+        var cbSession = null;
+        if (cbPairs) {
+          for (var k in cbPairs) {
+            if (cbPairs[k] && String(cbPairs[k].chatId) === cbChatId) {
+              cbSession = k;
+              break;
+            }
+          }
+        }
+
+        // Update approval in Firebase
+        if (cbSession) {
+          await writePath(APPROVALS_PATH + '/' + cbSession + '/' + approvalId + '/status', decision === 'approve' ? 'approved' : 'denied');
+          await writePath(APPROVALS_PATH + '/' + cbSession + '/' + approvalId + '/decidedBy', cbUsername);
+          await writePath(APPROVALS_PATH + '/' + cbSession + '/' + approvalId + '/decidedAt', new Date().toISOString());
+
+          // Store decision in message history
+          await pushPath(MSGS_PATH + '/' + cbSession, {
+            from: cbUsername,
+            content: decision === 'approve' ? 'Approved: ' + approvalId : 'Denied: ' + approvalId,
+            action: decision,
+            approvalId: approvalId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Answer the callback query
+        await callTelegram('answerCallbackQuery', {
+          callback_query_id: cb.id,
+          text: decision === 'approve' ? 'Approved!' : 'Denied.',
+        });
+
+        // Edit the original message to show the decision and remove buttons
+        var resultIcon = decision === 'approve' ? '✅' : '❌';
+        var resultText = cb.message.text + '\n\n' + resultIcon + ' *' + (decision === 'approve' ? 'Approved' : 'Denied') + '* by ' + cbUsername;
+        await callTelegram('editMessageText', {
+          chat_id: cbChatId,
+          message_id: cbMessageId,
+          text: resultText,
+          parse_mode: 'Markdown',
+        });
+      }
+
+      return res.json({ ok: true });
+    }
+
     if (!update || !update.message) return res.json({ ok: true });
 
     var msg = update.message;
@@ -117,4 +181,14 @@ async function sendTelegram(chatId, text, parseMode) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode || undefined }),
   });
+}
+
+async function callTelegram(method, params) {
+  if (!BOT_TOKEN) return;
+  var resp = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/' + method, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return resp.json();
 }

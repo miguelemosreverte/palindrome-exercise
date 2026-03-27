@@ -20,11 +20,13 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PAIRS_PATH = 'mercadopago-bridge/bridge-pairs';
 const MSGS_PATH = 'mercadopago-bridge/bridge-messages';
 const STATUS_PATH = 'mercadopago-bridge/bridge-status';
+const APPROVALS_PATH = 'mercadopago-bridge/bridge-approvals';
 
 const ICONS = {
   notify: '🔔',
   summary: '📋',
   ask: '❓',
+  approve: '🔐',
   status: '⚙️',
   error: '🚨',
   success: '✅',
@@ -39,10 +41,18 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // GET — fetch agent status for a session (desktop polls this)
+  // GET — fetch agent status or approval status
   if (req.method === 'GET') {
     var session = req.query.session;
     if (!session) return res.status(400).json({ error: 'session required' });
+
+    // Poll approval status
+    var approvalId = req.query.approval;
+    if (approvalId) {
+      var approval = await readPath(APPROVALS_PATH + '/' + session + '/' + approvalId);
+      if (!approval) return res.status(404).json({ error: 'Approval not found' });
+      return res.json({ approval: approval });
+    }
 
     var status = await readPath(STATUS_PATH + '/' + session);
     return res.json({ status: status || { state: 'idle' } });
@@ -92,6 +102,39 @@ module.exports = async function handler(req, res) {
           updatedAt: new Date().toISOString(),
         });
         break;
+      case 'approve':
+        var approvalId = metadata.approvalId;
+        if (!approvalId) return res.status(400).json({ error: 'metadata.approvalId required for approve action' });
+        formattedMsg = icon + ' *Approval requested*\n\n' + message;
+        if (metadata.command) formattedMsg += '\n\n`' + metadata.command + '`';
+        if (metadata.project) formattedMsg += '\n\nProject: _' + metadata.project + '_';
+        // Store pending approval in Firebase
+        await writePath(APPROVALS_PATH + '/' + sessionId + '/' + approvalId, {
+          status: 'pending',
+          message: message,
+          command: metadata.command || null,
+          project: metadata.project || null,
+          createdAt: new Date().toISOString(),
+        });
+        // Send with inline keyboard
+        var replyMarkup = {
+          inline_keyboard: [[
+            { text: '✅ Approve', callback_data: 'approve:' + approvalId },
+            { text: '❌ Deny', callback_data: 'deny:' + approvalId },
+          ]],
+        };
+        await sendTelegram(chatId, formattedMsg, 'Markdown', replyMarkup);
+        // Store in message history
+        if (sessionId) {
+          await pushPath(MSGS_PATH + '/' + sessionId, {
+            from: 'agent',
+            action: 'approve',
+            content: message,
+            approvalId: approvalId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return res.json({ ok: true, delivered: true, approvalId: approvalId });
       case 'error':
         formattedMsg = icon + ' *Error*\n\n`' + message + '`';
         break;
@@ -122,12 +165,14 @@ module.exports = async function handler(req, res) {
   }
 };
 
-async function sendTelegram(chatId, text, parseMode) {
+async function sendTelegram(chatId, text, parseMode, replyMarkup) {
   if (!BOT_TOKEN) return;
+  var payload = { chat_id: chatId, text: text, parse_mode: parseMode || undefined };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
   var resp = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode || undefined }),
+    body: JSON.stringify(payload),
   });
   return resp.json();
 }
