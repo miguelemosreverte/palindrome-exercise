@@ -1604,68 +1604,63 @@
       var main = document.getElementById('main');
       var curState = currentStep >= 0 && currentStep < s.steps.length ? s.steps[currentStep].state : s.states[0];
 
-      // State diagram — shows nodes + transition edges with branches/cycles
+      // State diagram
       var visitedStates = {};
       for (var vi = 0; vi <= currentStep && vi < s.steps.length; vi++) visitedStates[s.steps[vi].state] = true;
+      var trans = s.transitions || [];
 
-      // Build adjacency from transitions
-      var edges = {};  // from -> [{to, event}]
-      var backEdges = {};  // to -> [{from, event}] for cycles
-      if (s.transitions) {
-        s.transitions.forEach(function(t) {
-          if (!edges[t.from]) edges[t.from] = [];
-          edges[t.from].push({ to: t.to, event: t.event });
-          // Detect back-edge (cycle)
-          if (s.states.indexOf(t.to) <= s.states.indexOf(t.from)) {
-            if (!backEdges[t.from]) backEdges[t.from] = [];
-            backEdges[t.from].push({ to: t.to, event: t.event });
-          }
-        });
+      // Build edge map
+      var edgeMap = {};
+      var cycles = [];
+      for (var ti = 0; ti < trans.length; ti++) {
+        var t = trans[ti];
+        if (!edgeMap[t.from]) edgeMap[t.from] = [];
+        edgeMap[t.from].push(t);
+        if (s.states.indexOf(t.to) <= s.states.indexOf(t.from)) {
+          cycles.push(t);
+        }
       }
 
       var diagramHTML = '<div class="state-diagram"><h2>State Machine</h2><div class="nodes">';
-      s.states.forEach(function(st, idx) {
+      for (var si = 0; si < s.states.length; si++) {
+        var st = s.states[si];
         var cls = 'state-node';
         if (st === curState) cls += ' active';
         else if (visitedStates[st]) cls += ' visited';
-        // Check if final
         if (s.fsm && s.fsm.states && s.fsm.states[st] && s.fsm.states[st].final) cls += ' final';
         diagramHTML += '<div class="' + cls + '">' + esc(st) + '</div>';
-
-        // Forward arrows
-        var outs = edges[st] || [];
-        if (idx < s.states.length - 1) {
-          if (outs.length > 1) {
-            // Branch: show multiple labeled arrows
+        // Arrows between nodes
+        var outs = edgeMap[st] || [];
+        var fwdOuts = [];
+        for (var oi = 0; oi < outs.length; oi++) {
+          if (s.states.indexOf(outs[oi].to) > si) fwdOuts.push(outs[oi]);
+        }
+        if (si < s.states.length - 1) {
+          if (fwdOuts.length > 1) {
             diagramHTML += '<div class="edge-group">';
-            outs.forEach(function(e) {
-              var isFwd = s.states.indexOf(e.to) > idx;
-              if (isFwd) {
-                var aCls = visitedStates[e.to] || e.to === curState ? ' active' : '';
-                diagramHTML += '<div class="edge-label' + aCls + '"><span class="edge-arrow">→</span> ' + esc(e.event || e.to) + '</div>';
-              }
-            });
+            for (var fi = 0; fi < fwdOuts.length; fi++) {
+              var ac = (visitedStates[fwdOuts[fi].to] || fwdOuts[fi].to === curState) ? ' active' : '';
+              diagramHTML += '<div class="edge-label' + ac + '"><span class="edge-arrow">→</span> ' + esc(fwdOuts[fi].event || fwdOuts[fi].to) + '</div>';
+            }
             diagramHTML += '</div>';
-          } else if (outs.length === 1 && s.states.indexOf(outs[0].to) === idx + 1) {
-            var aCls = visitedStates[outs[0].to] || outs[0].to === curState ? ' active' : '';
-            diagramHTML += '<div class="edge-arrow' + aCls + '">→</div>';
           } else {
-            diagramHTML += '<div class="edge-arrow">→</div>';
+            var ac = (visitedStates[s.states[si + 1]] || s.states[si + 1] === curState) ? ' active' : '';
+            diagramHTML += '<div class="edge-arrow' + ac + '">→</div>';
           }
         }
-      });
-      // Show cycle/back-edges below the main row
-      var cycleHTML = '';
-      for (var bk in backEdges) {
-        backEdges[bk].forEach(function(e) {
-          var aCls = visitedStates[e.to] ? ' active' : '';
-          cycleHTML += '<div class="cycle-edge' + aCls + '">↩ ' + esc(bk) + ' → ' + esc(e.to) + '<span class="cycle-label">' + esc(e.event || '') + '</span></div>';
-        });
       }
-      if (cycleHTML) diagramHTML += '<div class="cycle-row">' + cycleHTML + '</div>';
-      diagramHTML += '</div></div>';
-
-      // (SVG edges removed — using CSS-based edge rendering above)
+      diagramHTML += '</div>';
+      // Cycle edges below
+      if (cycles.length > 0) {
+        diagramHTML += '<div class="cycle-row">';
+        for (var ci = 0; ci < cycles.length; ci++) {
+          var c = cycles[ci];
+          var ac = visitedStates[c.to] ? ' active' : '';
+          diagramHTML += '<div class="cycle-edge' + ac + '">↩ ' + esc(c.from) + ' → ' + esc(c.to) + ' <span class="cycle-label">' + esc(c.event || '') + '</span></div>';
+        }
+        diagramHTML += '</div>';
+      }
+      diagramHTML += '</div>';
 
       // Controls
       var atStart = currentStep < 0;
