@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser to navigate to mercadolibre.com.ar, search for \"teclado mecanico\", and show the first 3 results. Format as:\n```table\n{\"headers\":[\"Product\",\"Price (ARS)\",\"Seller\"],\"rows\":[...]}\n```\nOutput ONLY the table block. Use REAL data from the site.",
+  "text": "| # | Producto | Precio |\n|---|----------|--------|\n| 1 | Teclado Mecánico Inalámbrico Trimodo Tecware Spectre 75 Español Display LCD Gif Personalizable ! | $139.999 |\n| 2 | Teclado Gamer Redragon K619 Horus Cableado Usb Switch Rojo Color del teclado Negro Idioma Español Latinoamérica | $119.722 |\n| 3 | Teclado Mecánico Gamer Tkl T-dagger Arena Lite T-tgk321-l Rainbow | $41.999 |",
+  "date": "2026-03-27T20:44:43.525Z"
+}
