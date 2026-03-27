@@ -82,24 +82,27 @@ echo "[setup] OpenCode session: ${OC_SESSION_ID:0:16}..."
 RECENT_COMMITS=$(cd "$PROJECT_ROOT" && git log --oneline -10 2>/dev/null)
 PROJECT_CONTEXT=$(head -80 "$PROJECT_ROOT/CLAUDE.md" 2>/dev/null)
 
-SYSTEM_MSG="You are a friendly Telegram chatbot for the project '$PROJECT_NAME'.
-You are NOT a coding assistant. Do NOT read files, run commands, or use any tools.
-Just chat naturally with the user. You are like a knowledgeable friend who knows about this project.
+SYSTEM_MSG="You are Bridge Agent for the project '$PROJECT_NAME'.
+You talk to users via Telegram. You are the project's AI assistant.
 
-ABSOLUTE RULES — VIOLATING ANY OF THESE IS A FAILURE:
-1. NEVER mention code, scripts, files, paths, CLI commands, or implementation details.
-2. NEVER say 'I found', 'I can see', 'the code shows', 'let me check' or similar.
-3. NEVER use tools. Do NOT read files. Do NOT execute anything. Just respond with text.
-4. Keep responses under 300 characters. One short paragraph max.
-5. Be warm, human, and conversational. Like texting a friend.
-6. If asked to show options, just list them as a simple numbered list in your text.
+RULES:
+- Keep responses SHORT (under 400 chars). Be concise and natural.
+- NEVER mention scripts, CLI commands, internal tools, file paths, or code.
+- NEVER say things like 'run ./scripts/...' or 'use bridge.sh' — users don't see those.
+- You are a polished Telegram bot, not a developer tool. Speak like a friendly assistant.
+- Do not repeat yourself — you have full conversation history.
+- When presenting choices/options, use the options block format:
+  \`\`\`options
+  {\"items\":[{\"title\":\"Option 1\",\"desc\":\"Description 1\"},{\"title\":\"Option 2\",\"desc\":\"Description 2\"}]}
+  \`\`\`
+  This renders interactive cards in the miniapp. Use this format for any alternatives/recommendations.
 
-What you know about the project (from memory, not from reading files):
-- It connects desktop AI agents to phones via Telegram
-- Recently shipped: multi-user sessions, approval buttons, Mini App, SSE streaming
-- Stack: Electron + Vercel + Firebase + Telegram Bot
+Project: $PROJECT_NAME
 
-Say hi and ask what the user wants to work on. ONE short sentence."
+Recent work:
+$RECENT_COMMITS
+
+Say hello briefly, mention 1-2 recent things shipped, and ask what to work on next."
 
 echo "Bridge Agent starting..."
 echo "Project: $PROJECT_NAME"
@@ -189,10 +192,70 @@ except:
   done
 }
 
+# ─── Post-process response: strip meta-commentary, convert lists to options ───
+
+clean_response() {
+  local raw="$1"
+  python3 -c "
+import sys, json, re
+
+text = sys.argv[1]
+
+# Strip meta-commentary lines (OpenCode talking about itself)
+meta_patterns = [
+    r'(?i)^.*(?:sent (?:your|the) greeting|pick up (?:their|your) reply|next poll|updated the agent|I confirmed|let me check|found it|the code shows|I can see|I\'ll ask it).*$',
+    r'(?i)^.*(?:Done!.*(?:sent|greeting|updated|confirmed)).*$',
+]
+lines = text.split('\n')
+cleaned = []
+for line in lines:
+    skip = False
+    for pat in meta_patterns:
+        if re.match(pat, line.strip()):
+            skip = True
+            break
+    if not skip:
+        cleaned.append(line)
+text = '\n'.join(cleaned).strip()
+
+# If empty after cleaning, return a generic response
+if not text:
+    print('How can I help you?')
+    sys.exit(0)
+
+# Detect numbered list pattern and convert to options block
+# Matches: 1. Title - desc  OR  1. Title  OR  emoji Title - desc
+list_pattern = r'^(?:\d+[\.\)]\s*|[^\w\s]\s+)(.+?)(?:\s*[-–—]\s*(.+))?$'
+list_lines = []
+non_list = []
+for line in text.split('\n'):
+    m = re.match(list_pattern, line.strip())
+    if m and m.group(1):
+        title = m.group(1).strip().rstrip('.')
+        desc = (m.group(2) or '').strip()
+        list_lines.append({'title': title, 'desc': desc})
+    else:
+        non_list.append(line)
+
+# If we found 3+ list items, convert to options block
+if len(list_lines) >= 3:
+    preamble = '\n'.join(l for l in non_list if l.strip()).strip()
+    options_json = json.dumps({'items': list_lines})
+    result = ''
+    if preamble:
+        result = preamble + '\n\n'
+    result += chr(96)*3 + 'options\n' + options_json + '\n' + chr(96)*3
+    print(result)
+else:
+    print(text)
+" "$raw" 2>/dev/null
+}
+
 # ─── Startup: send system context and get greeting ───
 
 echo "Sending startup context to OpenCode..."
-GREETING=$(ask_opencode "$SYSTEM_MSG")
+RAW_GREETING=$(ask_opencode "$SYSTEM_MSG")
+GREETING=$(clean_response "$RAW_GREETING")
 if [ -n "$GREETING" ]; then
   echo "[agent] $GREETING"
   send_bridge "notify" "$GREETING"
@@ -239,7 +302,8 @@ for raw_line in sys.stdin:
   echo "[$FROM] $CONTENT"
 
   # Send to OpenCode — it already has full conversation history
-  RESPONSE=$(ask_opencode "$FROM says: $CONTENT")
+  RAW_RESPONSE=$(ask_opencode "$FROM says: $CONTENT")
+  RESPONSE=$(clean_response "$RAW_RESPONSE")
   if [ -n "$RESPONSE" ]; then
     echo "[agent] $RESPONSE"
     send_bridge "notify" "$RESPONSE"

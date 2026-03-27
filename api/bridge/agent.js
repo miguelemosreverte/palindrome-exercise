@@ -179,6 +179,15 @@ module.exports = async function handler(req, res) {
     // Strip any leaked internal paths/scripts from messages
     telegramText = telegramText.replace(/\.\/scripts\/[^\s]+/g, '').replace(/bridge\.sh\s+\w+/g, '').trim();
 
+    // Add Mini App button to all messages if session exists and no other markup
+    if (!telegramMarkup && sessionId) {
+      telegramMarkup = {
+        inline_keyboard: [[
+          { text: '📱 Open Mini App', web_app: { url: MINIAPP_BASE + '?session=' + sessionId } },
+        ]],
+      };
+    }
+
     // Send to all session members (owner + guests)
     for (var b = 0; b < allChatIds.length; b++) {
       await sendTelegram(allChatIds[b], telegramText, 'Markdown', telegramMarkup);
