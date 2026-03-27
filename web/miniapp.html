@@ -121,6 +121,40 @@
     },
   };
 
+  // Chart.js renderer — lazy-loads Chart.js from CDN
+  var chartCounter = 0;
+  RENDERERS.chartjs = function(data) {
+    var id = 'bridge-chart-' + (++chartCounter);
+    // Load Chart.js if not already loaded
+    if (!window.Chart && !document.getElementById('chartjs-cdn')) {
+      var s = document.createElement('script');
+      s.id = 'chartjs-cdn';
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+      s.onload = function() { renderPendingCharts(); };
+      document.head.appendChild(s);
+    }
+    // Queue chart for rendering after DOM insert
+    setTimeout(function() { renderPendingCharts(); }, 100);
+    return '<div style="margin:8px 0;border-radius:14px;background:white;padding:12px;border:1px solid var(--line,rgba(0,0,0,0.08));">' +
+      '<canvas id="' + id + '" data-chart=\'' + JSON.stringify(data).replace(/'/g, '&#39;') + '\' style="max-height:300px;width:100%;"></canvas></div>';
+  };
+
+  function renderPendingCharts() {
+    if (!window.Chart) return;
+    var canvases = document.querySelectorAll('canvas[data-chart]');
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      if (c._chartRendered) continue;
+      c._chartRendered = true;
+      try {
+        var config = JSON.parse(c.getAttribute('data-chart'));
+        new Chart(c, config);
+      } catch (e) {
+        c.parentElement.innerHTML = '<div style="color:#ef4444;font-size:12px;padding:6px;">Chart error: ' + esc(e.message) + '</div>';
+      }
+    }
+  }
+
   function normalizeItems(data) {
     if (Array.isArray(data)) return data;
     return data.items || data.eventos || data.opciones || data.pasos || [];
