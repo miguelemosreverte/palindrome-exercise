@@ -235,20 +235,19 @@
     });
 
     async function init() {
-      // Wait briefly for main process to inject __BRIDGE_SESSION__
-      await new Promise(r => setTimeout(r, 100));
+      // Get session from main process (reads ~/.bridge/session)
+      const persisted = window.bridge ? await window.bridge.getSession() : '';
 
-      // Reuse session: injected by main > localStorage > create new
-      if (window.__BRIDGE_SESSION__) {
-        sessionId = window.__BRIDGE_SESSION__;
-      } else if (localStorage.getItem('bridge-desktop-session')) {
-        sessionId = localStorage.getItem('bridge-desktop-session');
+      if (persisted) {
+        sessionId = persisted;
       } else {
+        // No session file exists — create one
         const res = await fetch(API_BASE + '/api/bridge/sessions', { method: 'POST' });
         const data = await res.json();
         sessionId = data.sessionId;
+        // Save to ~/.bridge/session so agent and CLI share it
+        if (window.bridge) await window.bridge.saveSession(sessionId);
       }
-      localStorage.setItem('bridge-desktop-session', sessionId);
 
       document.getElementById('session-label').textContent = 'Session: ' + sessionId.slice(0, 8) + '...';
 

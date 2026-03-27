@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('bridge', {
   version: require('./package.json').version,
   agentStatus: () => ipcRenderer.invoke('agent-status'),
   getSession: () => ipcRenderer.invoke('get-session'),
+  saveSession: (id) => ipcRenderer.invoke('save-session', id),
 });
