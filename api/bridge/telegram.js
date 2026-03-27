@@ -181,12 +181,11 @@ module.exports = async function handler(req, res) {
       }
       var inviteLink = 'https://t.me/AgenteGauchoBot?start=invite_' + session;
       await sendTelegram(chatId,
-        '📨 *Invite link*\n\n' +
+        '📨 Invite link\n\n' +
         'Share this with a friend:\n' +
         inviteLink + '\n\n' +
-        'They\'ll be able to see agent messages and chat in this session.\n' +
-        'Use /kick to remove them later.',
-        'Markdown'
+        'They will be able to see agent messages and chat in this session.\n' +
+        'Use /kick to remove them later.'
       );
       return res.json({ ok: true });
     }
