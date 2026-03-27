@@ -1351,8 +1351,6 @@
       .catch(function() {});
 
     renderSidebar();
-    // Auto-load first scenario
-    if (scenarios.length > 0) loadScenario(scenarios[0].id);
 
     function renderSidebar() {
       var sb = document.getElementById('sidebar');
@@ -1464,6 +1462,9 @@
     function stopAutoplay() {
       if (autoplayTimer) { clearInterval(autoplayTimer); autoplayTimer = null; }
     }
+
+    // Auto-load first scenario after everything is defined
+    if (scenarios.length > 0) loadScenario(scenarios[0].id);
   </script>
 </body>
 </html>
