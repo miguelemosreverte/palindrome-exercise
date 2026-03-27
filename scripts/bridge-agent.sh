@@ -147,7 +147,7 @@ $user_message"
   local send_resp
   send_resp=$(curl -sf -X POST "$OPENCODE_URL/session/$OC_SESSION_ID/message" \
     -H "Content-Type: application/json" \
-    -d "$(python3 -c "import json,sys;print(json.dumps({'content':sys.argv[1],'providerID':'anthropic','modelID':'claude-sonnet-4-20250514'}))" "$full_prompt")" 2>/dev/null)
+    -d "$(python3 -c 'import json,sys;print(json.dumps({"parts":[{"type":"text","text":sys.argv[1]}]}))' "$full_prompt")" 2>/dev/null)
 
   if [ -z "$send_resp" ]; then
     echo ""
@@ -165,20 +165,16 @@ $user_message"
     answer=$(echo "$messages" | python3 -c "
 import sys, json
 try:
-    msgs = json.load(sys.stdin)
-    if isinstance(msgs, dict):
-        msgs = msgs.get('messages', [])
-    # Find last assistant message
+    data = json.load(sys.stdin)
+    msgs = data if isinstance(data, list) else data.get('messages', data.get('data', []))
     for m in reversed(msgs):
-        role = m.get('role','')
-        if role == 'assistant':
-            parts = m.get('content', '')
-            if isinstance(parts, list):
-                texts = [p.get('text','') for p in parts if p.get('type')=='text']
+        role = m.get('role', m.get('info',{}).get('role',''))
+        parts = m.get('parts', [])
+        if role == 'assistant' or (not role and parts):
+            texts = [p.get('text','') for p in parts if p.get('type')=='text']
+            if texts:
                 print(''.join(texts))
-            else:
-                print(parts)
-            break
+                break
 except:
     pass
 " 2>/dev/null)
@@ -193,7 +189,7 @@ except:
 
 ask_claude() {
   local user_message="$1"
-  claude --dangerously-skip-permissions --output-format text --model sonnet -p \
+  claude -p --output-format text --model haiku --tools "" \
     "$SYSTEM_PROMPT
 
 Recent commits:
@@ -228,7 +224,7 @@ Introduce yourself in under 500 chars. Mention what was recently shipped and sug
   if [ "$AGENT_MODE" = "opencode" ]; then
     greeting=$(ask_opencode "$startup_prompt")
   else
-    greeting=$(claude --dangerously-skip-permissions --output-format text --model sonnet -p "$startup_prompt" 2>/dev/null)
+    greeting=$(claude -p --output-format text --model haiku --tools "" "$startup_prompt" 2>/dev/null)
   fi
 
   if [ -n "$greeting" ]; then
