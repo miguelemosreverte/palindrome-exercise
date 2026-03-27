@@ -617,10 +617,11 @@
       listenMessages();
       listenStatus();
 
-      // On first connect, send a greeting so the agent starts talking
-      var greeted = localStorage.getItem('bridge-greeted-' + sessionId);
+      // On first ever connect to this session, send a greeting
+      var greeted = localStorage.getItem('bridge-greeted-' + sessionId) || getCookie('bridge-greeted-' + sessionId);
       if (!greeted) {
         localStorage.setItem('bridge-greeted-' + sessionId, '1');
+        setCookie('bridge-greeted-' + sessionId, '1');
         var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
           ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
           : 'User';
@@ -632,42 +633,56 @@
       }
     }
 
-    // SSE for messages — single source of truth, no separate fetch
+    // Fetch all history first, then SSE for new messages only
     function listenMessages() {
       var url = FIREBASE_URL + '/mercadopago-bridge/bridge-messages/' + sessionId + '.json';
-      var es = new EventSource(url);
-      es.addEventListener('put', function(e) {
-        try {
-          var payload = JSON.parse(e.data);
-          if (!payload.data) return;
-          if (payload.path === '/') {
-            // Initial dump — render all messages sorted by key
-            var keys = Object.keys(payload.data).sort();
-            for (var i = 0; i < keys.length; i++) {
-              addMessage(keys[i], payload.data[keys[i]]);
-            }
-          } else {
-            // New message
-            var key = payload.path.replace('/', '');
-            addMessage(key, payload.data);
+
+      // 1. Load full history via fetch (reliable for large payloads)
+      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (data && typeof data === 'object') {
+          var keys = Object.keys(data).sort();
+          for (var i = 0; i < keys.length; i++) {
+            addMessage(keys[i], data[keys[i]]);
           }
           scrollBottom();
-        } catch (err) { console.error('SSE parse error', err); }
-      });
-      es.addEventListener('patch', function(e) {
-        try {
-          var payload = JSON.parse(e.data);
-          if (payload.data && payload.path) {
+        }
+
+        // 2. Then SSE for live updates only (skip initial dump)
+        var es = new EventSource(url);
+        var initialDumpReceived = false;
+        es.addEventListener('put', function(e) {
+          try {
+            var payload = JSON.parse(e.data);
+            if (!payload.data) return;
+            if (payload.path === '/') {
+              // Skip initial dump — we already loaded via fetch
+              initialDumpReceived = true;
+              return;
+            }
+            if (!initialDumpReceived) return; // safety: skip until dump seen
             var key = payload.path.replace('/', '');
             addMessage(key, payload.data);
             scrollBottom();
-          }
-        } catch (err) {}
-      });
-      es.onerror = function() {
-        es.close();
+          } catch (err) {}
+        });
+        es.addEventListener('patch', function(e) {
+          try {
+            var payload = JSON.parse(e.data);
+            if (payload.data && payload.path) {
+              var key = payload.path.replace('/', '');
+              addMessage(key, payload.data);
+              scrollBottom();
+            }
+          } catch (err) {}
+        });
+        es.onerror = function() {
+          es.close();
+          setTimeout(function() { listenMessages(); }, 3000);
+        };
+      }).catch(function(err) {
+        console.error('Fetch messages failed:', err);
         setTimeout(function() { listenMessages(); }, 3000);
-      };
+      });
     }
 
     // SSE for agent status
