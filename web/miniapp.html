@@ -431,11 +431,17 @@
     }
     .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-    /* Install banner */
-    .install-banner {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 16px; background: var(--ocean); color: white;
-      font-size: 13px; font-weight: 500;
+    /* Install overlay */
+    .install-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 24px;
+    }
+    .install-card {
+      background: var(--bg); border-radius: 24px; padding: 32px 24px;
+      max-width: 320px; width: 100%; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
 
     /* Pairing screen */
@@ -461,10 +467,15 @@
   </style>
 </head>
 <body>
-  <!-- iOS install banner -->
-  <div class="install-banner" id="installBanner" style="display:none;">
-    <span>Tap <strong style="font-size:18px;">⬆︎</strong> then <strong>Add to Home Screen</strong> to install</span>
-    <button onclick="this.parentElement.style.display='none';localStorage.setItem('bridge-install-dismissed','1')" style="background:none;border:none;color:var(--ocean);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px;">OK</button>
+  <!-- Install overlay — shown on first visit in mobile browser -->
+  <div class="install-overlay" id="installOverlay" style="display:none;">
+    <div class="install-card">
+      <svg width="64" height="64" viewBox="0 0 512 512"><rect width="512" height="512" rx="108" fill="#316dff"/><g transform="translate(256,256)"><path d="M-140,40 Q-140,-80 0,-80 Q140,-80 140,40" stroke="white" stroke-width="32" fill="none" stroke-linecap="round"/><rect x="-156" y="20" width="32" height="80" rx="8" fill="white"/><rect x="124" y="20" width="32" height="80" rx="8" fill="white"/><rect x="-170" y="80" width="340" height="24" rx="12" fill="white" opacity="0.9"/></g></svg>
+      <h2 style="font-size:22px;font-weight:800;margin:16px 0 8px;">Install Bridge</h2>
+      <p id="installInstructions" style="font-size:15px;color:var(--slate);line-height:1.6;margin-bottom:20px;"></p>
+      <button id="installAction" style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--btn-color);color:var(--btn-text);font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;">Got it</button>
+      <button onclick="dismissInstall()" style="width:100%;padding:12px;border:none;background:none;color:var(--slate);font-size:14px;font-family:inherit;cursor:pointer;margin-top:4px;">Skip for now</button>
+    </div>
   </div>
 
   <!-- Status bar -->
@@ -513,12 +524,54 @@
 
     var API_BASE = 'https://palindrome-exercise.vercel.app';
     var FIREBASE_URL = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
-    // Show iOS install banner if in Safari (not standalone, not Telegram, not dismissed)
+    // Install prompt — shows on first mobile browser visit (not standalone/PWA/Telegram)
     var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var isAndroid = /Android/.test(navigator.userAgent);
+    var isMobile = isIOS || isAndroid;
     var isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
     var isTelegram = !!(tg && tg.initData);
-    if (isIOS && !isStandalone && !isTelegram && !localStorage.getItem('bridge-install-dismissed')) {
-      document.getElementById('installBanner').style.display = 'flex';
+    var installDismissed = localStorage.getItem('bridge-install-dismissed') || getCookie('bridge-install-dismissed');
+    var deferredInstallPrompt = null;
+
+    // Capture Android install prompt
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
+
+    function showInstallOverlay() {
+      var overlay = document.getElementById('installOverlay');
+      var instructions = document.getElementById('installInstructions');
+      var action = document.getElementById('installAction');
+
+      if (isIOS) {
+        instructions.innerHTML = 'Tap the <strong>Share</strong> button <span style="font-size:20px;">⬆︎</span> at the bottom of Safari, then tap <strong>Add to Home Screen</strong>.';
+        action.textContent = 'Got it';
+        action.onclick = dismissInstall;
+      } else if (deferredInstallPrompt) {
+        instructions.textContent = 'Add Bridge to your home screen for the best experience.';
+        action.textContent = 'Install App';
+        action.onclick = function() {
+          deferredInstallPrompt.prompt();
+          deferredInstallPrompt.userChoice.then(function() { dismissInstall(); });
+        };
+      } else {
+        instructions.textContent = 'Open your browser menu and tap "Add to Home Screen" or "Install App".';
+        action.textContent = 'Got it';
+        action.onclick = dismissInstall;
+      }
+      overlay.style.display = 'flex';
+    }
+
+    function dismissInstall() {
+      document.getElementById('installOverlay').style.display = 'none';
+      localStorage.setItem('bridge-install-dismissed', '1');
+      setCookie('bridge-install-dismissed', '1');
+    }
+
+    if (isMobile && !isStandalone && !isTelegram && !installDismissed) {
+      // Show after a brief delay so the page loads first
+      setTimeout(showInstallOverlay, 800);
     }
 
     // Session: URL param ALWAYS wins > cookie > localStorage > empty (show pairing)
