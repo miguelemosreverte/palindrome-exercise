@@ -1352,6 +1352,192 @@
           { event: 'charts-ready', state: 'report', sender: 'agent', message: "Talent pipeline report ready:\n\n```chartjs\n{\"type\":\"pie\",\"data\":{\"labels\":[\"Argentina\",\"Brazil\",\"Colombia\"],\"datasets\":[{\"data\":[2,2,1],\"backgroundColor\":[\"#6366f1\",\"#22d3ee\",\"#f59e0b\"],\"borderWidth\":2,\"borderColor\":\"#1a1a2e\"}]},\"options\":{\"plugins\":{\"title\":{\"display\":true,\"text\":\"Candidates by Country\",\"color\":\"#e2e8f0\"},\"legend\":{\"labels\":{\"color\":\"#e2e8f0\"}}}}}\n```\n\n```chartjs\n{\"type\":\"bar\",\"data\":{\"labels\":[\"Mid (3yr)\",\"Mid (4yr)\",\"Senior (6yr)\",\"Senior (7yr)\",\"Lead (9yr)\"],\"datasets\":[{\"label\":\"Estimated Salary (USD)\",\"data\":[42000,48000,72000,65000,95000],\"backgroundColor\":[\"#818cf8\",\"#6366f1\",\"#4f46e5\",\"#4338ca\",\"#3730a3\"],\"borderRadius\":6}]},\"options\":{\"plugins\":{\"title\":{\"display\":true,\"text\":\"Salary by Seniority Level\",\"color\":\"#e2e8f0\"}},\"scales\":{\"y\":{\"ticks\":{\"color\":\"#94a3b8\",\"callback\":\"$\"},\"grid\":{\"color\":\"#1e293b\"}},\"x\":{\"ticks\":{\"color\":\"#94a3b8\"},\"grid\":{\"display\":false}}}}}\n```\n\n```timeline\n{\"items\":[{\"date\":\"Q1 2025\",\"title\":\"120 Scala postings in LATAM\",\"desc\":\"Baseline — growing demand for functional programming\"},{\"date\":\"Q2 2025\",\"title\":\"145 postings (+21%)\",\"desc\":\"Fintech boom driving Scala adoption in Argentina and Brazil\"},{\"date\":\"Q3 2025\",\"title\":\"180 postings (+24%)\",\"desc\":\"Remote-first companies expanding LATAM hiring\"},{\"date\":\"Q4 2025\",\"title\":\"210 postings (+17%)\",\"desc\":\"Enterprise migration from Java to Scala accelerates\"},{\"date\":\"Q1 2026\",\"title\":\"250 postings (+19%)\",\"desc\":\"ZIO and Scala 3 adoption creating new demand\"},{\"date\":\"Q2 2026\",\"title\":\"290 postings (projected)\",\"desc\":\"Strong upward trend — competitive market\"}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Export CSV\",\"icon\":\"📄\",\"desc\":\"Download scala_latam_candidates.csv with all 5 candidates\"},{\"title\":\"Share Report\",\"icon\":\"📤\",\"desc\":\"Send talent pipeline summary to the hiring team\"},{\"title\":\"Refine Search\",\"icon\":\"🔍\",\"desc\":\"Narrow by seniority, country, or salary range\"}]}\n```" },
         ],
       },
+
+      // ════════════════════════════════════════════════
+      // BRANCHING & CYCLES — real FSM modeling
+      // ════════════════════════════════════════════════
+
+      // BRANCHING: user choice determines which path
+      {
+        id: 'branching-code-review',
+        name: 'Code Review (Branching)',
+        icon: '🔀',
+        tag: 'composition',
+        desc: 'Review → approve OR request changes OR reject — each path has different outcomes',
+        states: ['idle', 'reviewing', 'approved', 'changes-requested', 'revision', 'rejected', 'merged'],
+        transitions: [
+          { from: 'idle', to: 'reviewing', event: 'pr-opened' },
+          { from: 'reviewing', to: 'approved', event: 'approve' },
+          { from: 'reviewing', to: 'changes-requested', event: 'request-changes' },
+          { from: 'reviewing', to: 'rejected', event: 'reject' },
+          { from: 'changes-requested', to: 'revision', event: 'author-pushes' },
+          { from: 'revision', to: 'reviewing', event: 're-review' },
+          { from: 'approved', to: 'merged', event: 'merge' },
+        ],
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'pr-opened': { target: 'reviewing' } } },
+            reviewing: { on: {
+              'approve': { target: 'approved', guard: 'testsPass' },
+              'request-changes': { target: 'changes-requested' },
+              'reject': { target: 'rejected' }
+            }},
+            approved: { on: { 'merge': { target: 'merged' } } },
+            'changes-requested': { on: { 'author-pushes': { target: 'revision' } } },
+            revision: { on: { 're-review': { target: 'reviewing' } } },
+            rejected: { final: true },
+            merged: { final: true }
+          }
+        },
+        steps: [
+          // Path 1: approve → merge (happy path)
+          { event: 'pr-opened', state: 'reviewing', sender: 'agent', message: "New PR opened: *feat: add user authentication*\n\n```diff\n{\"files\":[{\"file\":\"src/auth/login.js\",\"additions\":45,\"deletions\":3,\"preview\":\"+  const token = jwt.sign(payload, secret)\\n+  res.cookie('session', token, { httpOnly: true })\\n-  // TODO: implement auth\"}]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Files Changed\",\"value\":\"4\"},{\"label\":\"Additions\",\"value\":\"+127\"},{\"label\":\"Deletions\",\"value\":\"-12\"},{\"label\":\"Tests\",\"value\":\"Passing ✓\"}]}\n```\n\nChoose an action:\n\n```options\n{\"items\":[{\"title\":\"Approve\",\"desc\":\"Tests pass, code looks good\"},{\"title\":\"Request Changes\",\"desc\":\"Needs modifications before merge\"},{\"title\":\"Reject\",\"desc\":\"Not the right approach\"}]}\n```" },
+          // BRANCH A: user approves
+          { event: 'approve', state: 'approved', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"PR Approved\",\"message\":\"All checks pass. Ready to merge.\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Merge to main\",\"desc\":\"Squash and merge into main branch\"},{\"title\":\"Merge to staging\",\"desc\":\"Deploy to staging first\"}]}\n```" },
+          { event: 'merge', state: 'merged', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Merged!\",\"message\":\"PR #47 merged to main. Deploy triggered.\"}\n```\n\n```checklist\n{\"title\":\"Post-merge checklist\",\"items\":[{\"text\":\"Code merged to main\",\"done\":true},{\"text\":\"CI/CD pipeline triggered\",\"done\":true},{\"text\":\"Staging deploy complete\",\"done\":true},{\"text\":\"Production deploy\",\"done\":false}]}\n```" },
+        ],
+      },
+      // Same scenario, BRANCH B: request changes → revision → re-review cycle
+      {
+        id: 'branching-code-review-b',
+        name: 'Code Review (Change Cycle)',
+        icon: '🔄',
+        tag: 'composition',
+        desc: 'Review → request changes → revision → re-review — a cycle back to reviewing',
+        states: ['idle', 'reviewing', 'changes-requested', 'revision', 'reviewing-again', 'approved', 'merged'],
+        transitions: [
+          { from: 'idle', to: 'reviewing', event: 'pr-opened' },
+          { from: 'reviewing', to: 'changes-requested', event: 'request-changes' },
+          { from: 'changes-requested', to: 'revision', event: 'author-pushes' },
+          { from: 'revision', to: 'reviewing-again', event: 're-review' },
+          { from: 'reviewing-again', to: 'approved', event: 'approve' },
+          { from: 'approved', to: 'merged', event: 'merge' },
+        ],
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'pr-opened': { target: 'reviewing' } } },
+            reviewing: { on: { 'request-changes': { target: 'changes-requested' } } },
+            'changes-requested': { on: { 'author-pushes': { target: 'revision' } } },
+            revision: { on: { 're-review': { target: 'reviewing' } } },
+            'reviewing-again': { on: { 'approve': { target: 'approved' } } },
+            approved: { on: { 'merge': { target: 'merged' } } },
+            merged: { final: true }
+          }
+        },
+        steps: [
+          { event: 'pr-opened', state: 'reviewing', sender: 'agent', message: "PR #48: *refactor: migrate database to PostgreSQL*\n\n```cards\n{\"items\":[{\"label\":\"Files\",\"value\":\"12\"},{\"label\":\"Additions\",\"value\":\"+340\"},{\"label\":\"Deletions\",\"value\":\"-215\"},{\"label\":\"Tests\",\"value\":\"3 failing ✗\"}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Approve\",\"desc\":\"Accept as-is\"},{\"title\":\"Request Changes\",\"desc\":\"Tests failing — needs fixes\"},{\"title\":\"Reject\",\"desc\":\"Wrong approach\"}]}\n```" },
+          { event: 'request-changes', state: 'changes-requested', sender: 'agent', message: "```alert\n{\"type\":\"warning\",\"title\":\"Changes Requested\",\"message\":\"3 tests failing. Connection pooling needs fix.\"}\n```\n\n```quote\n{\"text\":\"The migration looks good overall, but the connection pool config is missing a max_connections setting, which will cause issues under load. Also, the 3 failing tests need the new schema.\",\"author\":\"Reviewer\",\"style\":\"warning\"}\n```\n\nWaiting for author to push fixes..." },
+          { event: 'author-pushes', state: 'revision', sender: 'agent', message: "Author pushed 2 new commits:\n\n```timeline\n{\"items\":[{\"date\":\"just now\",\"title\":\"fix: add connection pool config\",\"desc\":\"Set max_connections=20, idle_timeout=30s\"},{\"date\":\"just now\",\"title\":\"fix: update test schemas\",\"desc\":\"Migrated 3 test fixtures to new PostgreSQL schema\"}]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Tests\",\"value\":\"All passing ✓\"},{\"label\":\"New Commits\",\"value\":\"2\"},{\"label\":\"Changes\",\"value\":\"+28 -5\"}]}\n```\n\nReady for re-review." },
+          { event: 're-review', state: 'reviewing-again', sender: 'agent', message: "Re-reviewing PR #48 after fixes:\n\n```checklist\n{\"title\":\"Review checklist\",\"items\":[{\"text\":\"Connection pool configured\",\"done\":true},{\"text\":\"Tests passing\",\"done\":true},{\"text\":\"Migration script idempotent\",\"done\":true},{\"text\":\"Rollback tested\",\"done\":true}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Approve\",\"desc\":\"All issues resolved\"},{\"title\":\"Request More Changes\",\"desc\":\"Still needs work\"}]}\n```" },
+          { event: 'approve', state: 'approved', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Approved on second review\",\"message\":\"All checks pass after revision cycle.\"}\n```" },
+          { event: 'merge', state: 'merged', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Merged!\",\"message\":\"PR #48 merged after 1 revision cycle.\"}\n```\n\n```status\n{\"items\":[{\"label\":\"First review\",\"state\":\"done\"},{\"label\":\"Changes requested\",\"state\":\"done\"},{\"label\":\"Author revised\",\"state\":\"done\"},{\"label\":\"Re-review approved\",\"state\":\"done\"},{\"label\":\"Merged to main\",\"state\":\"done\"}]}\n```" },
+        ],
+      },
+
+      // CYCLE: retry loop with error recovery
+      {
+        id: 'cycle-deploy-retry',
+        name: 'Deploy with Retry Loop',
+        icon: '♻️',
+        tag: 'composition',
+        desc: 'Deploy → fail → diagnose → fix → retry — cycles until success or max retries',
+        states: ['idle', 'deploying', 'failed', 'diagnosing', 'fixing', 'retrying', 'deployed'],
+        transitions: [
+          { from: 'idle', to: 'deploying', event: 'deploy' },
+          { from: 'deploying', to: 'failed', event: 'deploy-failed' },
+          { from: 'deploying', to: 'deployed', event: 'deploy-success' },
+          { from: 'failed', to: 'diagnosing', event: 'diagnose' },
+          { from: 'diagnosing', to: 'fixing', event: 'fix-found' },
+          { from: 'fixing', to: 'retrying', event: 'fix-applied' },
+          { from: 'retrying', to: 'deploying', event: 'retry-deploy' },
+        ],
+        fsm: {
+          initial: 'idle',
+          context: { attempt: 0, maxRetries: 3 },
+          states: {
+            idle: { on: { 'deploy': { target: 'deploying', assign: function(ctx) { return Object.assign({}, ctx, { attempt: 1 }); } } } },
+            deploying: { on: {
+              'deploy-failed': { target: 'failed' },
+              'deploy-success': { target: 'deployed' }
+            }},
+            failed: { on: {
+              'diagnose': { target: 'diagnosing', guard: function(ctx) { return ctx.attempt < ctx.maxRetries; } }
+            }},
+            diagnosing: { on: { 'fix-found': { target: 'fixing' } } },
+            fixing: { on: { 'fix-applied': { target: 'retrying' } } },
+            retrying: { on: { 'retry-deploy': { target: 'deploying', assign: function(ctx) { return Object.assign({}, ctx, { attempt: ctx.attempt + 1 }); } } } },
+            deployed: { final: true }
+          }
+        },
+        steps: [
+          // Attempt 1: fails
+          { event: 'deploy', state: 'deploying', sender: 'user', message: 'Deploy v2.3.1 to production' },
+          { event: null, state: 'deploying', sender: 'agent', message: "```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"Compiling assets...\"},{\"title\":\"Test\",\"desc\":\"Running test suite...\"},{\"title\":\"Stage\",\"desc\":\"Deploying to staging...\"},{\"title\":\"Production\",\"desc\":\"Waiting...\"}]}\n```\n\n```progress\n{\"label\":\"Deploy attempt 1 of 3\",\"value\":40}\n```" },
+          { event: 'deploy-failed', state: 'failed', sender: 'agent', message: "```alert\n{\"type\":\"error\",\"title\":\"Deploy Failed (Attempt 1/3)\",\"message\":\"Health check timeout after 30s. Service did not start.\"}\n```\n\n```code\n{\"language\":\"log\",\"title\":\"Error log\",\"code\":\"[ERROR] 10:23:15 Health check failed: connection refused on port 8080\\n[ERROR] 10:23:45 Timeout waiting for service to become healthy\\n[ERROR] 10:23:46 Rolling back to v2.3.0\"}\n```\n\nAutomatic diagnosis starting..." },
+          // Diagnose
+          { event: 'diagnose', state: 'diagnosing', sender: 'agent', message: "```status\n{\"items\":[{\"label\":\"Checking port conflicts\",\"state\":\"done\"},{\"label\":\"Reviewing config changes\",\"state\":\"working\"},{\"label\":\"Analyzing memory usage\",\"state\":\"pending\"}]}\n```\n\n```quote\n{\"text\":\"Found the issue: the new config sets PORT=3000 but the health check expects port 8080. This was introduced in commit a3f2b1c.\",\"style\":\"warning\"}\n```" },
+          // Fix
+          { event: 'fix-found', state: 'fixing', sender: 'agent', message: "Applying fix:\n\n```diff\n{\"files\":[{\"file\":\"config/production.yml\",\"additions\":1,\"deletions\":1,\"preview\":\"-  port: 3000\\n+  port: 8080\"}]}\n```\n\n```checklist\n{\"title\":\"Fix verification\",\"items\":[{\"text\":\"Port config corrected\",\"done\":true},{\"text\":\"Health check endpoint verified\",\"done\":true},{\"text\":\"Config committed\",\"done\":true}]}\n```" },
+          // Retry
+          { event: 'fix-applied', state: 'retrying', sender: 'agent', message: "```quote\n{\"text\":\"Fix applied. Retrying deploy (attempt 2 of 3)...\",\"style\":\"info\"}\n```" },
+          // Attempt 2: succeeds!
+          { event: 'retry-deploy', state: 'deploying', sender: 'agent', message: "```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"Compiling assets... ✓\"},{\"title\":\"Test\",\"desc\":\"142 tests passing ✓\"},{\"title\":\"Stage\",\"desc\":\"Staging healthy ✓\"},{\"title\":\"Production\",\"desc\":\"Deploying...\"}]}\n```\n\n```progress\n{\"label\":\"Deploy attempt 2 of 3\",\"value\":85}\n```" },
+          { event: 'deploy-success', state: 'deployed', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Deployed! (Attempt 2/3)\",\"message\":\"v2.3.1 is live in production. All health checks passing.\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"Version\",\"value\":\"v2.3.1\"},{\"label\":\"Attempts\",\"value\":\"2\"},{\"label\":\"Downtime\",\"value\":\"0s\"},{\"label\":\"Rollback\",\"value\":\"Auto\"}]}\n```\n\n```timeline\n{\"items\":[{\"date\":\"10:23\",\"title\":\"Deploy attempt 1\",\"desc\":\"Failed — port mismatch\"},{\"date\":\"10:24\",\"title\":\"Auto-diagnosis\",\"desc\":\"Found PORT=3000 vs expected 8080\"},{\"date\":\"10:25\",\"title\":\"Fix applied\",\"desc\":\"Config corrected, committed\"},{\"date\":\"10:26\",\"title\":\"Deploy attempt 2\",\"desc\":\"Success — all checks green\"}]}\n```" },
+        ],
+      },
+
+      // BRANCHING: conditional paths based on data
+      {
+        id: 'branching-data-quality',
+        name: 'Data Quality Gate',
+        icon: '🚦',
+        tag: 'composition',
+        desc: 'Validate data → pass/warn/fail branches → different remediation paths',
+        states: ['idle', 'validating', 'passed', 'warnings', 'fixing-warnings', 'failed', 'quarantined', 'published'],
+        transitions: [
+          { from: 'idle', to: 'validating', event: 'new-data' },
+          { from: 'validating', to: 'passed', event: 'quality-pass' },
+          { from: 'validating', to: 'warnings', event: 'quality-warn' },
+          { from: 'validating', to: 'failed', event: 'quality-fail' },
+          { from: 'warnings', to: 'fixing-warnings', event: 'auto-fix' },
+          { from: 'fixing-warnings', to: 'validating', event: 're-validate' },
+          { from: 'failed', to: 'quarantined', event: 'quarantine' },
+          { from: 'passed', to: 'published', event: 'publish' },
+        ],
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'new-data': { target: 'validating' } } },
+            validating: { on: {
+              'quality-pass': { target: 'passed', guard: function(ctx) { return ctx.score > 95; } },
+              'quality-warn': { target: 'warnings', guard: function(ctx) { return ctx.score >= 70 && ctx.score <= 95; } },
+              'quality-fail': { target: 'failed', guard: function(ctx) { return ctx.score < 70; } }
+            }},
+            passed: { on: { 'publish': { target: 'published' } } },
+            warnings: { on: { 'auto-fix': { target: 'fixing-warnings' } } },
+            'fixing-warnings': { on: { 're-validate': { target: 'validating' } } },
+            failed: { on: { 'quarantine': { target: 'quarantined' } } },
+            quarantined: { final: true },
+            published: { final: true }
+          }
+        },
+        steps: [
+          { event: 'new-data', state: 'validating', sender: 'user', message: 'Validate the new customer dataset (45,000 records)' },
+          { event: null, state: 'validating', sender: 'agent', message: "```progress\n{\"label\":\"Running quality checks\",\"value\":60}\n```\n\n```status\n{\"items\":[{\"label\":\"Schema validation\",\"state\":\"done\"},{\"label\":\"Null check\",\"state\":\"done\"},{\"label\":\"Duplicate detection\",\"state\":\"working\"},{\"label\":\"Range validation\",\"state\":\"pending\"},{\"label\":\"Referential integrity\",\"state\":\"pending\"}]}\n```" },
+          // BRANCH: warnings (score 82/100)
+          { event: 'quality-warn', state: 'warnings', sender: 'agent', message: "```alert\n{\"type\":\"warning\",\"title\":\"Quality Score: 82/100\",\"message\":\"Dataset has fixable issues. 3 warnings detected.\"}\n```\n\n```table\n{\"headers\":[\"Check\",\"Status\",\"Records Affected\",\"Severity\"],\"rows\":[[\"Email format\",\"⚠️ Warning\",\"234 (0.5%)\",\"Low\"],[\"Phone number format\",\"⚠️ Warning\",\"1,203 (2.7%)\",\"Medium\"],[\"Missing ZIP code\",\"⚠️ Warning\",\"89 (0.2%)\",\"Low\"],[\"Schema valid\",\"✅ Pass\",\"0\",\"—\"],[\"No duplicates\",\"✅ Pass\",\"0\",\"—\"]]}\n```\n\n```options\n{\"items\":[{\"title\":\"Auto-fix warnings\",\"desc\":\"Apply automated corrections and re-validate\"},{\"title\":\"Publish with warnings\",\"desc\":\"Accept current quality level\"},{\"title\":\"Reject dataset\",\"desc\":\"Send back for manual review\"}]}\n```" },
+          // Auto-fix → cycle back to validation
+          { event: 'auto-fix', state: 'fixing-warnings', sender: 'agent', message: "```steps\n{\"items\":[{\"title\":\"Fixing email formats\",\"desc\":\"Normalizing 234 email addresses...\"},{\"title\":\"Fixing phone numbers\",\"desc\":\"Standardizing 1,203 phone numbers to E.164\"},{\"title\":\"Filling ZIP codes\",\"desc\":\"Geocoding 89 addresses for missing ZIPs\"}]}\n```\n\n```progress\n{\"label\":\"Auto-fixing 1,526 records\",\"value\":75}\n```" },
+          // Re-validate after fixes
+          { event: 're-validate', state: 'validating', sender: 'agent', message: "```progress\n{\"label\":\"Re-validating after fixes\",\"value\":90}\n```\n\n```quote\n{\"text\":\"Running validation again on the corrected dataset...\",\"style\":\"info\"}\n```" },
+          // Now passes!
+          { event: 'quality-pass', state: 'passed', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Quality Score: 99/100\",\"message\":\"All checks passing after auto-fix. Dataset is clean.\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"Records\",\"value\":\"45,000\"},{\"label\":\"Fixed\",\"value\":\"1,526\"},{\"label\":\"Quality\",\"value\":\"99/100\"},{\"label\":\"Status\",\"value\":\"Ready ✓\"}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Publish to data warehouse\",\"desc\":\"Make available for analytics\"},{\"title\":\"Review changes\",\"desc\":\"See what was auto-fixed\"}]}\n```" },
+          { event: 'publish', state: 'published', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Published!\",\"message\":\"45,000 records published to the data warehouse.\"}\n```\n\n```timeline\n{\"items\":[{\"date\":\"10:00\",\"title\":\"Dataset received\",\"desc\":\"45,000 customer records\"},{\"date\":\"10:01\",\"title\":\"First validation\",\"desc\":\"Score 82/100 — 3 warnings\"},{\"date\":\"10:02\",\"title\":\"Auto-fix applied\",\"desc\":\"1,526 records corrected\"},{\"date\":\"10:03\",\"title\":\"Re-validation\",\"desc\":\"Score 99/100 — all clear\"},{\"date\":\"10:03\",\"title\":\"Published\",\"desc\":\"Available in data warehouse\"}]}\n```" },
+        ],
+      },
+
     ];
 
     var scenarios = DEMO_SCENARIOS.slice();
