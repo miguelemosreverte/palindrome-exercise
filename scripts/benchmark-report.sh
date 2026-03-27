@@ -23,11 +23,13 @@ ALL_DATA=$(node -e "
 const db = require('./lib/db');
 
 // Get benchmark-specific data
-const collection = '$BENCH_NAME' === 'hr' ? 'hr-research' : '$BENCH_NAME';
+const collectionMap = { 'hr': 'hr-research', 'hr-real': 'hr-research-real' };
+const collection = collectionMap['$BENCH_NAME'] || '$BENCH_NAME';
 const records = db.getData(collection);
 
 // Get benchmark timing
-const benchName = '$BENCH_NAME' === 'hr' ? 'HR Scala LATAM Research' : '$BENCH_NAME';
+const benchMap = { 'hr': 'HR Scala LATAM Research', 'hr-real': 'hr-real' };
+const benchName = benchMap['$BENCH_NAME'] || '$BENCH_NAME';
 const bench = db.getLatestBenchmark(benchName);
 
 // Extract every piece of structured data
@@ -49,6 +51,12 @@ for (const r of records) {
   const d = JSON.parse(r.data);
   const text = d.text || '';
   const name = r.collection.split('/').pop().replace(/_/g, ' ');
+
+  // Direct structured data (from benchmark-hr-real.js)
+  if (d.headers && d.rows && d.rows.length > 0) {
+    output.tables.push({ name, headers: d.headers, rows: d.rows, sources: d.sources || [] });
+    continue; // skip markdown parsing — we have the structured data already
+  }
 
   // Extract chartjs blocks
   const chartMatch = text.match(/\x60\x60\x60chartjs\\s*\\n([\\s\\S]*?)\x60\x60\x60/);
