@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bridge — Phone Connected</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 500px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; color: #fff; text-align: center; }
+    .subtitle { color: #888; text-align: center; margin-bottom: 24px; font-size: 0.9rem; }
+    .status {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px; border-radius: 8px; margin-bottom: 16px; font-weight: 500;
+    }
+    .status.connecting { background: #1a1a2e; color: #7c7cf8; }
+    .status.connected { background: #0a2e0a; color: #4caf50; }
+    .status.error { background: #2e0a0a; color: #f44336; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    #messages {
+      width: 100%; max-height: 60vh; overflow-y: auto;
+    }
+    .msg {
+      padding: 12px; margin: 6px 0; background: #1a1a2e; border-radius: 8px;
+    }
+    .msg .type { font-weight: 600; color: #7c7cf8; }
+    .msg .content { margin-top: 4px; }
+    .msg .time { color: #666; font-size: 0.75rem; }
+    .controls {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 16px; background: #111; border-top: 1px solid #222;
+      display: flex; gap: 8px;
+    }
+    .controls input {
+      flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333;
+      background: #1a1a1a; color: #fff; font-size: 1rem;
+    }
+    .controls button {
+      padding: 12px 20px; border-radius: 8px; border: none;
+      background: #7c7cf8; color: white; font-weight: 600; cursor: pointer;
+    }
+    .empty {
+      text-align: center; color: #555; margin-top: 60px; font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📱 Bridge</h1>
+    <p class="subtitle">Connected to desktop session</p>
+
+    <div class="status connecting" id="status">
+      <span class="dot"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+
+    <div id="messages">
+      <div class="empty" id="empty">Waiting for messages...</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="msg-input" placeholder="Send a message..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+    let eventSource = null;
+
+    if (!sessionId) {
+      document.getElementById('status').className = 'status error';
+      document.getElementById('status-text').textContent = 'No session ID — scan a QR code from the desktop app';
+    } else {
+      connectSSE();
+    }
+
+    function connectSSE() {
+      eventSource = new EventSource(
+        `${API_BASE}/api/bridge/connect?session=${sessionId}&role=mobile`
+      );
+
+      eventSource.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'connected') {
+          document.getElementById('status').className = 'status connected';
+          document.getElementById('status-text').textContent = 'Connected!';
+          return;
+        }
+
+        document.getElementById('empty')?.remove();
+        addMessage(msg);
+      };
+
+      eventSource.onerror = () => {
+        document.getElementById('status').className = 'status error';
+        document.getElementById('status-text').textContent = 'Disconnected — reconnecting...';
+        setTimeout(() => connectSSE(), 3000);
+      };
+    }
+
+    function addMessage(msg) {
+      const div = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'msg';
+      const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+      el.innerHTML = `
+        <span class="time">${time}</span>
+        <span class="type">${msg.from || msg.type}</span>
+        <div class="content">${msg.content || msg.type}</div>
+      `;
+      div.prepend(el);
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('msg-input');
+      const content = input.value.trim();
+      if (!content) return;
+
+      await fetch(`${API_BASE}/api/bridge/connect?session=${sessionId}&role=mobile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'chat', content }),
+      });
+
+      input.value = '';
+    }
+
+    document.getElementById('msg-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>

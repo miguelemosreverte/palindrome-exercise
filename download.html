@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bridge — Download Desktop App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a0a; color: #e0e0e0;
+      min-height: 100vh;
+    }
+    nav {
+      padding: 16px 32px; border-bottom: 1px solid #1a1a1a;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .logo { font-size: 1.2rem; font-weight: 700; color: #fff; }
+    nav a { color: #7c7cf8; text-decoration: none; margin-left: 24px; font-size: 0.9rem; }
+    nav a:hover { color: #9e9eff; }
+
+    .hero {
+      text-align: center; padding: 80px 20px 40px;
+      max-width: 700px; margin: 0 auto;
+    }
+    .hero h1 {
+      font-size: 3rem; font-weight: 800; color: #fff;
+      line-height: 1.1; margin-bottom: 16px;
+    }
+    .hero h1 span { color: #7c7cf8; }
+    .hero p {
+      font-size: 1.15rem; color: #888; line-height: 1.6;
+      max-width: 500px; margin: 0 auto 40px;
+    }
+
+    .download-cards {
+      display: flex; gap: 16px; justify-content: center;
+      flex-wrap: wrap; padding: 0 20px;
+    }
+    .card {
+      background: #111; border: 1px solid #222; border-radius: 12px;
+      padding: 28px 32px; width: 200px; text-align: center;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #7c7cf8; }
+    .card .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .card h3 { font-size: 1rem; color: #fff; margin-bottom: 4px; }
+    .card p { font-size: 0.8rem; color: #666; margin-bottom: 16px; }
+    .card a {
+      display: inline-block; padding: 10px 24px; border-radius: 8px;
+      background: #7c7cf8; color: white; text-decoration: none;
+      font-weight: 600; font-size: 0.9rem;
+    }
+    .card a:hover { background: #6a6af0; }
+    .card a.soon {
+      background: #222; color: #555; cursor: default;
+    }
+
+    .steps {
+      max-width: 600px; margin: 60px auto; padding: 0 20px;
+    }
+    .steps h2 {
+      text-align: center; font-size: 1.5rem; color: #fff; margin-bottom: 32px;
+    }
+    .step {
+      display: flex; gap: 16px; margin-bottom: 24px; align-items: flex-start;
+    }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #7c7cf8; color: white; display: flex;
+      align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1rem; flex-shrink: 0;
+    }
+    .step-content h3 { font-size: 1rem; color: #fff; margin-bottom: 4px; }
+    .step-content p { font-size: 0.9rem; color: #888; line-height: 1.5; }
+
+    .web-fallback {
+      text-align: center; padding: 40px 20px; border-top: 1px solid #1a1a1a;
+      margin-top: 40px;
+    }
+    .web-fallback p { color: #666; margin-bottom: 12px; }
+    .web-fallback a {
+      color: #7c7cf8; text-decoration: none; font-weight: 600;
+    }
+
+    footer {
+      text-align: center; padding: 32px; color: #333; font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">Bridge</div>
+    <div>
+      <a href="/bridge.html">Web Version</a>
+      <a href="/download.html">Download</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Your agent,<br>in your <span>pocket</span>.</h1>
+    <p>Download Bridge for your desktop. Scan a QR code with your phone. Get real-time updates from your AI agent on Telegram.</p>
+  </div>
+
+  <div class="download-cards">
+    <div class="card">
+      <div class="icon">🍎</div>
+      <h3>macOS</h3>
+      <p>Apple Silicon & Intel</p>
+      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-mac.dmg">Download .dmg</a>
+    </div>
+    <div class="card">
+      <div class="icon">🪟</div>
+      <h3>Windows</h3>
+      <p>Windows 10+</p>
+      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-win.exe">Download .exe</a>
+    </div>
+    <div class="card">
+      <div class="icon">🐧</div>
+      <h3>Linux</h3>
+      <p>Ubuntu, Fedora, etc.</p>
+      <a href="https://github.com/miguelemosreverte/MercadoPago-to-ChutesAI-bridge/releases/latest/download/Bridge-linux.AppImage">Download .AppImage</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <h2>How it works</h2>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Download & open Bridge</h3>
+        <p>Install the desktop app. It starts instantly — no account needed.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Scan the QR code</h3>
+        <p>A QR code appears on screen. Point your phone's camera at it. Telegram opens automatically.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>You're connected</h3>
+        <p>That's it. Your Telegram chat is now linked to your desktop. You'll get agent status updates, can send commands, and chat — all from your phone.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="web-fallback">
+    <p>Don't want to install anything?</p>
+    <a href="/bridge.html">Use the web version instead →</a>
+  </div>
+
+  <footer>Bridge — Open source desktop ↔ phone bridge for AI agents</footer>
+</body>
+</html>

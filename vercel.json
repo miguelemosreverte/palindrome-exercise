@@ -1,9 +1,14 @@
 {
+  "rewrites": [
+    { "source": "/connect", "destination": "/connect.html" },
+    { "source": "/bridge", "destination": "/bridge.html" },
+    { "source": "/download", "destination": "/download.html" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://miguelemosreverte.github.io" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Access-Token, X-Demo-Session" }
       ]
