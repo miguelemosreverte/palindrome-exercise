@@ -173,7 +173,7 @@
     <div class="panel qr-panel active" id="panel-connect">
       <div class="qr-card">
         <h2>Connect your phone</h2>
-        <p class="sub">Scan with your camera to open Telegram</p>
+        <p class="sub">Scan with your camera to connect</p>
         <div id="qr-container"><canvas id="qr"></canvas></div>
         <div class="session-label" id="session-label">Creating session...</div>
         <div class="status-bar">
@@ -241,10 +241,21 @@
 
       document.getElementById('session-label').textContent = 'Session: ' + sessionId.slice(0, 8) + '...';
 
-      const telegramUrl = 'https://t.me/AgenteGauchoBot?start=' + sessionId;
-      QRCode.toCanvas(document.getElementById('qr'), telegramUrl,
+      // QR encodes the miniapp URL with session — works everywhere:
+      // iPhone camera → opens Safari → installs as PWA with session
+      // Android camera → opens Chrome/app → connects instantly
+      // Telegram → user can also use /start command separately
+      const appUrl = API_BASE + '/miniapp.html?session=' + sessionId;
+      QRCode.toCanvas(document.getElementById('qr'), appUrl,
         { width: 220, margin: 0, color: { dark: '#112033', light: '#ffffff' } }
       );
+
+      // Also pair with Telegram bot in background
+      fetch(API_BASE + '/api/bridge/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId }),
+      }).catch(function() {});
 
       startFirebaseStream();
     }
