@@ -1,0 +1,8 @@
+- [Home](/)
+- [Getting Started](getting-started.md)
+- [Architecture](architecture.md)
+- [Desktop App](desktop-app.md)
+- [Telegram Bot](telegram-bot.md)
+- [Agent API](agent-api.md)
+- [CLI Tools](cli-tools.md)
+- [Deployment](deployment.md)
