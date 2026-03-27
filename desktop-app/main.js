@@ -40,6 +40,23 @@ function spawnAgent() {
 
 ipcMain.handle('agent-status', () => agentStatus);
 
+// Read persisted session from ~/.bridge/session
+const fs = require('fs');
+function getPersistedSession() {
+  var locations = [
+    path.join(process.env.HOME || '', '.bridge', 'session'),
+    path.join(process.env.HOME || '', '.bridge-session'),
+  ];
+  for (var i = 0; i < locations.length; i++) {
+    try {
+      var s = fs.readFileSync(locations[i], 'utf8').trim();
+      if (s) return s;
+    } catch (e) {}
+  }
+  return null;
+}
+ipcMain.handle('get-session', () => getPersistedSession());
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 480,
