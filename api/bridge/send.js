@@ -3,6 +3,7 @@ const { readPath, pushPath } = require('../../lib/firebase');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PAIRS_PATH = 'mercadopago-bridge/bridge-pairs';
 const MSGS_PATH = 'mercadopago-bridge/bridge-messages';
+const MINIAPP_BASE = 'https://palindrome-exercise.vercel.app/miniapp.html';
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -51,10 +52,34 @@ module.exports = async function handler(req, res) {
 
   var results = [];
   for (var i = 0; i < recipients.length; i++) {
+    var text = '💻 ' + content;
+    var replyMarkup = null;
+
+    // If content has options block, send clean text + miniapp button
+    if (content.indexOf('```options') !== -1) {
+      text = '💻 Tap an option below in the miniapp:';
+      replyMarkup = {
+        inline_keyboard: [[
+          { text: '🔘 Open Options', web_app: { url: MINIAPP_BASE + '?session=' + sessionId } },
+        ]],
+      };
+    } else {
+      // Add miniapp button to all messages for quick access
+      replyMarkup = {
+        inline_keyboard: [[
+          { text: '📱 Open Mini App', web_app: { url: MINIAPP_BASE + '?session=' + sessionId } },
+        ]],
+      };
+    }
+
     var tgRes = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: recipients[i], text: '💻 ' + content }),
+      body: JSON.stringify({ 
+        chat_id: recipients[i], 
+        text: text,
+        reply_markup: replyMarkup,
+      }),
     });
     results.push(await tgRes.json());
   }
