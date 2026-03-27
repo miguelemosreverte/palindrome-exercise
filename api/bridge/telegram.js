@@ -167,6 +167,67 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
+    // /research — start an autonomous research task
+    if (text.startsWith('/research ')) {
+      var goal = text.slice(10).trim();
+      if (!goal) {
+        await sendTelegram(chatId, 'Usage: /research <goal>\nExample: /research Find Scala developers in LATAM');
+        return res.json({ ok: true });
+      }
+      var session = await findSessionForChat(chatId);
+      if (!session) {
+        await sendTelegram(chatId, 'Not connected. Scan a QR code first!');
+        return res.json({ ok: true });
+      }
+      // Create task in Firebase
+      var taskId = 'task-' + Date.now();
+      await writePath('mercadopago-bridge/bridge-tasks/' + taskId, {
+        goal: goal,
+        status: 'pending',
+        sessionId: session,
+        currentStep: 0,
+        steps: [
+          { name: 'search', prompt: 'Use Playwright browser to go to google.com and search for "' + goal + '". Read the first 10 results. For each result output: Title, URL, Summary (one line each).', status: 'pending', result: null },
+          { name: 'collect', prompt: 'From the search results, extract structured data into a table. Use the data from the previous step.', status: 'pending', result: null },
+          { name: 'analyze', prompt: 'Analyze the collected data. Identify key patterns, trends, and insights. Summarize as bullet points.', status: 'pending', result: null },
+          { name: 'visualize', prompt: 'Generate a chartjs visualization and a cards summary of the key findings.', status: 'pending', result: null },
+        ],
+        results: {},
+        createdAt: new Date().toISOString(),
+      });
+      await sendTelegram(chatId, '🔬 Research task created!\n\nGoal: ' + goal + '\nTask: ' + taskId + '\nSteps: 4 (search → collect → analyze → visualize)\n\nThe agent will start working on this. Check /tasks for progress.');
+      // Store in messages for the miniapp
+      await pushPath(MSGS_PATH + '/' + session, {
+        from: 'system',
+        content: 'Research task started: ' + goal + ' (' + taskId + ')',
+        timestamp: new Date().toISOString(),
+      });
+      return res.json({ ok: true, taskId: taskId });
+    }
+
+    // /tasks — list active tasks
+    if (text === '/tasks') {
+      var session = await findSessionForChat(chatId);
+      if (!session) {
+        await sendTelegram(chatId, 'Not connected.');
+        return res.json({ ok: true });
+      }
+      var tasks = await readPath('mercadopago-bridge/bridge-tasks');
+      var lines = [];
+      if (tasks) {
+        for (var tk in tasks) {
+          var t = tasks[tk];
+          if (t && t.sessionId === session) {
+            var done = (t.steps || []).filter(function(s) { return s.status === 'done'; }).length;
+            lines.push(t.status === 'done' ? '✅' : t.status === 'running' ? '🔄' : '⏳');
+            lines[lines.length-1] += ' ' + t.goal + ' (' + done + '/' + (t.steps || []).length + ' steps)';
+          }
+        }
+      }
+      await sendTelegram(chatId, lines.length > 0 ? '📋 Your tasks:\n\n' + lines.join('\n') : 'No active tasks. Use /research <goal> to start one.');
+      return res.json({ ok: true });
+    }
+
     // /dashboard — open the Mini App with rich components
     if (text === '/dashboard') {
       var session = await findSessionForChat(chatId);

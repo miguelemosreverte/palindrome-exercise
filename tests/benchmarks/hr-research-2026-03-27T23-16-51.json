@@ -1,0 +1,48 @@
+{
+  "task": "HR Scala LATAM Research",
+  "date": "2026-03-27T23:16:51.315Z",
+  "taskId": "bench-1774653334267",
+  "totalTime": 76,
+  "steps": [
+    {
+      "name": "search",
+      "time": 33,
+      "tokensUsed": 915,
+      "dataPoints": 6,
+      "status": "pass"
+    },
+    {
+      "name": "collect",
+      "time": 8,
+      "tokensUsed": 695,
+      "dataPoints": 11,
+      "status": "pass"
+    },
+    {
+      "name": "enrich",
+      "time": 8,
+      "tokensUsed": 453,
+      "dataPoints": 7,
+      "status": "pass"
+    },
+    {
+      "name": "csv",
+      "time": 4,
+      "tokensUsed": 152,
+      "dataPoints": 2,
+      "status": "pass"
+    },
+    {
+      "name": "chart",
+      "time": 6,
+      "tokensUsed": 129,
+      "dataPoints": 1,
+      "status": "pass"
+    }
+  ],
+  "results": {
+    "candidatesFound": 1,
+    "countriesCovered": 1,
+    "dataQuality": 1
+  }
+}
