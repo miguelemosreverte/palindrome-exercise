@@ -1,12 +1,11 @@
 /**
  * BridgeFSM — Finite State Machine engine for Bridge
+ * Supports hierarchical (invoke), parallel states, workflow steps, and final states.
  * Works in browser (window.BridgeFSM) and Node (require('./fsm'))
  */
 (function (root) {
-  // Global action registry
   var actions = {};
 
-  // Match event against pattern (supports trailing wildcard: "user-says-*")
   function matchEvent(pattern, event) {
     if (pattern === '*') return true;
     if (pattern === event) return true;
@@ -14,43 +13,35 @@
     return false;
   }
 
-  // Find matching transition for an event in a state definition
   function findTransition(stateDef, event) {
     if (!stateDef || !stateDef.on) return null;
     var keys = Object.keys(stateDef.on);
-    // Exact match first, then patterns, wildcard last
     for (var i = 0; i < keys.length; i++) {
       if (keys[i] === event) return stateDef.on[keys[i]];
     }
     for (var i = 0; i < keys.length; i++) {
-      if (keys[i] !== '*' && keys[i] !== event && matchEvent(keys[i], event)) {
+      if (keys[i] !== '*' && keys[i] !== event && matchEvent(keys[i], event))
         return stateDef.on[keys[i]];
-      }
     }
     if (stateDef.on['*']) return stateDef.on['*'];
     return null;
   }
 
-  // Deep clone plain objects
   function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
   }
 
-  /**
-   * Create a new FSM instance from a definition
-   */
-  function create(def) {
+  function create(def, parentNotify) {
     var machine = {
       id: def.id || 'fsm',
       state: def.initial || Object.keys(def.states)[0],
       context: clone(def.context || {}),
       _def: def,
       _listeners: [],
+      _children: {},       // active child machines keyed by invoke/parallel id
+      _parallelDone: {},   // tracks completed parallel children
       history: [],
 
-      /**
-       * Send an event to the machine. Returns { state, context, actions }.
-       */
       send: function (event, data) {
         var payload = data || {};
         var stateDef = def.states[machine.state];
@@ -60,10 +51,8 @@
           return { state: machine.state, context: clone(machine.context), actions: [] };
         }
 
-        // Normalize: allow transition to be a string (just target)
         if (typeof transition === 'string') transition = { target: transition };
 
-        // Check guard
         if (transition.guard && !transition.guard(machine.context, payload)) {
           return { state: machine.state, context: clone(machine.context), actions: [] };
         }
@@ -72,25 +61,30 @@
         var target = transition.target || machine.state;
         var actionNames = transition.actions || [];
 
-        // Update context via assign
         if (transition.assign) {
           machine.context = transition.assign(clone(machine.context), payload);
         }
 
         machine.state = target;
-
-        // Record history
         machine.history.push({ state: prev, event: event, timestamp: Date.now() });
 
-        // Execute registered actions
+        // Clean up old children when leaving a state
+        if (prev !== target) {
+          machine._children = {};
+          machine._parallelDone = {};
+        }
+
         for (var i = 0; i < actionNames.length; i++) {
           if (actions[actionNames[i]]) {
             actions[actionNames[i]](machine.context, payload, machine);
           }
         }
 
-        // Notify listeners
         var result = { state: machine.state, context: clone(machine.context), actions: actionNames };
+
+        // Enter new state: check for invoke, parallel, run
+        if (prev !== target) enterState(machine);
+
         for (var i = 0; i < machine._listeners.length; i++) {
           machine._listeners[i](result, event);
         }
@@ -98,7 +92,33 @@
         return result;
       },
 
-      /** Subscribe to state changes */
+      /** Send event that propagates to active children first */
+      sendDeep: function (event, data) {
+        var childIds = Object.keys(machine._children);
+        for (var i = 0; i < childIds.length; i++) {
+          var child = machine._children[childIds[i]];
+          var childState = child._def.states[child.state];
+          var childTransition = findTransition(childState, event);
+          if (childTransition) {
+            return child.sendDeep ? child.sendDeep(event, data) : child.send(event, data);
+          }
+        }
+        return machine.send(event, data);
+      },
+
+      /** Returns currently running child machines */
+      getActiveChildren: function () {
+        var result = {};
+        var ids = Object.keys(machine._children);
+        for (var i = 0; i < ids.length; i++) {
+          result[ids[i]] = {
+            state: machine._children[ids[i]].state,
+            context: clone(machine._children[ids[i]].context)
+          };
+        }
+        return result;
+      },
+
       onTransition: function (fn) {
         machine._listeners.push(fn);
         return function () {
@@ -106,7 +126,6 @@
         };
       },
 
-      /** Serialize to JSON-safe object */
       toJSON: function () {
         return {
           id: machine.id,
@@ -118,34 +137,115 @@
       }
     };
 
+    // Enter initial state
+    enterState(machine);
+
     return machine;
   }
 
-  // Registry of machine definitions for fromJSON restoration
+  function enterState(machine) {
+    var stateDef = machine._def.states[machine.state];
+    if (!stateDef) return;
+
+    // Final state: notify parent
+    if (stateDef.final && machine._parentNotify) {
+      machine._parentNotify(machine.context);
+      return;
+    }
+
+    // Invoke child machine
+    if (stateDef.invoke) {
+      var inv = stateDef.invoke;
+      var child = create(inv.machine, function onChildDone(childCtx) {
+        machine._children = {};
+        if (inv.onDone) {
+          var target = inv.onDone.target || machine.state;
+          if (inv.onDone.assign) {
+            machine.context = inv.onDone.assign(clone(machine.context), childCtx);
+          }
+          var prev = machine.state;
+          machine.state = target;
+          machine.history.push({ state: prev, event: 'done.invoke.' + inv.id, timestamp: Date.now() });
+          enterState(machine);
+          var result = { state: machine.state, context: clone(machine.context), actions: [] };
+          for (var i = 0; i < machine._listeners.length; i++) {
+            machine._listeners[i](result, 'done.invoke.' + inv.id);
+          }
+        }
+      });
+      child._parentNotify = function (childCtx) {
+        machine._children = {};
+        if (inv.onDone) {
+          var target = inv.onDone.target || machine.state;
+          if (inv.onDone.assign) {
+            machine.context = inv.onDone.assign(clone(machine.context), childCtx);
+          }
+          var prev = machine.state;
+          machine.state = target;
+          machine.history.push({ state: prev, event: 'done.invoke.' + inv.id, timestamp: Date.now() });
+          enterState(machine);
+          var result = { state: machine.state, context: clone(machine.context), actions: [] };
+          for (var i = 0; i < machine._listeners.length; i++) {
+            machine._listeners[i](result, 'done.invoke.' + inv.id);
+          }
+        }
+      };
+      machine._children[inv.id] = child;
+    }
+
+    // Parallel child machines
+    if (stateDef.parallel) {
+      machine._parallelDone = {};
+      var parallelResults = {};
+      for (var p = 0; p < stateDef.parallel.length; p++) {
+        (function (spec) {
+          var child = create(spec.machine);
+          child._parentNotify = function (childCtx) {
+            parallelResults[spec.id] = childCtx;
+            machine._parallelDone[spec.id] = true;
+            delete machine._children[spec.id];
+            // Check if all done
+            if (Object.keys(machine._parallelDone).length === stateDef.parallel.length && stateDef.onAllDone) {
+              var target = stateDef.onAllDone.target || machine.state;
+              if (stateDef.onAllDone.assign) {
+                machine.context = stateDef.onAllDone.assign(clone(machine.context), parallelResults);
+              }
+              var prev = machine.state;
+              machine.state = target;
+              machine.history.push({ state: prev, event: 'done.parallel', timestamp: Date.now() });
+              enterState(machine);
+              var result = { state: machine.state, context: clone(machine.context), actions: [] };
+              for (var i = 0; i < machine._listeners.length; i++) {
+                machine._listeners[i](result, 'done.parallel');
+              }
+            }
+          };
+          machine._children[spec.id] = child;
+        })(stateDef.parallel[p]);
+      }
+    }
+
+    // Workflow run metadata (exposed for host to read, no auto-execution)
+    if (stateDef.run) {
+      machine._currentRun = stateDef.run;
+    } else {
+      machine._currentRun = null;
+    }
+  }
+
   var defs = {};
 
   var BridgeFSM = {
-    /**
-     * Create a machine from a definition. Also registers it for fromJSON.
-     */
     create: function (def) {
       var m = create(def);
       defs[def.id || 'fsm'] = def;
       return m;
     },
 
-    /**
-     * Register a named action handler
-     */
     registerAction: function (name, fn) {
       actions[name] = fn;
     },
 
-    /**
-     * Restore a machine from serialized JSON.
-     * Requires the original definition to have been registered via create().
-     * Alternatively pass the definition as second argument.
-     */
     fromJSON: function (json, def) {
       var data = typeof json === 'string' ? JSON.parse(json) : json;
       var definition = def || defs[data._defId || data.id];
@@ -158,10 +258,11 @@
     }
   };
 
-  // Universal export
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = BridgeFSM;
+  } else if (typeof define === 'function' && define.amd) {
+    define(function () { return BridgeFSM; });
   } else if (typeof root !== 'undefined') {
     root.BridgeFSM = BridgeFSM;
   }
-})(typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : this);
+})(typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : this);
