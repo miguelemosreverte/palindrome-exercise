@@ -251,6 +251,9 @@
     .s-tag--report { background:rgba(34,197,94,.1); color:#16a34a; }
     .s-tag--action { background:rgba(245,158,11,.1); color:#b45309; }
     .s-tag--monitor { background:rgba(239,68,68,.1); color:#dc2626; }
+    .s-tag--workflow { background:rgba(168,85,247,.1); color:#7c3aed; }
+    .s-tag--explore { background:rgba(6,182,212,.1); color:#0891b2; }
+    .s-tag--composition { background:rgba(236,72,153,.1); color:#db2777; }
 
     /* ── State Diagram ── */
     .state-diagram { background:#fff; border-radius:16px; border:1px solid var(--line); padding:24px; }
@@ -636,6 +639,367 @@
           { event: null, state: 'breaking-changes', sender: 'agent', message: "Done!\n\n```status\n{\"items\":[{\"label\":\"GitHub Release v2.5.0\",\"status\":\"done\",\"desc\":\"Published with full changelog and assets\"},{\"label\":\"Slack #releases\",\"status\":\"done\",\"desc\":\"Posted formatted announcement with highlights\"}]}\n```\n\n```quote\n{\"text\":\"Release v2.5.0 Phoenix is officially out. Great sprint, team.\",\"style\":\"success\"}\n```" },
         ],
       },
+      // ════════════════════════════════════════════
+      // FSM COMPOSITION SCENARIOS
+      // ════════════════════════════════════════════
+      //
+      // Three composition patterns:
+      // ● Invoke  — parent state spawns a child FSM, waits for completion
+      // ● Parallel — multiple FSMs run simultaneously, parent waits for all
+      // ● Event coupling — independent FSMs communicate via shared event bus
+      //
+      // ────────────────────────────────────────────
+      // 19. PARALLEL DATA GATHERING
+      // ────────────────────────────────────────────
+      {
+        id: 'parallel-data-gathering',
+        name: 'Parallel Data Gathering',
+        icon: '\u26A1',
+        tag: 'composition',
+        desc: 'Two FSMs run in parallel: web search + database query, results merge',
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'user-request': { target: 'gathering' } } },
+            gathering: {
+              parallel: [
+                { id: 'web', machine: { initial: 'searching', states: { searching: { run: { tool: 'brave_web_search' } }, done: { final: true } } } },
+                { id: 'db', machine: { initial: 'querying', states: { querying: { run: { tool: 'database' } }, done: { final: true } } } }
+              ],
+              onAllDone: { target: 'merging' }
+            },
+            merging: { on: { 'merge-complete': { target: 'presenting' } } },
+            presenting: { final: true }
+          }
+        },
+        states: ['idle', 'gathering', 'merging', 'presenting'],
+        transitions: [
+          { from: 'idle', to: 'gathering', event: 'user-request' },
+          { from: 'gathering', to: 'merging', event: 'all-done' },
+          { from: 'merging', to: 'presenting', event: 'merge-complete' },
+        ],
+        steps: [
+          { event: 'user-request', state: 'gathering', sender: 'user', message: 'Get me a full report on competitor pricing.' },
+          { event: null, state: 'gathering', sender: 'agent', message: "Launching parallel data-gathering FSMs...\n\n```status\n{\"items\":[{\"label\":\"Web Search FSM\",\"status\":\"working\",\"desc\":\"brave_web_search: competitor pricing 2026\"},{\"label\":\"Database Query FSM\",\"status\":\"working\",\"desc\":\"SELECT * FROM competitor_prices WHERE updated > NOW()-30d\"}]}\n```\n\n```progress\n{\"label\":\"Web Search\",\"value\":60,\"desc\":\"Found 15 results, extracting pricing data...\"}\n```\n\n```progress\n{\"label\":\"Database Query\",\"value\":40,\"desc\":\"Scanning 234 records across 5 competitor tables...\"}\n```" },
+          { event: 'all-done', state: 'merging', sender: 'agent', message: "Both sub-machines reached their final states. Merging results...\n\n```progress\n{\"label\":\"Merging datasets\",\"value\":90,\"desc\":\"Merging 15 web results with 234 database records...\"}\n```\n\n```quote\n{\"text\":\"Deduplicating entries, normalizing currency, and computing deltas...\",\"style\":\"info\"}\n```" },
+          { event: 'merge-complete', state: 'presenting', sender: 'agent', message: "Competitor pricing report ready.\n\n```table\n{\"headers\":[\"Competitor\",\"Our Price\",\"Their Price\",\"Difference %\"],\"rows\":[[\"Acme Corp\",\"$49/mo\",\"$45/mo\",\"-8.2%\"],[\"GlobalTech\",\"$49/mo\",\"$52/mo\",\"+6.1%\"],[\"NovaSoft\",\"$49/mo\",\"$39/mo\",\"-20.4%\"],[\"PeakStack\",\"$49/mo\",\"$55/mo\",\"+12.2%\"],[\"ZetaCloud\",\"$49/mo\",\"$42/mo\",\"-14.3%\"]]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Competitors Analyzed\",\"value\":\"5\"},{\"label\":\"Avg Price Difference\",\"value\":\"-12%\",\"trend\":\"-12%\"},{\"label\":\"Market Position\",\"value\":\"3rd of 6\"},{\"label\":\"Data Sources\",\"value\":\"Web + DB\"}]}\n```\n\n```quote\n{\"text\":\"2 competitors dropped prices this week: NovaSoft (-$4) and ZetaCloud (-$3). Consider reviewing our pricing strategy.\",\"style\":\"warning\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 20. NESTED APPROVAL CHAIN
+      // ────────────────────────────────────────────
+      {
+        id: 'nested-approval-chain',
+        name: 'Nested Approval Chain',
+        icon: '\uD83D\uDD17',
+        tag: 'composition',
+        desc: 'Parent FSM invokes child approval FSM, which itself can invoke an escalation FSM',
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'pr-opened': { target: 'reviewing' } } },
+            reviewing: { on: { 'review-complete': { target: 'awaiting-approval' } } },
+            'awaiting-approval': {
+              invoke: {
+                id: 'approval-fsm',
+                machine: {
+                  initial: 'pending',
+                  states: {
+                    pending: { on: { 'peer-approves': { target: 'approved' }, 'needs-escalation': { target: 'escalating' } } },
+                    escalating: {
+                      invoke: {
+                        id: 'escalation-fsm',
+                        machine: {
+                          initial: 'notifying-manager',
+                          states: {
+                            'notifying-manager': { on: { 'manager-notified': { target: 'manager-decides' } } },
+                            'manager-decides': { on: { 'manager-approves': { target: 'resolved' }, 'manager-rejects': { target: 'resolved' } } },
+                            resolved: { final: true }
+                          }
+                        }
+                      }
+                    },
+                    approved: { final: true }
+                  }
+                }
+              },
+              onDone: [
+                { target: 'approved', guard: 'wasApproved' },
+                { target: 'rejected', guard: 'wasRejected' }
+              ]
+            },
+            approved: { final: true },
+            rejected: { final: true }
+          }
+        },
+        states: ['idle', 'reviewing', 'awaiting-approval', 'escalating', 'approved'],
+        transitions: [
+          { from: 'idle', to: 'reviewing', event: 'pr-opened' },
+          { from: 'reviewing', to: 'awaiting-approval', event: 'review-complete' },
+          { from: 'awaiting-approval', to: 'approved', event: 'peer-approves' },
+          { from: 'awaiting-approval', to: 'escalating', event: 'needs-escalation' },
+          { from: 'escalating', to: 'approved', event: 'manager-approves' },
+        ],
+        steps: [
+          { event: 'pr-opened', state: 'reviewing', sender: 'agent', message: "PR #287 opened: \"Refactor payment processing pipeline\"\n\n```diff\n{\"file\":\"src/payments/processor.ts\",\"additions\":145,\"deletions\":23,\"preview\":\"+export class PaymentPipeline {\\n+  private readonly retryPolicy: RetryPolicy;\\n+  async process(payment: Payment): Promise<Result> {\\n-export function processPayment(data) {\\n-  // legacy implementation\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"Files Changed\",\"value\":\"12\"},{\"label\":\"Additions\",\"value\":\"+145\"},{\"label\":\"Deletions\",\"value\":\"-23\"},{\"label\":\"Net Change\",\"value\":\"+122 lines\"}]}\n```" },
+          { event: 'review-complete', state: 'awaiting-approval', sender: 'agent', message: "Code review complete. Invoking **approval-fsm** (child machine)...\n\n```steps\n{\"items\":[{\"title\":\"Code Review\",\"status\":\"done\",\"desc\":\"Static analysis passed, no issues found\"},{\"title\":\"Peer Approval\",\"status\":\"working\",\"desc\":\"Waiting for peer reviewer\"},{\"title\":\"Manager Approval\",\"status\":\"pending\",\"desc\":\"Not started\"}]}\n```" },
+          { event: 'peer-approves', state: 'awaiting-approval', sender: 'agent', message: "**Path A: Peer approves directly (no escalation)**\n\nFranco approved the PR.\n\n```checklist\n{\"items\":[{\"label\":\"Code review\",\"checked\":true},{\"label\":\"Peer approval\",\"checked\":true},{\"label\":\"Auto-merged to main\",\"checked\":true}]}\n```\n\n```quote\n{\"text\":\"approval-fsm reached final state: approved. Control returned to parent FSM.\",\"style\":\"success\"}\n```" },
+          { event: 'needs-escalation', state: 'escalating', sender: 'agent', message: "**Path B: Large PR triggers escalation**\n\n```quote\n{\"text\":\"Large PR detected (12 files, 145 additions). Escalating to manager for approval.\",\"style\":\"warning\"}\n```\n\napproval-fsm invokes **escalation-fsm** (grandchild machine)...\n\n```status\n{\"items\":[{\"label\":\"Author: Miguel\",\"status\":\"done\",\"desc\":\"PR submitted\"},{\"label\":\"Reviewer: Franco\",\"status\":\"done\",\"desc\":\"Approved with comments\"},{\"label\":\"Manager: Carlos\",\"status\":\"working\",\"desc\":\"Review pending\"}]}\n```" },
+          { event: 'manager-approves', state: 'approved', sender: 'agent', message: "Carlos approved. Escalation-fsm resolved, approval-fsm resolved, parent FSM reaches final state.\n\n```steps\n{\"items\":[{\"title\":\"Code Review\",\"status\":\"done\",\"desc\":\"Passed\"},{\"title\":\"Peer Approval (Franco)\",\"status\":\"done\",\"desc\":\"Approved with comments\"},{\"title\":\"Manager Escalation (Carlos)\",\"status\":\"done\",\"desc\":\"Approved\"}]}\n```\n\n```quote\n{\"text\":\"PR #287 merged. Three-level approval chain completed: author > peer > manager.\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 21. MULTI-AGENT COLLABORATION
+      // ────────────────────────────────────────────
+      {
+        id: 'multi-agent-collaboration',
+        name: 'Multi-Agent Collaboration',
+        icon: '\uD83E\uDD16',
+        tag: 'composition',
+        desc: 'Three specialized agent FSMs coordinate: researcher, analyst, writer',
+        fsm: {
+          initial: 'idle',
+          states: {
+            idle: { on: { 'user-request': { target: 'researching' } } },
+            researching: {
+              invoke: {
+                id: 'researcher-fsm',
+                machine: {
+                  initial: 'gathering-sources',
+                  states: {
+                    'gathering-sources': { run: { tool: 'brave_web_search' }, on: { 'sources-found': { target: 'extracting-data' } } },
+                    'extracting-data': { on: { 'data-extracted': { target: 'summarizing' } } },
+                    summarizing: { on: { done: { target: 'complete' } } },
+                    complete: { final: true }
+                  }
+                }
+              },
+              onDone: { target: 'analyzing' }
+            },
+            analyzing: {
+              invoke: {
+                id: 'analyst-fsm',
+                machine: {
+                  initial: 'processing-data',
+                  states: {
+                    'processing-data': { run: { tool: 'code_execution', script: 'analysis.py' }, on: { 'processed': { target: 'modeling' } } },
+                    modeling: { on: { 'model-complete': { target: 'validating' } } },
+                    validating: { on: { done: { target: 'complete' } } },
+                    complete: { final: true }
+                  }
+                }
+              },
+              onDone: { target: 'writing' }
+            },
+            writing: {
+              invoke: {
+                id: 'writer-fsm',
+                machine: {
+                  initial: 'outlining',
+                  states: {
+                    outlining: { on: { 'outline-ready': { target: 'drafting' } } },
+                    drafting: { on: { 'draft-complete': { target: 'polishing' } } },
+                    polishing: { on: { done: { target: 'complete' } } },
+                    complete: { final: true }
+                  }
+                }
+              },
+              onDone: { target: 'review' }
+            },
+            review: { on: { 'publish': { target: 'published' }, 'revise': { target: 'writing' } } },
+            published: { final: true }
+          }
+        },
+        states: ['idle', 'researching', 'analyzing', 'writing', 'review', 'published'],
+        transitions: [
+          { from: 'idle', to: 'researching', event: 'user-request' },
+          { from: 'researching', to: 'analyzing', event: 'research-done' },
+          { from: 'analyzing', to: 'writing', event: 'analysis-done' },
+          { from: 'writing', to: 'review', event: 'draft-done' },
+          { from: 'review', to: 'published', event: 'publish' },
+        ],
+        steps: [
+          { event: 'user-request', state: 'researching', sender: 'user', message: 'Create a market analysis report for the Latin American fintech sector.' },
+          { event: null, state: 'researching', sender: 'agent', message: "Invoking **researcher-fsm** (agent 1 of 3)...\n\n```status\n{\"items\":[{\"label\":\"Researcher\",\"status\":\"working\",\"desc\":\"Searching for market data\"},{\"label\":\"Analyst\",\"status\":\"pending\",\"desc\":\"Waiting for research\"},{\"label\":\"Writer\",\"status\":\"pending\",\"desc\":\"Waiting for analysis\"}]}\n```\n\n```progress\n{\"label\":\"Overall pipeline\",\"value\":20,\"desc\":\"Stage 1/3: Research\"}\n```\n\n```quote\n{\"text\":\"Agent 1 is searching for market data on Latin American fintech: funding rounds, regulatory changes, market size estimates...\",\"style\":\"info\"}\n```" },
+          { event: 'research-done', state: 'analyzing', sender: 'agent', message: "researcher-fsm reached final state. Data handed off to **analyst-fsm**.\n\n```timeline\n{\"items\":[{\"date\":\"2025-Q4\",\"title\":\"$2.1B in LatAm fintech funding\",\"desc\":\"Led by Brazil and Mexico\"},{\"date\":\"2026-Q1\",\"title\":\"Open Banking regulation in Colombia\",\"desc\":\"New API mandates for banks\"},{\"date\":\"2026-Q1\",\"title\":\"Pix International expansion\",\"desc\":\"Cross-border instant payments pilot\"},{\"date\":\"2026-Q2\",\"title\":\"CBDC pilots in Argentina & Chile\",\"desc\":\"Central bank digital currency testing\"},{\"date\":\"2026-Q3\",\"title\":\"Embedded finance surge\",\"desc\":\"Non-banks offering financial products via APIs\"}]}\n```\n\n```status\n{\"items\":[{\"label\":\"Researcher\",\"status\":\"done\",\"desc\":\"15 sources collected\"},{\"label\":\"Analyst\",\"status\":\"working\",\"desc\":\"Processing data\"},{\"label\":\"Writer\",\"status\":\"pending\",\"desc\":\"Waiting for analysis\"}]}\n```" },
+          { event: null, state: 'analyzing', sender: 'agent', message: "```progress\n{\"label\":\"Overall pipeline\",\"value\":50,\"desc\":\"Stage 2/3: Analysis\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"Market Size\",\"value\":\"$4.2B\",\"trend\":\"+18% YoY\"},{\"label\":\"Annual Growth\",\"value\":\"12%\",\"desc\":\"CAGR 2024-2028\"},{\"label\":\"Key Players\",\"value\":\"8\",\"desc\":\"Nubank, MercadoPago, Ualá...\"},{\"label\":\"Regulatory Score\",\"value\":\"7.2/10\",\"trend\":\"+1.1\",\"desc\":\"Improving regulatory environment\"}]}\n```\n\n```code\n{\"language\":\"python\",\"code\":\"# analyst-fsm: running market segmentation\\nimport pandas as pd\\n\\nsegments = df.groupby('segment').agg({\\n    'revenue': 'sum',\\n    'users': 'count',\\n    'growth_rate': 'mean'\\n}).sort_values('revenue', ascending=False)\\n\\nprint(segments.head())\"}\n```" },
+          { event: 'analysis-done', state: 'writing', sender: 'agent', message: "analyst-fsm complete. Invoking **writer-fsm** (agent 3 of 3).\n\n```status\n{\"items\":[{\"label\":\"Researcher\",\"status\":\"done\",\"desc\":\"15 sources collected\"},{\"label\":\"Analyst\",\"status\":\"done\",\"desc\":\"Model complete\"},{\"label\":\"Writer\",\"status\":\"working\",\"desc\":\"Drafting report\"}]}\n```\n\n```chartjs\n{\"type\":\"bar\",\"data\":{\"labels\":[\"Payments\",\"Lending\",\"Banking\",\"Insurance\",\"Wealth\",\"Crypto\"],\"datasets\":[{\"label\":\"Market Size ($B)\",\"data\":[1.8,0.9,0.6,0.4,0.3,0.2],\"backgroundColor\":[\"rgba(49,109,255,0.7)\",\"rgba(34,197,94,0.7)\",\"rgba(245,158,11,0.7)\",\"rgba(168,85,247,0.7)\",\"rgba(6,182,212,0.7)\",\"rgba(239,68,68,0.7)\"],\"borderRadius\":6}]},\"options\":{\"responsive\":true,\"plugins\":{\"legend\":{\"display\":false},\"title\":{\"display\":true,\"text\":\"LatAm Fintech Market by Segment ($B)\",\"font\":{\"size\":14,\"weight\":\"bold\"}}},\"scales\":{\"y\":{\"beginAtZero\":true}}}}\n```\n\n```progress\n{\"label\":\"Overall pipeline\",\"value\":80,\"desc\":\"Stage 3/3: Writing\"}\n```\n\n```steps\n{\"items\":[{\"title\":\"Executive Summary\",\"status\":\"done\"},{\"title\":\"Market Analysis\",\"status\":\"done\"},{\"title\":\"Competitive Landscape\",\"status\":\"working\"},{\"title\":\"Recommendations\",\"status\":\"pending\"}]}\n```" },
+          { event: 'draft-done', state: 'review', sender: 'agent', message: "writer-fsm complete. All three agent FSMs have finished. Here is the full report:\n\n```quote\n{\"text\":\"The Latin American fintech market reached $4.2B in 2025, growing at 12% CAGR. Brazil leads with 45% market share, followed by Mexico (22%) and Colombia (11%). Open Banking regulations and Pix International are the key catalysts for 2026.\",\"author\":\"Executive Summary\",\"style\":\"info\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"Total Market\",\"value\":\"$4.2B\",\"trend\":\"+18%\"},{\"label\":\"Top Player\",\"value\":\"Nubank\",\"desc\":\"$1.2B revenue\"},{\"label\":\"Fastest Growth\",\"value\":\"Colombia\",\"trend\":\"+34%\"},{\"label\":\"Biggest Risk\",\"value\":\"Regulation\",\"desc\":\"Fragmented across 7 jurisdictions\"}]}\n```\n\n```table\n{\"headers\":[\"Company\",\"Country\",\"Segment\",\"Valuation\",\"Growth\"],\"rows\":[[\"Nubank\",\"Brazil\",\"Banking\",\"$45B\",\"+22%\"],[\"MercadoPago\",\"Argentina\",\"Payments\",\"$18B\",\"+28%\"],[\"Ualá\",\"Argentina\",\"Banking\",\"$2.5B\",\"+41%\"],[\"Clip\",\"Mexico\",\"Payments\",\"$2.0B\",\"+19%\"],[\"RappiPay\",\"Colombia\",\"Payments\",\"$1.1B\",\"+34%\"]]}\n```\n\n```timeline\n{\"items\":[{\"date\":\"Q2 2026\",\"title\":\"Expand to Colombia\",\"desc\":\"Leverage Open Banking APIs for market entry\"},{\"date\":\"Q3 2026\",\"title\":\"Launch Pix International integration\",\"desc\":\"Cross-border payments with Brazil\"},{\"date\":\"Q4 2026\",\"title\":\"Embedded finance partnerships\",\"desc\":\"Partner with 3 non-bank platforms\"},{\"date\":\"Q1 2027\",\"title\":\"CBDC readiness\",\"desc\":\"Prepare infrastructure for digital currency pilots\"}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Publish Report\",\"icon\":\"\uD83D\uDCE4\",\"desc\":\"Finalize and distribute to stakeholders\"},{\"title\":\"Revise\",\"icon\":\"\u270F\uFE0F\",\"desc\":\"Make changes before publishing\"},{\"title\":\"Share Draft\",\"icon\":\"\uD83D\uDCE8\",\"desc\":\"Send preview to the team for feedback\"}]}\n```" },
+          { event: 'publish', state: 'published', sender: 'user', message: 'Publish Report' },
+          { event: null, state: 'published', sender: 'agent', message: "```quote\n{\"text\":\"Report published and distributed to 12 stakeholders. All three agent FSMs (researcher, analyst, writer) completed successfully.\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 22. EVENT-DRIVEN PIPELINE
+      // ────────────────────────────────────────────
+      {
+        id: 'event-driven-pipeline',
+        name: 'Event-Driven Pipeline',
+        icon: '\uD83D\uDD04',
+        tag: 'composition',
+        desc: 'Events from one FSM trigger transitions in another — loosely coupled composition',
+        fsm: {
+          machines: {
+            monitor: {
+              initial: 'watching',
+              states: {
+                watching: { on: { 'anomaly-detected': { target: 'alerting', emit: { event: 'start-investigation', target: 'responder' } } } },
+                alerting: { on: { 'alert-sent': { target: 'watching' } } }
+              }
+            },
+            responder: {
+              initial: 'idle',
+              states: {
+                idle: { on: { 'start-investigation': { target: 'investigating' } } },
+                investigating: { on: { 'cause-found': { target: 'mitigating' } } },
+                mitigating: { on: { 'mitigation-complete': { target: 'resolved' } } },
+                resolved: { final: true }
+              }
+            }
+          },
+          eventBus: {
+            desc: 'Monitor emits events that Responder listens to. Loosely coupled — neither machine knows the other\'s internals.'
+          }
+        },
+        states: ['watching', 'anomaly-detected', 'investigating', 'mitigating', 'resolved'],
+        transitions: [
+          { from: 'watching', to: 'anomaly-detected', event: 'anomaly-detected' },
+          { from: 'anomaly-detected', to: 'investigating', event: 'start-investigation' },
+          { from: 'investigating', to: 'mitigating', event: 'cause-found' },
+          { from: 'mitigating', to: 'resolved', event: 'mitigation-complete' },
+        ],
+        steps: [
+          { event: 'watching', state: 'watching', sender: 'agent', message: "Two independent FSMs connected via event bus:\n\n```cards\n{\"items\":[{\"label\":\"CPU\",\"value\":\"45%\"},{\"label\":\"Memory\",\"value\":\"62%\"},{\"label\":\"Requests\",\"value\":\"1.2k/s\"},{\"label\":\"Errors\",\"value\":\"0.1%\"}]}\n```\n\n```status\n{\"items\":[{\"label\":\"Monitor FSM\",\"status\":\"up\",\"desc\":\"State: watching\"},{\"label\":\"Responder FSM\",\"status\":\"pending\",\"desc\":\"State: idle\"}]}\n```" },
+          { event: 'anomaly-detected', state: 'anomaly-detected', sender: 'agent', message: "Monitor FSM detected anomaly. Emitting `start-investigation` event on bus.\n\n```quote\n{\"text\":\"Error rate spike: 0.1% → 4.7% in 90 seconds\",\"style\":\"error\"}\n```\n\n```cards\n{\"items\":[{\"label\":\"CPU\",\"value\":\"89%\",\"trend\":\"+44%\"},{\"label\":\"Memory\",\"value\":\"78%\",\"trend\":\"+16%\"},{\"label\":\"Requests\",\"value\":\"800/s\",\"trend\":\"-33%\"},{\"label\":\"Errors\",\"value\":\"4.7%\",\"trend\":\"+4.6%\"}]}\n```\n\n```status\n{\"items\":[{\"label\":\"Monitor FSM\",\"status\":\"error\",\"desc\":\"State: alerting\"},{\"label\":\"Responder FSM\",\"status\":\"working\",\"desc\":\"State: investigating (triggered via event bus)\"}]}\n```" },
+          { event: 'start-investigation', state: 'investigating', sender: 'agent', message: "Responder FSM received `start-investigation` event. Correlating logs...\n\n```timeline\n{\"items\":[{\"date\":\"10:23:14\",\"title\":\"Deploy v2.3.1 pushed\",\"icon\":\"\uD83D\uDE80\",\"desc\":\"12 files changed, new payment handler\"},{\"date\":\"10:25:02\",\"title\":\"Error rate increase begins\",\"icon\":\"\u26A0\uFE0F\",\"desc\":\"NullPointerException in PaymentHandler.process()\"},{\"date\":\"10:25:47\",\"title\":\"Monitor FSM: anomaly-detected\",\"icon\":\"\uD83D\uDEA8\",\"desc\":\"Threshold breached: errors > 2%\"},{\"date\":\"10:25:48\",\"title\":\"Event bus: start-investigation\",\"icon\":\"\uD83D\uDD17\",\"desc\":\"Responder FSM activated\"},{\"date\":\"10:26:01\",\"title\":\"Auto-rollback triggered\",\"icon\":\"\u21A9\uFE0F\",\"desc\":\"Reverting to v2.3.0\"}]}\n```\n\n```diff\n{\"file\":\"src/payments/handler.ts\",\"additions\":3,\"deletions\":1,\"preview\":\"+  const result = await processor.process(payment);\\n+  // BUG: result can be null when gateway times out\\n+  return result.status;  // NullPointerException\\n-  return processor.processSync(payment).status;\"}\n```" },
+          { event: 'cause-found', state: 'mitigating', sender: 'agent', message: "Root cause identified. Responder FSM → mitigating.\n\n```steps\n{\"items\":[{\"title\":\"Rollback to v2.3.0\",\"status\":\"done\",\"desc\":\"Deployed at 10:26:01\"},{\"title\":\"Error rate normalizing\",\"status\":\"working\",\"desc\":\"4.7% → 1.2% → trending down\"},{\"title\":\"Notify team on Slack\",\"status\":\"working\",\"desc\":\"Posting to #incidents\"},{\"title\":\"Schedule post-mortem\",\"status\":\"pending\",\"desc\":\"Auto-create Jira ticket\"}]}\n```\n\n```progress\n{\"label\":\"Mitigation progress\",\"value\":70,\"desc\":\"Rollback active, error rate dropping\"}\n```" },
+          { event: 'mitigation-complete', state: 'resolved', sender: 'agent', message: "Both FSMs back to stable states.\n\n```status\n{\"items\":[{\"label\":\"Monitor FSM\",\"status\":\"up\",\"desc\":\"State: watching (resumed)\"},{\"label\":\"Responder FSM\",\"status\":\"done\",\"desc\":\"State: resolved\"}]}\n```\n\n```quote\n{\"text\":\"Incident resolved in 4 minutes. Auto-rollback successful. Root cause: null-safety bug in PaymentHandler introduced in v2.3.1.\",\"style\":\"success\"}\n```\n\n```checklist\n{\"items\":[{\"label\":\"Rollback deployed\",\"checked\":true},{\"label\":\"Monitoring restored\",\"checked\":true},{\"label\":\"Team notified via Slack\",\"checked\":true},{\"label\":\"Post-mortem scheduled for tomorrow 10:00\",\"checked\":true}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 14. PRODUCT SEARCH
+      // ────────────────────────────────────────────
+      {
+        id: 'product-search',
+        name: 'Product Search',
+        icon: '🛒',
+        tag: 'explore',
+        desc: 'Search MercadoLibre for products, compare prices, read reviews',
+        states: ['idle', 'searching', 'results', 'comparing', 'recommendation'],
+        transitions: [
+          { from: 'idle', to: 'searching', event: 'user-searches' },
+          { from: 'searching', to: 'results', event: 'results-ready' },
+          { from: 'results', to: 'comparing', event: 'user-compares' },
+          { from: 'comparing', to: 'recommendation', event: 'show-recommendation' },
+        ],
+        steps: [
+          { event: 'user-searches', state: 'searching', sender: 'user', message: 'Find me a good mechanical keyboard under $50,000 ARS' },
+          { event: null, state: 'searching', sender: 'agent', message: "```progress\n{\"label\":\"Searching MercadoLibre...\",\"value\":30,\"desc\":\"Scanning mechanical keyboards under $50,000 ARS\"}\n```\n\n```quote\n{\"text\":\"Searching MercadoLibre for mechanical keyboards under $50,000 ARS...\",\"style\":\"info\"}\n```" },
+          { event: 'results-ready', state: 'results', sender: 'agent', message: "Found 5 results:\n\n```table\n{\"headers\":[\"Product\",\"Price (ARS)\",\"Rating\",\"Seller\",\"Link\"],\"rows\":[[\"Redragon Kumara K552\",\"$28,500\",\"4.6 ⭐\",\"TecnoStore AR\",\"ML #1234\"],[\"HyperX Alloy Origins Core\",\"$47,900\",\"4.8 ⭐\",\"HyperX Official\",\"ML #2345\"],[\"Logitech K835\",\"$38,200\",\"4.3 ⭐\",\"LogiStore\",\"ML #3456\"],[\"VSG Mintaka\",\"$22,100\",\"4.1 ⭐\",\"VSG Argentina\",\"ML #4567\"],[\"Nisuta NSKBGZ41\",\"$31,700\",\"4.0 ⭐\",\"Nisuta Shop\",\"ML #5678\"]]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Results Found\",\"value\":\"5\"},{\"label\":\"Price Range\",\"value\":\"$22,100 - $47,900\"},{\"label\":\"Avg Rating\",\"value\":\"4.3 ⭐\"}]}\n```" },
+          { event: 'user-compares', state: 'comparing', sender: 'user', message: 'Compare the Redragon Kumara and the HyperX Alloy' },
+          { event: null, state: 'comparing', sender: 'agent', message: "```comparison\n{\"left\":{\"title\":\"Redragon Kumara K552\",\"items\":[{\"label\":\"Price\",\"value\":\"$28,500\"},{\"label\":\"Switches\",\"value\":\"Outemu Blue\"},{\"label\":\"Size\",\"value\":\"TKL (87 keys)\"},{\"label\":\"Backlight\",\"value\":\"Red LED\"},{\"label\":\"Warranty\",\"value\":\"1 year\"},{\"label\":\"Rating\",\"value\":\"4.6 ⭐\"}]},\"right\":{\"title\":\"HyperX Alloy Origins Core\",\"items\":[{\"label\":\"Price\",\"value\":\"$47,900\"},{\"label\":\"Switches\",\"value\":\"HyperX Red\"},{\"label\":\"Size\",\"value\":\"TKL (87 keys)\"},{\"label\":\"Backlight\",\"value\":\"RGB per-key\"},{\"label\":\"Warranty\",\"value\":\"2 years\"},{\"label\":\"Rating\",\"value\":\"4.8 ⭐\"}]}}\n```" },
+          { event: 'show-recommendation', state: 'recommendation', sender: 'agent', message: "```quote\n{\"text\":\"If you want the best value, the Redragon Kumara at $28,500 is excellent for the price. If you want premium build quality and RGB, the HyperX Alloy at $47,900 is worth the extra. Both are TKL and well-reviewed.\",\"author\":\"Bridge Agent\",\"style\":\"info\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Buy Redragon Kumara\",\"icon\":\"🛒\",\"desc\":\"$28,500 -- Best value pick\"},{\"title\":\"Buy HyperX Alloy\",\"icon\":\"🛒\",\"desc\":\"$47,900 -- Premium pick\"},{\"title\":\"Search More\",\"icon\":\"🔍\",\"desc\":\"Refine search or try different brands\"},{\"title\":\"Save for Later\",\"icon\":\"📌\",\"desc\":\"Bookmark these results\"}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 15. PRICE TRACKER
+      // ────────────────────────────────────────────
+      {
+        id: 'price-tracker',
+        name: 'Price Tracker',
+        icon: '📊',
+        tag: 'explore',
+        desc: 'Track product prices over time, alert on drops',
+        states: ['idle', 'selecting', 'tracking', 'alert'],
+        transitions: [
+          { from: 'idle', to: 'selecting', event: 'user-requests-tracking' },
+          { from: 'selecting', to: 'tracking', event: 'variant-selected' },
+          { from: 'tracking', to: 'alert', event: 'price-alert' },
+        ],
+        steps: [
+          { event: 'user-requests-tracking', state: 'selecting', sender: 'user', message: 'Track the iPhone 15 price on MercadoLibre' },
+          { event: null, state: 'selecting', sender: 'agent', message: "Which variant do you want to track?\n\n```options\n{\"items\":[{\"title\":\"iPhone 15 128GB\",\"icon\":\"📱\",\"desc\":\"Currently ~$780,000 ARS\"},{\"title\":\"iPhone 15 256GB\",\"icon\":\"📱\",\"desc\":\"Currently ~$920,000 ARS\"},{\"title\":\"iPhone 15 Pro\",\"icon\":\"📱\",\"desc\":\"Currently ~$1,150,000 ARS\"}]}\n```" },
+          { event: 'variant-selected', state: 'tracking', sender: 'user', message: 'iPhone 15 128GB' },
+          { event: null, state: 'tracking', sender: 'agent', message: "Price history for iPhone 15 128GB on MercadoLibre:\n\n```timeline\n{\"items\":[{\"date\":\"January\",\"title\":\"$850,000 ARS\",\"desc\":\"Post-holiday pricing\"},{\"date\":\"February\",\"title\":\"$820,000 ARS\",\"desc\":\"Slight dip after initial demand\"},{\"date\":\"March\",\"title\":\"$780,000 ARS\",\"desc\":\"Current price, trending down\"}]}\n```\n\n```chartjs\n{\"type\":\"line\",\"data\":{\"labels\":[\"Oct\",\"Nov\",\"Dec\",\"Jan\",\"Feb\",\"Mar\"],\"datasets\":[{\"label\":\"Price (ARS)\",\"data\":[890000,870000,860000,850000,820000,780000],\"borderColor\":\"#316dff\",\"tension\":0.3,\"fill\":false}]},\"options\":{\"plugins\":{\"title\":{\"display\":true,\"text\":\"iPhone 15 128GB - Price History\"}},\"scales\":{\"y\":{\"beginAtZero\":false}}}}\n```\n\n```cards\n{\"items\":[{\"label\":\"Current Price\",\"value\":\"$780,000\",\"trend\":\"-4.9% this month\"},{\"label\":\"Lowest (6mo)\",\"value\":\"$750,000\",\"desc\":\"Reached in late Feb flash sale\"},{\"label\":\"Price Trend\",\"value\":\"-8.2%\",\"desc\":\"Steady decline over 6 months\"}]}\n```" },
+          { event: 'price-alert', state: 'alert', sender: 'agent', message: "```alert\n{\"type\":\"success\",\"title\":\"Price Alert!\",\"message\":\"iPhone 15 128GB dropped below your target of $800,000! Current price: $780,000 ARS on MercadoLibre.\"}\n```\n\n```quote\n{\"text\":\"Price dropped below your target of $800,000! Current price is $780,000 ARS. This is the second-lowest price in 6 months.\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 16. RESTAURANT FINDER
+      // ────────────────────────────────────────────
+      {
+        id: 'restaurant-finder',
+        name: 'Restaurant Finder',
+        icon: '🍽️',
+        tag: 'explore',
+        desc: 'Find restaurants nearby using local search',
+        states: ['idle', 'searching', 'results', 'details', 'booking'],
+        transitions: [
+          { from: 'idle', to: 'searching', event: 'user-searches' },
+          { from: 'searching', to: 'results', event: 'results-ready' },
+          { from: 'results', to: 'details', event: 'user-picks-restaurant' },
+          { from: 'details', to: 'booking', event: 'user-books' },
+        ],
+        steps: [
+          { event: 'user-searches', state: 'searching', sender: 'user', message: 'Find Italian restaurants in Palermo, Buenos Aires' },
+          { event: null, state: 'searching', sender: 'agent', message: "```progress\n{\"label\":\"Searching restaurants...\",\"value\":40,\"desc\":\"Scanning Italian restaurants in Palermo\"}\n```" },
+          { event: 'results-ready', state: 'results', sender: 'agent', message: "Found 4 Italian restaurants in Palermo:\n\n```cards\n{\"items\":[{\"label\":\"Il Ballo del Mattone\",\"value\":\"4.7 ⭐\",\"desc\":\"$$$ · Pasta artesanal · 0.3 km\"},{\"label\":\"Siamo nel Forno\",\"value\":\"4.5 ⭐\",\"desc\":\"$$ · Pizza napolitana · 0.5 km\"},{\"label\":\"Cucina Paradiso\",\"value\":\"4.6 ⭐\",\"desc\":\"$$$ · Cocina italiana clásica · 0.8 km\"},{\"label\":\"La Parolaccia\",\"value\":\"4.4 ⭐\",\"desc\":\"$$$$ · Fine dining italiano · 1.2 km\"}]}\n```\n\n```avatar-list\n{\"items\":[{\"name\":\"Il Ballo del Mattone\",\"desc\":\"Pasta artesanal\",\"status\":\"up\"},{\"name\":\"Siamo nel Forno\",\"desc\":\"Pizza napolitana\",\"status\":\"up\"},{\"name\":\"Cucina Paradiso\",\"desc\":\"Cocina clásica\",\"status\":\"up\"},{\"name\":\"La Parolaccia\",\"desc\":\"Fine dining\",\"status\":\"down\"}]}\n```" },
+          { event: 'user-picks-restaurant', state: 'details', sender: 'user', message: 'Tell me more about Il Ballo del Mattone' },
+          { event: null, state: 'details', sender: 'agent', message: "Il Ballo del Mattone:\n\n```cards\n{\"items\":[{\"label\":\"Rating\",\"value\":\"4.7 ⭐\",\"desc\":\"Based on 342 reviews\"},{\"label\":\"Reviews\",\"value\":\"342\",\"desc\":\"Mostly positive\"},{\"label\":\"Price Range\",\"value\":\"$$$\",\"desc\":\"$8,000 - $15,000 per person\"}]}\n```\n\nRecent reviews:\n\n```timeline\n{\"items\":[{\"date\":\"2 days ago\",\"title\":\"María G.\",\"desc\":\"La mejor pasta de Buenos Aires. Los sorrentinos de calabaza son increíbles.\"},{\"date\":\"5 days ago\",\"title\":\"Carlos R.\",\"desc\":\"Ambiente acogedor, servicio excelente. El tiramisú es imperdible.\"},{\"date\":\"1 week ago\",\"title\":\"Ana L.\",\"desc\":\"Siempre vuelvo. La pasta fresca se nota. Reservar con anticipación.\"},{\"date\":\"2 weeks ago\",\"title\":\"Diego M.\",\"desc\":\"Muy buena relación calidad-precio para la zona de Palermo.\"}]}\n```\n\n```options\n{\"items\":[{\"title\":\"Reserve a Table\",\"icon\":\"📅\",\"desc\":\"Book online for tonight or this weekend\"},{\"title\":\"Call Restaurant\",\"icon\":\"📞\",\"desc\":\"+54 11 4833-XXXX\"},{\"title\":\"Get Directions\",\"icon\":\"🗺️\",\"desc\":\"0.3 km -- 4 min walk\"},{\"title\":\"View Menu\",\"icon\":\"📋\",\"desc\":\"See full menu with prices\"}]}\n```" },
+          { event: 'user-books', state: 'booking', sender: 'user', message: 'Reserve a Table' },
+          { event: null, state: 'booking', sender: 'agent', message: "```steps\n{\"items\":[{\"title\":\"Select Date\",\"desc\":\"Choose your preferred date for the reservation\",\"status\":\"working\"},{\"title\":\"Choose Time\",\"desc\":\"Available slots: 20:00, 20:30, 21:00, 21:30\",\"status\":\"pending\"},{\"title\":\"Party Size\",\"desc\":\"How many guests?\",\"status\":\"pending\"},{\"title\":\"Confirm Reservation\",\"desc\":\"Review and confirm your booking\",\"status\":\"pending\"}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 17. NEWS BRIEFING
+      // ────────────────────────────────────────────
+      {
+        id: 'news-briefing',
+        name: 'News Briefing',
+        icon: '📰',
+        tag: 'explore',
+        desc: 'Curate a personalized news briefing from web search',
+        states: ['idle', 'gathering', 'curating', 'briefing', 'deep-dive'],
+        transitions: [
+          { from: 'idle', to: 'gathering', event: 'user-requests-news' },
+          { from: 'gathering', to: 'curating', event: 'articles-found' },
+          { from: 'curating', to: 'briefing', event: 'briefing-ready' },
+          { from: 'briefing', to: 'deep-dive', event: 'user-clicks-story' },
+        ],
+        steps: [
+          { event: 'user-requests-news', state: 'gathering', sender: 'user', message: "Give me today's tech news" },
+          { event: null, state: 'gathering', sender: 'agent', message: "```progress\n{\"label\":\"Gathering news...\",\"value\":50,\"desc\":\"Scanning tech news sources\"}\n```\n\n```status\n{\"items\":[{\"label\":\"Tech news\",\"status\":\"working\",\"desc\":\"Scanning major tech outlets\"},{\"label\":\"AI news\",\"status\":\"working\",\"desc\":\"Checking AI-specific sources\"},{\"label\":\"Crypto\",\"status\":\"pending\",\"desc\":\"Queued\"}]}\n```" },
+          { event: 'articles-found', state: 'curating', sender: 'agent', message: "```progress\n{\"label\":\"Curating briefing...\",\"value\":80,\"desc\":\"Selecting top stories\"}\n```\n\n```quote\n{\"text\":\"Found 24 articles, selecting top stories...\",\"style\":\"info\"}\n```" },
+          { event: 'briefing-ready', state: 'briefing', sender: 'agent', message: "Your tech news briefing:\n\n```timeline\n{\"items\":[{\"date\":\"2h ago\",\"title\":\"OpenAI announces GPT-5 with real-time reasoning\",\"desc\":\"Major leap in multi-step problem solving, available to Plus subscribers first.\"},{\"date\":\"4h ago\",\"title\":\"Apple Vision Pro 2 leaks reveal lighter design\",\"desc\":\"50% lighter, external battery eliminated, expected Q4 launch.\"},{\"date\":\"6h ago\",\"title\":\"Argentina's tech sector grows 23% in Q1\",\"desc\":\"Startup funding doubles year-over-year, led by fintech and AI companies.\"},{\"date\":\"Yesterday\",\"title\":\"GitHub Copilot now writes full test suites\",\"desc\":\"New agent mode generates comprehensive test coverage from codebase analysis.\"},{\"date\":\"Yesterday\",\"title\":\"Bitcoin hits $95,000 amid ETF inflows\",\"desc\":\"Institutional demand continues to drive price, Ethereum follows at $4,200.\"}]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Sources Checked\",\"value\":\"24\"},{\"label\":\"Top Stories\",\"value\":\"5\"},{\"label\":\"Categories\",\"value\":\"3\",\"desc\":\"Tech, AI, Crypto\"}]}\n```" },
+          { event: 'user-clicks-story', state: 'deep-dive', sender: 'user', message: 'Tell me more about the GPT-5 announcement' },
+          { event: null, state: 'deep-dive', sender: 'agent', message: "```quote\n{\"text\":\"OpenAI has announced GPT-5, featuring real-time multi-step reasoning capabilities. The model can break down complex problems, verify its own logic, and correct mistakes mid-response. Benchmarks show a 40% improvement on graduate-level math and coding tasks. Available initially to ChatGPT Plus subscribers, with API access rolling out next month. Enterprise pricing starts at $0.03/1K tokens.\",\"author\":\"Summary from TechCrunch, The Verge, Ars Technica\",\"style\":\"info\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Read Full Article\",\"icon\":\"📄\",\"desc\":\"Open the original TechCrunch article\"},{\"title\":\"Related Stories\",\"icon\":\"🔗\",\"desc\":\"See 3 related articles about GPT-5\"},{\"title\":\"Save to Reading List\",\"icon\":\"📌\",\"desc\":\"Bookmark for later\"}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 18. TRAVEL PLANNER
+      // ────────────────────────────────────────────
+      {
+        id: 'travel-planner',
+        name: 'Travel Planner',
+        icon: '✈️',
+        tag: 'explore',
+        desc: 'Plan a trip with flights, hotels, and activities from web search',
+        states: ['idle', 'searching-flights', 'searching-hotels', 'itinerary', 'booking'],
+        transitions: [
+          { from: 'idle', to: 'searching-flights', event: 'user-plans-trip' },
+          { from: 'searching-flights', to: 'searching-hotels', event: 'flights-found' },
+          { from: 'searching-hotels', to: 'itinerary', event: 'hotels-found' },
+          { from: 'itinerary', to: 'booking', event: 'user-books' },
+        ],
+        steps: [
+          { event: 'user-plans-trip', state: 'searching-flights', sender: 'user', message: 'Plan a weekend trip to Bariloche from Buenos Aires' },
+          { event: null, state: 'searching-flights', sender: 'agent', message: "```progress\n{\"label\":\"Searching flights...\",\"value\":30,\"desc\":\"Scanning airlines for Buenos Aires → Bariloche\"}\n```\n\n```status\n{\"items\":[{\"label\":\"Flights\",\"status\":\"working\",\"desc\":\"Checking Aerolíneas, LATAM, Flybondi\"},{\"label\":\"Hotels\",\"status\":\"pending\",\"desc\":\"Queued\"},{\"label\":\"Activities\",\"status\":\"pending\",\"desc\":\"Queued\"}]}\n```" },
+          { event: 'flights-found', state: 'searching-hotels', sender: 'agent', message: "Flights found:\n\n```table\n{\"headers\":[\"Airline\",\"Departure\",\"Price (ARS)\",\"Stops\"],\"rows\":[[\"Aerolíneas Argentinas\",\"Fri 08:30\",\"$45,000\",\"Direct\"],[\"LATAM\",\"Fri 10:15\",\"$52,000\",\"Direct\"],[\"Flybondi\",\"Fri 06:00\",\"$32,000\",\"Direct\"],[\"Aerolíneas Argentinas\",\"Fri 14:45\",\"$48,500\",\"Direct\"]]}\n```\n\n```progress\n{\"label\":\"Searching hotels...\",\"value\":60,\"desc\":\"Scanning availability for 2 nights\"}\n```\n\n```status\n{\"items\":[{\"label\":\"Flights\",\"status\":\"done\",\"desc\":\"4 options found\"},{\"label\":\"Hotels\",\"status\":\"working\",\"desc\":\"Checking Booking, Despegar\"},{\"label\":\"Activities\",\"status\":\"pending\",\"desc\":\"Queued\"}]}\n```" },
+          { event: 'hotels-found', state: 'itinerary', sender: 'agent', message: "Hotels available:\n\n```table\n{\"headers\":[\"Hotel\",\"Price/Night (ARS)\",\"Rating\",\"Location\"],\"rows\":[[\"Llao Llao Resort\",\"$120,000\",\"4.9 ⭐\",\"Lago Nahuel Huapi\"],[\"Hotel Panamericano\",\"$65,000\",\"4.5 ⭐\",\"Centro cívico\"],[\"Charming Luxury Lodge\",\"$85,000\",\"4.7 ⭐\",\"Circuito Chico\"]]}\n```\n\nSuggested itinerary:\n\n```steps\n{\"items\":[{\"title\":\"Day 1: Arrive & Check In\",\"desc\":\"Morning flight, settle into hotel, explore downtown Bariloche, chocolate shops on Mitre street\"},{\"title\":\"Day 2: Cerro Catedral Skiing\",\"desc\":\"Full day at Cerro Catedral ski resort. Equipment rental available on-site. Après-ski at the base lodge.\"},{\"title\":\"Day 3: Circuito Chico & Return\",\"desc\":\"Morning scenic drive around Circuito Chico (25 km loop), lunch at Colonia Suiza, afternoon flight home\"}]}\n```\n\n```cards\n{\"items\":[{\"label\":\"Total Estimate\",\"value\":\"$285,000\",\"desc\":\"Flight + 2 nights + activities\"},{\"label\":\"Duration\",\"value\":\"2 nights\",\"desc\":\"Fri to Sun\"},{\"label\":\"Activities\",\"value\":\"3\",\"desc\":\"Skiing, Circuito Chico, Downtown\"}]}\n```" },
+          { event: 'user-books', state: 'booking', sender: 'user', message: "Let's book it!" },
+          { event: null, state: 'booking', sender: 'agent', message: "Booking checklist:\n\n```steps\n{\"items\":[{\"title\":\"Book flight AA1234 — $45,000\",\"desc\":\"Aerolíneas Argentinas, Fri 08:30 direct\",\"status\":\"done\"},{\"title\":\"Reserve Hotel Llao Llao — $120,000/night\",\"desc\":\"2 nights, Fri-Sun, lake view room\",\"status\":\"working\"},{\"title\":\"Book ski pass — $35,000\",\"desc\":\"Full day at Cerro Catedral, equipment included\",\"status\":\"pending\"},{\"title\":\"Reserve car rental — $28,000\",\"desc\":\"Compact SUV for Circuito Chico drive\",\"status\":\"pending\"}]}\n```" },
+        ],
+      },
     ];
 
     var scenarios = DEMO_SCENARIOS.slice();
@@ -664,8 +1028,8 @@
 
     function renderSidebar() {
       var sb = document.getElementById('sidebar');
-      var tagMap = { flow: 's-tag--flow', report: 's-tag--report', action: 's-tag--action', monitor: 's-tag--monitor' };
-      var tagLabels = { flow: 'Flow', report: 'Report', action: 'Action', monitor: 'Monitor' };
+      var tagMap = { flow: 's-tag--flow', report: 's-tag--report', action: 's-tag--action', monitor: 's-tag--monitor', workflow: 's-tag--workflow', explore: 's-tag--explore', composition: 's-tag--composition' };
+      var tagLabels = { flow: 'Flow', report: 'Report', action: 'Action', monitor: 'Monitor', workflow: 'Workflow', explore: 'Explore', composition: 'Composition' };
       sb.innerHTML = '<div class="sidebar-title">Scenarios</div>' + scenarios.map(function(s) {
         var tagCls = tagMap[s.tag] || 's-tag--flow';
         var tagLabel = tagLabels[s.tag] || s.tag || '';
