@@ -98,12 +98,18 @@ print(json.dumps(charts))
 
 # Step 3: Generate WSJ-style HTML with Tailwind + Chart.js
 echo "Generating HTML report..."
-python3 << 'PYEOF'
-import json, sys
+export REPORT_MARKDOWN="$MARKDOWN"
+export REPORT_CHARTS="$CHART_DATA"
+export REPORT_BENCH="$BENCH_DATA"
+export REPORT_OUT="$REPORT_HTML"
 
-markdown = sys.argv[1] if len(sys.argv) > 1 else ""
-charts = json.loads(sys.argv[2]) if len(sys.argv) > 2 else []
-bench_data = json.loads(sys.argv[3]) if len(sys.argv) > 3 else []
+python3 << 'PYEOF'
+import json, sys, os
+
+markdown = os.environ.get('REPORT_MARKDOWN', '')
+charts = json.loads(os.environ.get('REPORT_CHARTS', '[]'))
+bench_data = json.loads(os.environ.get('REPORT_BENCH', '[]'))
+REPORT_HTML = os.environ.get('REPORT_OUT', 'report.html')
 
 # Convert markdown to simple HTML
 import re
@@ -241,10 +247,10 @@ report = f"""<!DOCTYPE html>
 </body>
 </html>"""
 
-with open(sys.argv[4], 'w') as f:
+with open(REPORT_HTML, 'w') as f:
     f.write(report)
-print(f"Report saved: {sys.argv[4]} ({len(report)} bytes)")
-PYEOF "$MARKDOWN" "$CHART_DATA" "$BENCH_DATA" "$REPORT_HTML"
+print(f"Report saved: {REPORT_HTML} ({len(report)} bytes)")
+PYEOF
 
 echo ""
 echo "Opening report..."
