@@ -41,22 +41,50 @@ for f in files:
 print(json.dumps(benchmarks, indent=2))
 ")
 
-# Step 1: Ask Claude to write a markdown analysis
-echo "Generating analysis with Claude..."
-MARKDOWN=$(echo "You are a senior data analyst. Analyze this benchmark data and write a professional markdown report.
+# Collect actual research data from SQLite
+COLLECTED_DATA=$(node -e "
+const db = require('./lib/db');
+const rows = db.getData('hr-research').concat(db.getData('web-browse'));
+for (const r of rows.slice(0, 20)) {
+  try {
+    const d = JSON.parse(r.data);
+    const text = d.text || d.response || '';
+    if (text) {
+      const name = r.collection.split('/').pop().replace(/_/g, ' ');
+      console.log('### ' + name.charAt(0).toUpperCase() + name.slice(1));
+      console.log(text.substring(0, 800));
+      console.log();
+    }
+  } catch(e) {}
+}
+const stats = db.getStats();
+console.log('### Database Stats');
+console.log('Collections: ' + stats.collections + ', Total rows: ' + stats.totalRows + ', Benchmarks: ' + stats.benchmarks);
+" 2>/dev/null)
 
-BENCHMARK DATA:
+# Step 1: Ask Claude to write a data-first analysis
+echo "Generating analysis with Claude..."
+MARKDOWN=$(echo "You are a senior data analyst writing a Wall Street Journal style research brief. The report should lead with the FINDINGS, not the methodology.
+
+COLLECTED RESEARCH DATA:
+$COLLECTED_DATA
+
+BENCHMARK TIMINGS:
 $BENCH_DATA
 
-Write a report with these sections:
-1. **Executive Summary** — one paragraph overview
-2. **Performance Metrics** — a markdown table of step timings
-3. **Trends** — if multiple runs exist, describe improvement/regression
-4. **Data Quality** — assess the quality of collected data
-5. **Recommendations** — 3 actionable suggestions for improvement
+Write a professional report with these sections:
 
-Include specific numbers. Be concise. Use markdown tables and bullet points.
-Do NOT include code blocks or technical implementation details." | claude --model haiku --output-format text --dangerously-skip-permissions --tools "" -p -)
+1. **Key Findings** — lead with the most important data insights. What did we learn about the Scala developer market in LATAM? What are the salary ranges? Where is the talent? Use specific numbers from the data above.
+
+2. **Market Overview** — synthesize the data into a narrative. Trends, pricing, talent distribution. Write as if briefing an executive.
+
+3. **Data Sources & Coverage** — which sites were browsed, how many data points collected, data quality assessment.
+
+4. **Performance Metrics** — a markdown table of benchmark step timings (search, collect, enrich, csv, chart).
+
+5. **Methodology** — brief note on how data was collected (Playwright browser automation, real website browsing).
+
+IMPORTANT: Start with the actual findings. Numbers first, methodology last. Be specific — cite actual salary figures, product prices, candidate counts from the data above." | claude --model haiku --output-format text --dangerously-skip-permissions --tools "" -p -)
 
 echo "Analysis complete ($(echo "$MARKDOWN" | wc -c | tr -d ' ') chars)"
 
