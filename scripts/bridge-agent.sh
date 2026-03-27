@@ -80,13 +80,13 @@ echo "[setup] OpenCode session: ${OC_SESSION_ID:0:16}..."
 # OpenCode remembers everything in the session — no need to resend
 
 RECENT_COMMITS=$(cd "$PROJECT_ROOT" && git log --oneline -10 2>/dev/null)
-PROJECT_CONTEXT=$(head -80 "$PROJECT_ROOT/CLAUDE.md" 2>/dev/null)
 
-SYSTEM_MSG="You are Bridge Agent for the project '$PROJECT_NAME'.
-You talk to users via Telegram. You are the project's AI assistant.
+# ─── Default directives (used as fallback and for seeding Firebase) ───
 
-RULES:
-- Keep responses SHORT (under 400 chars). Be concise and natural.
+DEFAULT_SYSTEM="You are Bridge Agent for the project '$PROJECT_NAME'.
+You talk to users via Telegram. You are the project's AI assistant."
+
+DEFAULT_RULES="- Keep responses SHORT (under 400 chars). Be concise and natural.
 - NEVER mention scripts, CLI commands, internal tools, file paths, or code.
 - NEVER say things like 'run ./scripts/...' or 'use bridge.sh' — users don't see those.
 - You are a polished Telegram bot, not a developer tool. Speak like a friendly assistant.
@@ -95,7 +95,67 @@ RULES:
   \`\`\`options
   {\"items\":[{\"title\":\"Option 1\",\"desc\":\"Description 1\"},{\"title\":\"Option 2\",\"desc\":\"Description 2\"}]}
   \`\`\`
-  This renders interactive cards in the miniapp. Use this format for any alternatives/recommendations.
+  This renders interactive cards in the miniapp. Use this format for any alternatives/recommendations."
+
+# ─── Fetch directives from Firebase (seed defaults if missing) ───
+
+DIRECTIVES_JSON=$(python3 -c "
+import json, sys, urllib.request
+
+FIREBASE_URL = sys.argv[1]
+FB_ROOT = sys.argv[2]
+default_system = sys.argv[3]
+default_rules = sys.argv[4]
+
+directives_url = FIREBASE_URL + '/' + FB_ROOT + '/bridge-config/bot-directives.json'
+
+system_prompt = default_system
+rules = default_rules
+seeded = False
+
+try:
+    req = urllib.request.Request(directives_url)
+    resp = urllib.request.urlopen(req, timeout=5)
+    data = json.loads(resp.read().decode())
+    if data and isinstance(data, dict):
+        if data.get('system'):
+            system_prompt = data['system']
+        if data.get('rules'):
+            rules = data['rules']
+    else:
+        raise ValueError('empty')
+except:
+    # Firebase returned null or errored — seed with defaults
+    try:
+        payload = json.dumps({'system': default_system, 'rules': default_rules}).encode()
+        req = urllib.request.Request(directives_url, data=payload, method='PUT',
+            headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=5)
+        seeded = True
+    except:
+        pass
+
+print(json.dumps({'system': system_prompt, 'rules': rules, 'seeded': seeded}))
+" "$FIREBASE_URL" "$FB_ROOT" "$DEFAULT_SYSTEM" "$DEFAULT_RULES" 2>/dev/null)
+
+DIRECTIVES_SYSTEM=$(python3 -c "import json,sys;d=json.loads(sys.argv[1]);print(d['system'])" "$DIRECTIVES_JSON" 2>/dev/null)
+DIRECTIVES_RULES=$(python3 -c "import json,sys;d=json.loads(sys.argv[1]);print(d['rules'])" "$DIRECTIVES_JSON" 2>/dev/null)
+DIRECTIVES_SEEDED=$(python3 -c "import json,sys;d=json.loads(sys.argv[1]);print('yes' if d.get('seeded') else 'no')" "$DIRECTIVES_JSON" 2>/dev/null)
+
+# Fallback if parsing failed
+[ -z "$DIRECTIVES_SYSTEM" ] && DIRECTIVES_SYSTEM="$DEFAULT_SYSTEM"
+[ -z "$DIRECTIVES_RULES" ] && DIRECTIVES_RULES="$DEFAULT_RULES"
+
+if [ "$DIRECTIVES_SEEDED" = "yes" ]; then
+  echo "[setup] Seeded default bot directives to Firebase"
+else
+  echo "[setup] Loaded bot directives from Firebase"
+fi
+
+SYSTEM_MSG="$DIRECTIVES_SYSTEM
+
+RULES:
+$DIRECTIVES_RULES
 
 Project: $PROJECT_NAME
 

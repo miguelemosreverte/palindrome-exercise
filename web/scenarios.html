@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bridge Scenarios</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+// ── Bridge Components (inlined from components.js) ──
+(function(global) {
+  'use strict';
+  function esc(s) { var d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML; }
+  var RENDERERS = {
+    timeline: function(data) {
+      var items = normalizeItems(data);
+      return '<div class="rc-timeline">' + items.map(function(item) {
+        var date = item.date || item.year || item.fecha || '';
+        var title = item.title || item.nombre || item.event || '';
+        var desc = item.desc || item.descripcion || item.description || '';
+        return '<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>' +
+          '<div class="rc-timeline-content"><div class="rc-timeline-date">' + esc(date) + '</div><div class="rc-timeline-title">' + esc(title) + '</div>' +
+          (desc ? '<div class="rc-timeline-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    },
+    options: function(data) {
+      var items = normalizeItems(data);
+      return '<div class="rc-options">' + items.map(function(item) {
+        var title = item.title || item.nombre || item.opcion || '';
+        var desc = item.desc || item.descripcion || item.description || '';
+        return '<div class="rc-option" onclick="BridgeComponents.onSelect(this,\'' + esc(title).replace(/'/g, "\\'") + '\')"><div class="rc-option-body"><div class="rc-option-title">' + esc(title) + '</div>' +
+          (desc ? '<div class="rc-option-desc">' + esc(desc) + '</div>' : '') + '</div><div class="rc-option-arrow">&rarr;</div></div>';
+      }).join('') + '</div>';
+    },
+    cards: function(data) {
+      var items = normalizeItems(data);
+      return '<div class="rc-cards">' + items.map(function(item) {
+        var label = item.label || item.etiqueta || item.title || '';
+        var value = item.value || item.valor || '';
+        var desc = item.desc || item.descripcion || item.description || '';
+        return '<div class="rc-card"><div class="rc-card-label">' + esc(label) + '</div><div class="rc-card-value">' + esc(value) + '</div>' +
+          (desc ? '<div class="rc-card-desc">' + esc(desc) + '</div>' : '') + '</div>';
+      }).join('') + '</div>';
+    },
+    table: function(data) {
+      var headers = data.headers || data.columnas || [];
+      var rows = data.rows || data.filas || [];
+      var html = '<table class="rc-table"><thead><tr>';
+      for (var i = 0; i < headers.length; i++) html += '<th>' + esc(headers[i]) + '</th>';
+      html += '</tr></thead><tbody>';
+      for (var r = 0; r < rows.length; r++) { html += '<tr>'; var row = rows[r]; for (var c = 0; c < row.length; c++) html += '<td>' + esc(row[c]) + '</td>'; html += '</tr>'; }
+      return html + '</tbody></table>';
+    },
+    steps: function(data) {
+      var items = normalizeItems(data);
+      return '<div class="rc-steps">' + items.map(function(item, i) {
+        var title = item.title || item.nombre || item.paso || '';
+        var desc = item.desc || item.descripcion || item.description || '';
+        return '<div class="rc-step"><div class="rc-step-num">' + (i + 1) + '</div><div class="rc-step-body"><div class="rc-step-title">' + esc(title) + '</div>' +
+          (desc ? '<div class="rc-step-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    },
+    progress: function(data) {
+      var label = data.label || data.title || '';
+      var value = Math.min(100, Math.max(0, Number(data.value || data.percent || 0)));
+      var desc = data.desc || data.description || '';
+      return '<div class="rc-progress"><div class="rc-progress-label">' + esc(label) + ' <span class="rc-progress-value">' + value + '%</span></div>' +
+        '<div class="rc-progress-bar"><div class="rc-progress-fill" style="width:' + value + '%"></div></div>' +
+        (desc ? '<div class="rc-progress-desc">' + esc(desc) + '</div>' : '') + '</div>';
+    },
+    status: function(data) {
+      var items = normalizeItems(data);
+      return '<div class="rc-status-list">' + items.map(function(item) {
+        var label = item.label || item.title || item.task || '';
+        var state = item.state || item.status || 'pending';
+        var icons = { done: '\u2705', working: '\uD83D\uDD27', pending: '\u23F3', error: '\uD83D\uDEA8', blocked: '\uD83D\uDEAB' };
+        return '<div class="rc-status-item"><span class="rc-status-icon">' + (icons[state] || '\u23F3') + '</span><span>' + esc(label) + '</span></div>';
+      }).join('') + '</div>';
+    },
+  };
+  function normalizeItems(data) { if (Array.isArray(data)) return data; return data.items || data.eventos || data.opciones || data.pasos || []; }
+  function render(lang, jsonString) {
+    try { var data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString; var renderer = RENDERERS[lang]; if (renderer) return renderer(data); return '<pre>' + esc(JSON.stringify(data, null, 2)) + '</pre>'; }
+    catch (e) { return '<pre>' + esc(jsonString) + '</pre>'; }
+  }
+  function md(text) {
+    if (!text) return '';
+    var html = ''; var parts = text.split(/(```\w+[\s\S]*?```)/);
+    for (var i = 0; i < parts.length; i++) { var part = parts[i]; var match = part.match(/^```(\w+)\n([\s\S]*?)```$/);
+      if (match && RENDERERS[match[1]]) { html += render(match[1], match[2].trim()); } else { html += esc(part).replace(/\n/g, '<br>'); } }
+    return html;
+  }
+  var onSelectCallback = function() {};
+  function injectCSS() {
+    if (document.getElementById('bridge-components-css')) return;
+    var style = document.createElement('style'); style.id = 'bridge-components-css';
+    style.textContent = '.rc-timeline{padding:8px 0}.rc-timeline-item{display:flex;gap:12px;position:relative;padding-bottom:20px;align-items:stretch}.rc-timeline-item:last-child{padding-bottom:0}.rc-timeline-track{display:flex;flex-direction:column;align-items:center;width:18px;flex-shrink:0}.rc-timeline-dot{width:10px;height:10px;border-radius:50%;background:var(--ocean,#316dff);border:2px solid rgba(49,109,255,0.2);z-index:1;flex-shrink:0}.rc-timeline-line{width:2px;flex:1;background:var(--line,rgba(0,0,0,0.08));margin-top:4px}.rc-timeline-item:last-child .rc-timeline-line{display:none}.rc-timeline-content{flex:1}.rc-timeline-date{font-size:11px;font-weight:700;color:var(--ocean,#316dff);margin-bottom:2px}.rc-timeline-title{font-size:14px;font-weight:700;line-height:1.3}.rc-timeline-desc{font-size:12px;color:var(--slate,#56708a);line-height:1.5;margin-top:2px}.rc-options{display:flex;flex-direction:column;gap:8px}.rc-option{display:flex;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));cursor:pointer;transition:all .15s}.rc-option:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}.rc-option.selected{border-color:var(--ocean,#316dff);background:rgba(49,109,255,0.06)}.rc-option-body{flex:1}.rc-option-title{font-size:14px;font-weight:700}.rc-option-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}.rc-option-arrow{font-size:18px;color:var(--slate,#56708a);margin-left:8px}.rc-option.selected .rc-option-arrow{color:var(--ocean,#316dff)}.rc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.rc-card{padding:14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08))}.rc-card-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700}.rc-card-value{font-size:22px;font-weight:800;margin-top:2px}.rc-card-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}.rc-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;border:1px solid var(--line,rgba(0,0,0,0.08));font-size:13px}.rc-table th{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700;text-align:left;padding:10px 12px;border-bottom:2px solid var(--line,rgba(0,0,0,0.08))}.rc-table td{padding:8px 12px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08))}.rc-table tr:last-child td{border-bottom:none}.rc-steps{display:flex;flex-direction:column}.rc-step{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--line,rgba(0,0,0,0.08))}.rc-step:first-child{border-top:none}.rc-step-num{width:32px;height:32px;border-radius:10px;background:var(--ocean,#316dff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}.rc-step-body{flex:1}.rc-step-title{font-size:14px;font-weight:700}.rc-step-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}.rc-progress{margin:8px 0}.rc-progress-label{font-size:13px;font-weight:600;display:flex;justify-content:space-between;margin-bottom:6px}.rc-progress-value{color:var(--ocean,#316dff)}.rc-progress-bar{height:8px;border-radius:4px;background:var(--line,rgba(0,0,0,0.08));overflow:hidden}.rc-progress-fill{height:100%;border-radius:4px;background:var(--ocean,#316dff);transition:width .3s}.rc-progress-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}.rc-status-list{display:flex;flex-direction:column;gap:6px}.rc-status-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 0}.rc-status-icon{font-size:16px}';
+    document.head.appendChild(style);
+  }
+  global.BridgeComponents = {
+    render: render, md: md, injectCSS: injectCSS,
+    onSelect: function(el, title) { var siblings = el.parentElement.querySelectorAll('.rc-option'); for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('selected'); el.classList.add('selected'); if (onSelectCallback) onSelectCallback(title, el); },
+    setOnSelect: function(fn) { onSelectCallback = fn; },
+  };
+})(window);
+  </script>
+  <style>
+    :root { --sky:#e8f0fe; --ocean:#316dff; --ink:#1a2b3c; --slate:#56708a; --line:rgba(0,0,0,0.08); }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Instrument Sans',system-ui,sans-serif; background:#f4f6f9; color:var(--ink); min-height:100vh; display:flex; flex-direction:column; }
+
+    /* ── Header ── */
+    .header { background:#fff; border-bottom:1px solid var(--line); padding:16px 24px; display:flex; align-items:center; gap:12px; }
+    .header h1 { font-size:20px; font-weight:800; }
+    .header span { font-size:13px; color:var(--slate); }
+
+    /* ── Layout ── */
+    .layout { display:flex; flex:1; min-height:0; }
+    .sidebar { width:260px; background:#fff; border-right:1px solid var(--line); overflow-y:auto; flex-shrink:0; }
+    .main { flex:1; display:flex; flex-direction:column; overflow-y:auto; padding:24px; gap:24px; }
+
+    /* ── Sidebar items ── */
+    .scenario-item { padding:14px 18px; cursor:pointer; border-bottom:1px solid var(--line); transition:background .15s; }
+    .scenario-item:hover { background:var(--sky); }
+    .scenario-item.active { background:rgba(49,109,255,0.08); border-left:3px solid var(--ocean); }
+    .scenario-item h3 { font-size:14px; font-weight:700; }
+    .scenario-item p { font-size:11px; color:var(--slate); margin-top:2px; }
+
+    /* ── State Diagram ── */
+    .state-diagram { background:#fff; border-radius:16px; border:1px solid var(--line); padding:24px; }
+    .state-diagram h2 { font-size:14px; font-weight:700; margin-bottom:16px; color:var(--slate); text-transform:uppercase; letter-spacing:.08em; }
+    .states-row { display:flex; align-items:center; gap:0; flex-wrap:wrap; justify-content:center; }
+    .state-node { width:100px; height:100px; border-radius:50%; border:3px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; text-align:center; padding:8px; transition:all .3s; background:#fff; flex-shrink:0; }
+    .state-node.active { border-color:var(--ocean); background:rgba(49,109,255,0.08); color:var(--ocean); box-shadow:0 0 0 6px rgba(49,109,255,0.12); }
+    .state-node.visited { border-color:var(--ocean); opacity:.5; }
+    .state-arrow { font-size:20px; color:var(--line); margin:0 4px; flex-shrink:0; }
+    .state-arrow.active { color:var(--ocean); }
+
+    /* ── Controls ── */
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .controls button { padding:8px 18px; border-radius:10px; border:1px solid var(--line); background:#fff; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer; transition:all .15s; }
+    .controls button:hover { background:var(--sky); }
+    .controls button.primary { background:var(--ocean); color:#fff; border-color:var(--ocean); }
+    .controls button.primary:hover { background:#2555cc; }
+    .controls button:disabled { opacity:.4; cursor:default; }
+    .step-label { font-size:13px; color:var(--slate); font-weight:600; margin-left:auto; }
+
+    /* ── Chat Preview ── */
+    .chat-area { background:#fff; border-radius:16px; border:1px solid var(--line); display:flex; flex-direction:column; min-height:300px; }
+    .chat-header { padding:12px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+    .chat-header .dot { width:8px; height:8px; border-radius:50%; background:#34d399; }
+    .chat-header span { font-size:13px; font-weight:700; }
+    .fsm-badge { margin-left:auto; font-size:11px; font-weight:700; background:rgba(49,109,255,0.1); color:var(--ocean); padding:4px 10px; border-radius:8px; }
+    .chat-messages { flex:1; padding:18px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+    .msg { max-width:85%; padding:12px 16px; border-radius:18px; font-size:14px; line-height:1.5; animation:msgIn .25s ease; }
+    .msg.agent { background:var(--sky); align-self:flex-start; border-bottom-left-radius:4px; }
+    .msg.user { background:var(--ocean); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+    .msg-sender { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--slate); margin-bottom:4px; }
+    .msg.user .msg-sender { color:rgba(255,255,255,.7); }
+    @keyframes msgIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ── Event Log ── */
+    .event-log { background:#fff; border-radius:16px; border:1px solid var(--line); padding:18px; }
+    .event-log h2 { font-size:14px; font-weight:700; margin-bottom:12px; color:var(--slate); text-transform:uppercase; letter-spacing:.08em; }
+    .log-entry { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+    .log-entry:last-child { border-bottom:none; }
+    .log-entry.future { opacity:.3; }
+    .log-entry.current { color:var(--ocean); font-weight:700; }
+    .log-idx { width:24px; height:24px; border-radius:8px; background:var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+    .log-entry.current .log-idx { background:var(--ocean); color:#fff; }
+    .log-event { flex:1; }
+    .log-state { font-size:11px; color:var(--slate); font-weight:600; }
+
+    /* ── Empty state ── */
+    .empty { display:flex; align-items:center; justify-content:center; flex:1; color:var(--slate); font-size:15px; text-align:center; padding:40px; }
+
+    /* ── Mobile ── */
+    @media(max-width:700px) {
+      .layout { flex-direction:column; }
+      .sidebar { width:100%; max-height:180px; border-right:none; border-bottom:1px solid var(--line); display:flex; overflow-x:auto; overflow-y:hidden; }
+      .scenario-item { white-space:nowrap; border-bottom:none; border-right:1px solid var(--line); }
+      .main { padding:16px; }
+      .state-node { width:70px; height:70px; font-size:9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Bridge Scenarios</h1>
+    <span>Visual scenario replay and storybook</span>
+  </div>
+  <div class="layout">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main" id="main">
+      <div class="empty">Select a scenario from the sidebar to begin.</div>
+    </div>
+  </div>
+
+  <script>
+    BridgeComponents.injectCSS();
+
+    var FIREBASE_URL = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
+
+    // ── Built-in demo scenarios ──
+    var DEMO_SCENARIOS = [
+      {
+        id: 'onboarding',
+        name: 'Onboarding Flow',
+        desc: 'User connects and explores options',
+        states: ['idle', 'greeting', 'showing-options', 'chatting'],
+        transitions: [
+          { from: 'idle', to: 'greeting', event: 'user-connects' },
+          { from: 'greeting', to: 'showing-options', event: 'user-asks-options' },
+          { from: 'showing-options', to: 'chatting', event: 'option-selected' },
+        ],
+        steps: [
+          { event: 'user-connects', state: 'greeting', sender: 'agent', message: "Hey! I'm Bridge Agent for your project. What would you like to do?" },
+          { event: 'user-asks-options', state: 'showing-options', sender: 'agent', message: '```options\n{"items":[{"title":"Check project status","desc":"See what\'s been shipped"},{"title":"Start a new task","desc":"Tell me what to build"},{"title":"View timeline","desc":"See project history"}]}\n```' },
+          { event: 'option-selected', state: 'chatting', sender: 'user', message: 'Check project status' },
+          { event: null, state: 'chatting', sender: 'agent', message: 'Great choice! Let me pull up the project status...' },
+        ],
+      },
+      {
+        id: 'approval',
+        name: 'Approval Flow',
+        desc: 'Agent requests user approval for an action',
+        states: ['idle', 'requesting', 'waiting-approval', 'approved', 'denied'],
+        transitions: [
+          { from: 'idle', to: 'requesting', event: 'agent-needs-approval' },
+          { from: 'requesting', to: 'waiting-approval', event: 'approval-sent' },
+          { from: 'waiting-approval', to: 'approved', event: 'user-approves' },
+          { from: 'waiting-approval', to: 'denied', event: 'user-denies' },
+        ],
+        steps: [
+          { event: 'agent-needs-approval', state: 'requesting', sender: 'agent', message: 'I need to deploy the latest build to production. This will affect 3 services.' },
+          { event: 'approval-sent', state: 'waiting-approval', sender: 'agent', message: '```options\n{"items":[{"title":"Approve deploy","desc":"Push v2.4.1 to production now"},{"title":"Deny","desc":"Cancel this deployment"}]}\n```' },
+          { event: 'user-approves', state: 'approved', sender: 'user', message: 'Approve deploy' },
+          { event: null, state: 'approved', sender: 'agent', message: '```progress\n{"label":"Deploying to production","value":100,"desc":"All 3 services updated successfully"}\n```' },
+        ],
+      },
+      {
+        id: 'status-report',
+        name: 'Project Status Report',
+        desc: 'User asks for status, gets rich report',
+        states: ['idle', 'gathering', 'reporting'],
+        transitions: [
+          { from: 'idle', to: 'gathering', event: 'user-asks-status' },
+          { from: 'gathering', to: 'reporting', event: 'data-ready' },
+        ],
+        steps: [
+          { event: 'user-asks-status', state: 'gathering', sender: 'user', message: 'How is the project going?' },
+          { event: null, state: 'gathering', sender: 'agent', message: 'Gathering project data...' },
+          { event: 'data-ready', state: 'reporting', sender: 'agent', message: '```status\n{"items":[{"label":"API endpoints","status":"done"},{"label":"Auth module","status":"done"},{"label":"Dashboard UI","status":"working"},{"label":"Mobile app","status":"pending"}]}\n```' },
+          { event: null, state: 'reporting', sender: 'agent', message: '```cards\n{"items":[{"label":"Commits this week","value":"42"},{"label":"Open PRs","value":"3"},{"label":"Tests passing","value":"98%"},{"label":"Deploy count","value":"7"}]}\n```' },
+          { event: null, state: 'reporting', sender: 'agent', message: '```timeline\n{"items":[{"date":"Today","title":"Dashboard redesign","desc":"New layout with responsive grid"},{"date":"Yesterday","title":"Auth refactor","desc":"Switched to JWT with refresh tokens"},{"date":"2 days ago","title":"API v2 released","desc":"Breaking changes documented"}]}\n```' },
+        ],
+      },
+    ];
+
+    var scenarios = DEMO_SCENARIOS.slice();
+    var currentScenario = null;
+    var currentStep = -1;
+    var autoplayTimer = null;
+
+    // ── Load from Firebase ──
+    fetch(FIREBASE_URL + '/mercadopago-bridge/bridge-config/scenarios.json')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && typeof data === 'object') {
+          Object.keys(data).forEach(function(k) {
+            var s = data[k];
+            if (s.name && s.states && s.steps) {
+              s.id = s.id || k;
+              scenarios.push(s);
+            }
+          });
+          renderSidebar();
+        }
+      })
+      .catch(function() {});
+
+    renderSidebar();
+
+    function renderSidebar() {
+      var sb = document.getElementById('sidebar');
+      sb.innerHTML = scenarios.map(function(s) {
+        return '<div class="scenario-item' + (currentScenario && currentScenario.id === s.id ? ' active' : '') + '" onclick="loadScenario(\'' + s.id + '\')">' +
+          '<h3>' + esc(s.name) + '</h3><p>' + esc(s.desc || '') + '</p></div>';
+      }).join('');
+    }
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+    window.loadScenario = function(id) {
+      stopAutoplay();
+      currentScenario = scenarios.find(function(s) { return s.id === id; });
+      currentStep = -1;
+      renderSidebar();
+      renderMain();
+    };
+
+    function renderMain() {
+      if (!currentScenario) return;
+      var s = currentScenario;
+      var main = document.getElementById('main');
+      var curState = currentStep >= 0 && currentStep < s.steps.length ? s.steps[currentStep].state : s.states[0];
+
+      // State diagram
+      var diagramHTML = '<div class="state-diagram"><h2>State Machine</h2><div class="states-row">';
+      var visitedStates = {};
+      for (var i = 0; i <= currentStep && i < s.steps.length; i++) visitedStates[s.steps[i].state] = true;
+      s.states.forEach(function(st, idx) {
+        var cls = 'state-node';
+        if (st === curState) cls += ' active';
+        else if (visitedStates[st]) cls += ' visited';
+        diagramHTML += '<div class="' + cls + '">' + esc(st) + '</div>';
+        if (idx < s.states.length - 1) {
+          diagramHTML += '<div class="state-arrow' + (visitedStates[s.states[idx + 1]] || s.states[idx + 1] === curState ? ' active' : '') + '">&rarr;</div>';
+        }
+      });
+      diagramHTML += '</div></div>';
+
+      // Controls
+      var atStart = currentStep < 0;
+      var atEnd = currentStep >= s.steps.length - 1;
+      var controlsHTML = '<div class="controls">' +
+        '<button onclick="stepReset()">Reset</button>' +
+        '<button onclick="stepBack()"' + (atStart ? ' disabled' : '') + '>Back</button>' +
+        '<button class="primary" onclick="stepForward()"' + (atEnd ? ' disabled' : '') + '>Step Forward</button>' +
+        '<button onclick="toggleAutoplay()" id="autoplayBtn">' + (autoplayTimer ? 'Pause' : 'Auto-play') + '</button>' +
+        '<span class="step-label">Step ' + (currentStep + 1) + ' / ' + s.steps.length + '</span>' +
+        '</div>';
+
+      // Chat
+      var chatHTML = '<div class="chat-area"><div class="chat-header"><div class="dot"></div><span>Bridge Agent</span><div class="fsm-badge">' + esc(curState) + '</div></div><div class="chat-messages">';
+      for (var m = 0; m <= currentStep && m < s.steps.length; m++) {
+        var step = s.steps[m];
+        var cls = 'msg ' + (step.sender === 'user' ? 'user' : 'agent');
+        var senderLabel = step.sender === 'user' ? 'You' : 'Agent';
+        chatHTML += '<div class="' + cls + '"><div class="msg-sender">' + senderLabel + '</div>' + BridgeComponents.md(step.message) + '</div>';
+      }
+      if (currentStep < 0) chatHTML += '<div style="color:var(--slate);font-size:13px;text-align:center;padding:20px;">Press Step Forward to begin</div>';
+      chatHTML += '</div></div>';
+
+      // Event log
+      var logHTML = '<div class="event-log"><h2>Event Log</h2>';
+      s.steps.forEach(function(step, idx) {
+        var cls = 'log-entry';
+        if (idx === currentStep) cls += ' current';
+        else if (idx > currentStep) cls += ' future';
+        logHTML += '<div class="' + cls + '"><div class="log-idx">' + (idx + 1) + '</div><div class="log-event">' + esc(step.event || '(continuation)') + '</div><div class="log-state">' + esc(step.state) + '</div></div>';
+      });
+      logHTML += '</div>';
+
+      main.innerHTML = diagramHTML + controlsHTML + chatHTML + logHTML;
+    }
+
+    window.stepForward = function() {
+      if (!currentScenario || currentStep >= currentScenario.steps.length - 1) { stopAutoplay(); return; }
+      currentStep++;
+      renderMain();
+      var msgs = document.querySelector('.chat-messages');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    };
+
+    window.stepBack = function() {
+      if (!currentScenario || currentStep < 0) return;
+      stopAutoplay();
+      currentStep--;
+      renderMain();
+    };
+
+    window.stepReset = function() {
+      stopAutoplay();
+      currentStep = -1;
+      renderMain();
+    };
+
+    window.toggleAutoplay = function() {
+      if (autoplayTimer) { stopAutoplay(); renderMain(); }
+      else { autoplayTimer = setInterval(function() { stepForward(); }, 1200); renderMain(); }
+    };
+
+    function stopAutoplay() {
+      if (autoplayTimer) { clearInterval(autoplayTimer); autoplayTimer = null; }
+    }
+  </script>
+</body>
+</html>
