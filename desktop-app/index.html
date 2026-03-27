@@ -5,18 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bridge</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --sky: #bcecff;
+      --mist: #dff7f2;
+      --cream: #f7f6ef;
+      --shell: #fffdf8;
+      --ink: #112033;
+      --slate: #56708a;
+      --ocean: #316dff;
+      --mint: #89e0c8;
+      --coral: #ff9f6e;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: #0a0a0a; color: #e0e0e0;
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      background: linear-gradient(180deg, var(--sky) 0%, var(--mist) 42%, var(--cream) 100%);
+      color: var(--ink);
       height: 100vh; display: flex; flex-direction: column;
       -webkit-app-region: drag;
       user-select: none;
     }
     .titlebar {
-      height: 32px; display: flex; align-items: center; justify-content: center;
-      font-size: 0.8rem; color: #666; flex-shrink: 0;
+      height: 38px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 600; color: var(--slate);
+      letter-spacing: 0.35em; text-transform: uppercase; flex-shrink: 0;
+      background: rgba(255,255,255,0.5); backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.75);
     }
     .content {
       flex: 1; display: flex; flex-direction: column;
@@ -25,101 +43,149 @@
 
     /* Tabs */
     .tabs {
-      display: flex; border-bottom: 1px solid #222; flex-shrink: 0;
+      display: flex; flex-shrink: 0;
+      background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(86,112,138,0.1);
     }
     .tab {
-      flex: 1; padding: 10px; text-align: center; cursor: pointer;
-      color: #666; font-size: 0.85rem; font-weight: 500;
+      flex: 1; padding: 11px; text-align: center; cursor: pointer;
+      color: var(--slate); font-size: 0.8rem; font-weight: 600;
+      letter-spacing: 0.04em;
       border-bottom: 2px solid transparent; transition: all 0.2s;
     }
-    .tab.active { color: #7c7cf8; border-bottom-color: #7c7cf8; }
-    .tab:hover { color: #aaa; }
+    .tab.active { color: var(--ocean); border-bottom-color: var(--ocean); }
+    .tab:hover { color: var(--ink); }
 
     /* Panels */
     .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
     .panel.active { display: flex; }
 
     /* QR Panel */
-    .qr-panel { align-items: center; justify-content: center; gap: 16px; padding: 20px; }
+    .qr-panel {
+      align-items: center; justify-content: center; gap: 16px; padding: 24px;
+    }
+    .qr-card {
+      background: rgba(255,255,255,0.82); border: 1px solid rgba(255,255,255,0.75);
+      border-radius: 2rem; padding: 28px; text-align: center;
+      box-shadow: 0 20px 50px rgba(75,133,178,0.14);
+      backdrop-filter: blur(6px);
+    }
+    .qr-card h2 {
+      font-size: 1.4rem; font-weight: 800; color: var(--ink);
+      margin-bottom: 4px; letter-spacing: -0.03em;
+    }
+    .qr-card .sub { font-size: 0.85rem; color: var(--slate); margin-bottom: 20px; }
     #qr-container {
-      background: white; padding: 16px; border-radius: 12px; display: inline-block;
+      background: white; padding: 16px; border-radius: 16px; display: inline-block;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
     }
     #qr-container canvas { display: block; }
-    .session-label { font-family: monospace; font-size: 0.8rem; color: #555; }
+    .session-label {
+      font-family: monospace; font-size: 0.75rem; color: var(--slate);
+      margin-top: 12px;
+    }
 
     /* Status */
     .status-bar {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 16px; font-size: 0.85rem; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 10px 16px; font-size: 0.85rem; font-weight: 500;
+      margin-top: 12px;
     }
     .dot {
       width: 8px; height: 8px; border-radius: 50%;
       animation: pulse 1.5s infinite;
     }
-    .dot.waiting { background: #7c7cf8; }
-    .dot.connected { background: #4caf50; }
+    .dot.waiting { background: var(--ocean); }
+    .dot.connected { background: #34a853; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
     /* Messages */
-    .messages { flex: 1; overflow-y: auto; padding: 12px; }
+    .messages { flex: 1; overflow-y: auto; padding: 12px 16px; }
     .msg {
-      padding: 10px 12px; margin: 4px 0; border-radius: 8px;
-      font-size: 0.85rem; line-height: 1.4;
+      padding: 10px 14px; margin: 5px 0; border-radius: 16px;
+      font-size: 0.85rem; line-height: 1.5; max-width: 85%;
     }
-    .msg.incoming { background: #1a1a2e; }
-    .msg.outgoing { background: #1a2e1a; }
-    .msg.system { background: #1a1a1a; color: #666; font-size: 0.8rem; }
-    .msg .meta { font-size: 0.7rem; color: #555; margin-top: 4px; }
+    .msg.incoming {
+      background: rgba(255,255,255,0.82); border: 1px solid rgba(255,255,255,0.75);
+      box-shadow: 0 2px 8px rgba(75,133,178,0.08);
+      align-self: flex-start;
+    }
+    .msg.outgoing {
+      background: var(--ocean); color: white;
+      margin-left: auto; align-self: flex-end;
+    }
+    .msg.system {
+      background: rgba(137,224,200,0.18); color: #195a4a;
+      font-size: 0.8rem; text-align: center; max-width: 100%;
+      border: 1px solid rgba(137,224,200,0.4); border-radius: 12px;
+    }
+    .msg .meta { font-size: 0.7rem; color: var(--slate); margin-top: 4px; opacity: 0.7; }
+    .msg.outgoing .meta { color: rgba(255,255,255,0.7); }
 
     /* Input */
     .input-bar {
-      display: flex; gap: 8px; padding: 12px; border-top: 1px solid #222; flex-shrink: 0;
+      display: flex; gap: 8px; padding: 12px 16px;
+      background: rgba(255,255,255,0.6); backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(86,112,138,0.1); flex-shrink: 0;
     }
     .input-bar input {
-      flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #333;
-      background: #111; color: #fff; font-size: 0.9rem; outline: none;
+      flex: 1; padding: 10px 16px; border-radius: 999px;
+      border: 1px solid rgba(86,112,138,0.15); background: white;
+      color: var(--ink); font-size: 0.9rem; font-family: inherit; outline: none;
     }
-    .input-bar input:focus { border-color: #7c7cf8; }
+    .input-bar input:focus { border-color: var(--ocean); box-shadow: 0 0 0 3px rgba(49,109,255,0.1); }
     .input-bar button {
-      padding: 10px 18px; border-radius: 8px; border: none;
-      background: #7c7cf8; color: white; font-weight: 600; cursor: pointer;
+      padding: 10px 20px; border-radius: 999px; border: none;
+      background: var(--ocean); color: white; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(49,109,255,0.3);
+      transition: transform 0.1s;
     }
-    .input-bar button:hover { background: #6a6af0; }
+    .input-bar button:hover { transform: translateY(-1px); }
 
     /* Agent Status Panel */
     .agent-status {
       padding: 20px; display: flex; flex-direction: column; gap: 12px;
     }
     .status-card {
-      background: #111; border-radius: 8px; padding: 16px;
-      border-left: 3px solid #7c7cf8;
+      background: rgba(255,255,255,0.82); border: 1px solid rgba(255,255,255,0.75);
+      border-radius: 1rem; padding: 16px;
+      border-left: 3px solid var(--ocean);
+      box-shadow: 0 4px 14px rgba(75,133,178,0.08);
     }
-    .status-card h3 { font-size: 0.9rem; color: #7c7cf8; margin-bottom: 4px; }
-    .status-card p { font-size: 0.85rem; color: #aaa; }
+    .status-card h3 {
+      font-size: 0.65rem; font-weight: 600; color: var(--slate);
+      letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 4px;
+    }
+    .status-card p { font-size: 0.9rem; color: var(--ink); font-weight: 500; }
   </style>
 </head>
 <body>
-  <div class="titlebar">Bridge v1.0</div>
+  <div class="titlebar">Bridge</div>
   <div class="content">
     <div class="tabs">
       <div class="tab active" data-tab="connect">Connect</div>
       <div class="tab" data-tab="chat">Chat</div>
-      <div class="tab" data-tab="status">Agent Status</div>
+      <div class="tab" data-tab="status">Agent</div>
     </div>
 
     <!-- Connect Tab -->
     <div class="panel qr-panel active" id="panel-connect">
-      <div id="qr-container"><canvas id="qr"></canvas></div>
-      <div class="session-label" id="session-label">Creating session...</div>
-      <div class="status-bar">
-        <span class="dot waiting" id="dot"></span>
-        <span id="status-text">Waiting for phone...</span>
+      <div class="qr-card">
+        <h2>Connect your phone</h2>
+        <p class="sub">Scan with your camera to open Telegram</p>
+        <div id="qr-container"><canvas id="qr"></canvas></div>
+        <div class="session-label" id="session-label">Creating session...</div>
+        <div class="status-bar">
+          <span class="dot waiting" id="dot"></span>
+          <span id="status-text">Waiting for phone...</span>
+        </div>
       </div>
     </div>
 
     <!-- Chat Tab -->
     <div class="panel" id="panel-chat">
-      <div class="messages" id="messages"></div>
+      <div class="messages" id="messages" style="display:flex;flex-direction:column;"></div>
       <div class="input-bar">
         <input type="text" id="msg-input" placeholder="Send a message..." />
         <button onclick="sendMessage()">Send</button>
@@ -177,10 +243,9 @@
 
       const telegramUrl = 'https://t.me/AgenteGauchoBot?start=' + sessionId;
       QRCode.toCanvas(document.getElementById('qr'), telegramUrl,
-        { width: 220, margin: 0, color: { dark: '#000', light: '#fff' } }
+        { width: 220, margin: 0, color: { dark: '#112033', light: '#ffffff' } }
       );
 
-      // Start Firebase real-time listeners (SSE — instant, no polling)
       startFirebaseStream();
     }
 
@@ -188,31 +253,29 @@
     const FB_ROOT = 'mercadopago-bridge';
 
     function startFirebaseStream() {
-      // Stream pairing changes
       const pairSSE = new EventSource(
         FIREBASE_URL + '/' + FB_ROOT + '/bridge-pairs/' + sessionId + '.json'
       );
       pairSSE.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data && data.data && data.data.chatId && !pairedChatId) {
-          pairedChatId = data.data.chatId;
-          pairedUsername = data.data.username;
-          document.getElementById('dot').className = 'dot connected';
-          document.getElementById('status-text').textContent = (pairedUsername || 'Phone') + ' connected via Telegram';
-          document.getElementById('agent-devices').textContent = '1 phone connected (' + (pairedUsername || 'unknown') + ')';
-          addMsgEl('system', '📱 ' + (pairedUsername || 'Phone') + ' connected via Telegram');
-          document.querySelector('[data-tab="chat"]').click();
-          // Now stream messages
-          startMessageStream();
+          onPaired(data.data.chatId, data.data.username);
         }
       };
-      pairSSE.onerror = () => {
-        // Fallback to polling if SSE fails
-        setTimeout(() => pollForPairing(), 2000);
-      };
-
-      // Also poll as fallback (Firebase REST SSE can be flaky)
+      pairSSE.onerror = () => setTimeout(() => pollForPairing(), 2000);
       pollForPairing();
+    }
+
+    function onPaired(chatId, username) {
+      pairedChatId = chatId;
+      pairedUsername = username;
+      document.getElementById('dot').className = 'dot connected';
+      document.getElementById('status-text').textContent = (username || 'Phone') + ' connected via Telegram';
+      document.getElementById('agent-devices').textContent = '1 phone connected (' + (username || 'unknown') + ')';
+      addMsgEl('system', (username || 'Phone') + ' connected via Telegram');
+      document.querySelector('[data-tab="chat"]').click();
+      if (pollInterval) clearInterval(pollInterval);
+      startMessageStream();
     }
 
     function pollForPairing() {
@@ -222,17 +285,7 @@
         try {
           const res = await fetch(API_BASE + '/api/bridge/pair?session=' + sessionId);
           const data = await res.json();
-          if (data.paired) {
-            pairedChatId = data.chatId;
-            pairedUsername = data.username;
-            document.getElementById('dot').className = 'dot connected';
-            document.getElementById('status-text').textContent = (data.username || 'Phone') + ' connected via Telegram';
-            document.getElementById('agent-devices').textContent = '1 phone connected (' + (data.username || 'unknown') + ')';
-            addMsgEl('system', '📱 ' + (data.username || 'Phone') + ' connected via Telegram');
-            document.querySelector('[data-tab="chat"]').click();
-            clearInterval(pollInterval);
-            startMessageStream();
-          }
+          if (data.paired) onPaired(data.chatId, data.username);
         } catch (e) {}
       }, 1500);
     }
@@ -240,7 +293,6 @@
     const seenMsgKeys = new Set();
 
     function startMessageStream() {
-      // Stream new messages from Firebase in real-time
       const msgSSE = new EventSource(
         FIREBASE_URL + '/' + FB_ROOT + '/bridge-messages/' + sessionId + '.json'
       );
@@ -248,27 +300,17 @@
         try {
           const payload = JSON.parse(event.data);
           if (!payload || !payload.data) return;
-
-          // Could be a single message or all messages
           if (payload.path === '/') {
-            // Initial load — all messages
-            const msgs = payload.data;
-            if (msgs && typeof msgs === 'object') {
-              Object.entries(msgs).forEach(([key, msg]) => {
-                if (!seenMsgKeys.has(key) && msg.from !== 'agent') {
-                  seenMsgKeys.add(key);
-                  // Skip if this is old
-                }
-              });
+            if (payload.data && typeof payload.data === 'object') {
+              Object.keys(payload.data).forEach(k => seenMsgKeys.add(k));
             }
           } else {
-            // New individual message
             const key = payload.path.replace('/', '');
             const msg = payload.data;
             if (msg && !seenMsgKeys.has(key)) {
               seenMsgKeys.add(key);
               msgCount++;
-              const label = msg.from === 'agent' ? '🤖 agent' : ('📱 ' + (msg.from || 'phone'));
+              const label = msg.from === 'agent' ? 'Agent' : (msg.from || 'phone');
               addMsgEl(msg.from === 'agent' ? 'system' : 'incoming',
                 msg.content,
                 label + ' · ' + (msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '')
@@ -278,12 +320,8 @@
           }
         } catch (e) {}
       });
-      msgSSE.onerror = () => {
-        // Fallback to polling
-        startMessagePolling();
-      };
+      msgSSE.onerror = () => startMessagePolling();
 
-      // Also stream agent status
       const statusSSE = new EventSource(
         FIREBASE_URL + '/' + FB_ROOT + '/bridge-status/' + sessionId + '.json'
       );
@@ -291,9 +329,8 @@
         try {
           const payload = JSON.parse(event.data);
           if (payload && payload.data) {
-            const s = payload.data;
-            document.getElementById('agent-task').textContent = s.task || 'No active task';
-            document.getElementById('agent-state').textContent = s.state || 'Idle';
+            document.getElementById('agent-task').textContent = payload.data.task || 'No active task';
+            document.getElementById('agent-state').textContent = payload.data.state || 'Idle';
           }
         } catch (e) {}
       });
@@ -318,21 +355,6 @@
       }, 1500);
     }
 
-    function addMessage(msg) {
-      if (msg.type === 'peer_joined' || msg.type === 'peer_left') {
-        addMsgEl('system', msg.type === 'peer_joined' ? '📱 Phone connected' : '📱 Phone disconnected');
-        return;
-      }
-      msgCount++;
-      document.getElementById('agent-msg-count').textContent = msgCount + ' messages exchanged';
-
-      const isFromMe = msg.from === 'desktop';
-      addMsgEl(isFromMe ? 'outgoing' : 'incoming',
-        msg.content || msg.type,
-        (msg.from || 'system') + ' · ' + (msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '')
-      );
-    }
-
     function addMsgEl(type, text, meta) {
       const div = document.getElementById('messages');
       const el = document.createElement('div');
@@ -353,7 +375,6 @@
       const content = input.value.trim();
       if (!content || !pairedChatId) return;
 
-      // Send to Telegram via our API
       await fetch(API_BASE + '/api/bridge/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
