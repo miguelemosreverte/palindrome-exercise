@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#316dff"/>
+  <g transform="translate(256,256)">
+    <!-- Bridge arch -->
+    <path d="M-140,40 Q-140,-80 0,-80 Q140,-80 140,40" stroke="white" stroke-width="32" fill="none" stroke-linecap="round"/>
+    <!-- Left pillar -->
+    <rect x="-156" y="20" width="32" height="80" rx="8" fill="white"/>
+    <!-- Right pillar -->
+    <rect x="124" y="20" width="32" height="80" rx="8" fill="white"/>
+    <!-- Road -->
+    <rect x="-170" y="80" width="340" height="24" rx="12" fill="white" opacity="0.9"/>
+    <!-- Signal dots -->
+    <circle cx="-60" cy="-20" r="12" fill="#89e0c8"/>
+    <circle cx="0" cy="-50" r="12" fill="#bcecff"/>
+    <circle cx="60" cy="-20" r="12" fill="#ff9f6e"/>
+  </g>
+</svg>
