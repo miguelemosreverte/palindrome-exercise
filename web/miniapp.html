@@ -178,6 +178,22 @@
     var renderedKeys = {};
     // Component types are now managed by components.js
 
+    // Initialize shared component library
+    BridgeComponents.injectCSS();
+    BridgeComponents.loadDynamic(FIREBASE_URL);
+    BridgeComponents.setOnSelect(function(title) {
+      if (sessionId) {
+        var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
+          ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
+          : 'User';
+        fetch(API_BASE + '/api/bridge/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionId, from: username, content: title }),
+        });
+      }
+    });
+
     if (!sessionId) {
       statusLabel.textContent = 'No session ID provided';
       emptyState.textContent = 'Open this page with ?session=SESSION_ID';
@@ -331,22 +347,6 @@
       d.textContent = s;
       return d.innerHTML;
     }
-
-    // Use shared component library (components.js)
-    BridgeComponents.injectCSS();
-    BridgeComponents.loadDynamic(FIREBASE_URL);
-    BridgeComponents.setOnSelect(function(title) {
-      if (sessionId) {
-        var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
-          ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
-          : 'User';
-        fetch(API_BASE + '/api/bridge/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sessionId, from: username, content: title }),
-        });
-      }
-    });
 
     function md(text) {
       return BridgeComponents.md(text);
