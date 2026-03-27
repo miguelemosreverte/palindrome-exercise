@@ -69,14 +69,24 @@ module.exports = async function handler(req, res) {
     var message = body.message || '';
     var metadata = body.metadata || {};
 
-    // Resolve chatId from sessionId if needed
-    if (!chatId && sessionId) {
+    // Resolve chatIds from sessionId (owner + guests)
+    var allChatIds = [];
+    if (chatId) {
+      allChatIds = [chatId];
+    } else if (sessionId) {
       var pair = await readPath(PAIRS_PATH + '/' + sessionId);
-      if (pair) chatId = pair.chatId;
+      if (pair) {
+        chatId = pair.chatId;
+        allChatIds.push(String(pair.chatId));
+        if (pair.guests) {
+          for (var gid in pair.guests) {
+            if (pair.guests[gid]) allChatIds.push(gid);
+          }
+        }
+      }
     }
 
-    if (!chatId) {
-      // Try to find any active session
+    if (allChatIds.length === 0) {
       if (!sessionId) return res.status(400).json({ error: 'sessionId or chatId required' });
       return res.status(404).json({ error: 'No phone connected to this session' });
     }
@@ -116,14 +126,16 @@ module.exports = async function handler(req, res) {
           project: metadata.project || null,
           createdAt: new Date().toISOString(),
         });
-        // Send with inline keyboard
+        // Send with inline keyboard to all members
         var replyMarkup = {
           inline_keyboard: [[
             { text: '✅ Approve', callback_data: 'approve:' + approvalId },
             { text: '❌ Deny', callback_data: 'deny:' + approvalId },
           ]],
         };
-        await sendTelegram(chatId, formattedMsg, 'Markdown', replyMarkup);
+        for (var a = 0; a < allChatIds.length; a++) {
+          await sendTelegram(allChatIds[a], formattedMsg, 'Markdown', replyMarkup);
+        }
         // Store in message history
         if (sessionId) {
           await pushPath(MSGS_PATH + '/' + sessionId, {
@@ -145,8 +157,10 @@ module.exports = async function handler(req, res) {
         formattedMsg = icon + ' ' + message;
     }
 
-    // Send to Telegram
-    await sendTelegram(chatId, formattedMsg, 'Markdown');
+    // Send to all session members (owner + guests)
+    for (var b = 0; b < allChatIds.length; b++) {
+      await sendTelegram(allChatIds[b], formattedMsg, 'Markdown');
+    }
 
     // Store in message history
     if (sessionId) {
