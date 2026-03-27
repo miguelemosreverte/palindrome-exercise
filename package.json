@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "vercel-build": "cp -r web/* ."
+    "vercel-build": "cp -r web/* . && node -e \"const fs=require('fs');const vm=require('vm');for(const f of fs.readdirSync('.').filter(f=>f.endsWith('.html'))){const h=fs.readFileSync(f,'utf8');const m=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];for(const[,s]of m){try{new vm.Script(s,{filename:f})}catch(e){console.error(f+': JS syntax error:',e.message);process.exit(1)}}}\""
   },
   "dependencies": {
     "@opencode-ai/sdk": "^1.3.0",
