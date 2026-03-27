@@ -1,5 +1,4 @@
 {
-  "outputDirectory": "web",
   "rewrites": [
     { "source": "/connect", "destination": "/connect.html" },
     { "source": "/bridge", "destination": "/bridge.html" },
