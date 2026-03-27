@@ -521,8 +521,17 @@
       document.getElementById('installBanner').style.display = 'flex';
     }
 
-    // Session: URL param > localStorage > empty (show pairing)
+    // Session: URL param > cookie > localStorage > empty (show pairing)
+    // Cookie persists across Safari → Add to Home Screen (localStorage doesn't)
+    function getCookie(name) {
+      var m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    function setCookie(name, val) {
+      document.cookie = name + '=' + encodeURIComponent(val) + ';path=/;max-age=31536000;SameSite=Lax';
+    }
     var sessionId = new URLSearchParams(window.location.search).get('session')
+      || getCookie('bridge-session')
       || localStorage.getItem('bridge-session') || '';
 
     var messagesEl = document.getElementById('messages');
@@ -559,6 +568,7 @@
       statusLabel.textContent = 'Not connected';
     } else {
       localStorage.setItem('bridge-session', sessionId);
+      setCookie('bridge-session', sessionId);
       init();
     }
 
@@ -579,6 +589,7 @@
           if (data && data.chatId) {
             sessionId = input;
             localStorage.setItem('bridge-session', sessionId);
+      setCookie('bridge-session', sessionId);
             document.getElementById('pairingScreen').style.display = 'none';
             document.getElementById('messages').style.display = 'flex';
             document.querySelector('.composer').style.display = 'flex';
