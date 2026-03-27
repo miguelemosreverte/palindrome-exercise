@@ -521,8 +521,7 @@
       document.getElementById('installBanner').style.display = 'flex';
     }
 
-    // Session: URL param > cookie > localStorage > empty (show pairing)
-    // Cookie persists across Safari → Add to Home Screen (localStorage doesn't)
+    // Session: URL param ALWAYS wins > cookie > localStorage > empty (show pairing)
     function getCookie(name) {
       var m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
       return m ? decodeURIComponent(m[1]) : '';
@@ -530,9 +529,14 @@
     function setCookie(name, val) {
       document.cookie = name + '=' + encodeURIComponent(val) + ';path=/;max-age=31536000;SameSite=Lax';
     }
-    var sessionId = new URLSearchParams(window.location.search).get('session')
-      || getCookie('bridge-session')
-      || localStorage.getItem('bridge-session') || '';
+    var urlSession = new URLSearchParams(window.location.search).get('session');
+    var sessionId = urlSession || getCookie('bridge-session') || localStorage.getItem('bridge-session') || '';
+
+    // If URL has a session, always save it (overrides any cached session)
+    if (urlSession) {
+      localStorage.setItem('bridge-session', urlSession);
+      setCookie('bridge-session', urlSession);
+    }
 
     var messagesEl = document.getElementById('messages');
     var emptyState = document.getElementById('emptyState');
