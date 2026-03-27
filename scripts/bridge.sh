@@ -153,6 +153,11 @@ else:
         print(f'[{m.get(\"from\",\"user\")}] {m[\"content\"]}')
 " 2>/dev/null
     ;;
+  dashboard)
+    curl -s -X POST "$API_BASE/api/bridge/miniapp" \
+      -H "Content-Type: application/json" \
+      -d "{\"sessionId\":\"$SESSION_ID\"}" | python3 -c "import sys,json;d=json.load(sys.stdin);print('Dashboard sent' if d.get('ok') else d.get('error','failed'))" 2>/dev/null
+    ;;
   *)
     echo "Usage: bridge <command> [args]"
     echo ""

@@ -167,6 +167,26 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
+    // /dashboard — open the Mini App with rich components
+    if (text === '/dashboard') {
+      var session = await findSessionForChat(chatId);
+      if (!session) {
+        await sendTelegram(chatId, 'Not connected. Scan a QR code first!');
+        return res.json({ ok: true });
+      }
+      var miniAppUrl = 'https://palindrome-exercise.vercel.app/miniapp.html?session=' + session;
+      await callTelegram('sendMessage', {
+        chat_id: chatId,
+        text: 'Open the Bridge dashboard for rich components and live agent status.',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Open Dashboard', web_app: { url: miniAppUrl } },
+          ]],
+        },
+      });
+      return res.json({ ok: true });
+    }
+
     // /invite — owner generates a shareable link
     if (text === '/invite') {
       var session = await findSessionForChat(chatId);

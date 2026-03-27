@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Bridge Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sky: #bcecff;
+      --mist: #dff7f2;
+      --cream: #f7f6ef;
+      --shell: rgba(255,255,255,0.72);
+      --ink: var(--tg-theme-text-color, #112033);
+      --slate: var(--tg-theme-hint-color, #56708a);
+      --ocean: var(--tg-theme-link-color, #316dff);
+      --mint: #89e0c8;
+      --coral: #ff9f6e;
+      --line: var(--tg-theme-secondary-bg-color, rgba(17,32,51,0.08));
+      --bg: var(--tg-theme-bg-color, #f7f6ef);
+      --bg-secondary: var(--tg-theme-secondary-bg-color, rgba(255,255,255,0.5));
+      --btn-color: var(--tg-theme-button-color, #316dff);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Status bar */
+    .status-bar {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg-secondary);
+      flex-shrink: 0;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #94a3b8;
+      flex-shrink: 0;
+    }
+    .status-dot.active { background: #22c55e; animation: pulse 1.5s infinite; }
+    .status-label {
+      font-size: 13px; font-weight: 600; color: var(--slate);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .status-label .task { color: var(--ink); font-weight: 700; }
+
+    @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Messages */
+    .messages {
+      flex: 1; overflow-y: auto; padding: 16px; display: flex;
+      flex-direction: column; gap: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-thumb { background: rgba(86,112,138,0.2); border-radius: 2px; }
+
+    .msg { animation: fadeIn 0.2s ease-out; max-width: 100%; }
+    .msg-from {
+      font-size: 11px; font-weight: 700; color: var(--ocean);
+      margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .msg-from.user-msg { color: var(--slate); text-align: right; }
+    .msg-bubble {
+      font-size: 14px; line-height: 1.6; padding: 10px 14px;
+      border-radius: 14px; background: var(--bg-secondary);
+      border: 1px solid var(--line); word-break: break-word;
+    }
+    .msg-bubble.from-user {
+      background: var(--btn-color); color: var(--btn-text);
+      border: none; margin-left: auto; max-width: 85%;
+      border-radius: 14px 14px 4px 14px;
+    }
+    .msg-bubble.from-agent { border-radius: 14px 14px 14px 4px; }
+    .msg-time {
+      font-size: 10px; color: var(--slate); opacity: 0.5;
+      margin-top: 2px;
+    }
+    .msg-row-user { display: flex; flex-direction: column; align-items: flex-end; }
+    .msg-row-other { display: flex; flex-direction: column; align-items: flex-start; }
+
+    .empty-state {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--slate); font-size: 14px; opacity: 0.5; text-align: center;
+      padding: 40px;
+    }
+
+    /* Composer */
+    .composer {
+      padding: 10px 12px; border-top: 1px solid var(--line);
+      background: var(--bg); display: flex; gap: 8px; align-items: flex-end;
+      flex-shrink: 0;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+    .composer textarea {
+      flex: 1; border: 1px solid var(--line); background: var(--bg-secondary);
+      border-radius: 12px; padding: 10px 14px; font-size: 15px;
+      font-family: inherit; color: var(--ink); resize: none;
+      min-height: 40px; max-height: 120px; outline: none;
+    }
+    .composer textarea::placeholder { color: var(--slate); opacity: 0.5; }
+    .send-btn {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: var(--btn-color); color: var(--btn-text);
+      border: none; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Rich components — adapted from chat.html */
+    .rc-timeline { padding: 8px 0; }
+    .rc-timeline-item { display: flex; gap: 12px; position: relative; padding-bottom: 20px; }
+    .rc-timeline-item:last-child { padding-bottom: 0; }
+    .rc-timeline-track { display: flex; flex-direction: column; align-items: center; width: 18px; flex-shrink: 0; }
+    .rc-timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ocean); border: 2px solid rgba(49,109,255,0.2); z-index: 1; flex-shrink: 0; }
+    .rc-timeline-line { width: 2px; flex: 1; background: var(--line); margin-top: 4px; }
+    .rc-timeline-item:last-child .rc-timeline-line { display: none; }
+    .rc-timeline-content { flex: 1; }
+    .rc-timeline-date { font-size: 11px; font-weight: 700; color: var(--ocean); margin-bottom: 2px; }
+    .rc-timeline-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .rc-timeline-desc { font-size: 12px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+
+    .rc-options { display: flex; flex-direction: column; gap: 8px; }
+    .rc-option { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-secondary); cursor: pointer; transition: all 0.15s; }
+    .rc-option:active { transform: scale(0.98); }
+    .rc-option-body { flex: 1; }
+    .rc-option-title { font-size: 14px; font-weight: 700; }
+    .rc-option-desc { font-size: 12px; color: var(--slate); line-height: 1.4; margin-top: 2px; }
+    .rc-option-arrow { color: var(--slate); opacity: 0.4; font-size: 16px; }
+    .rc-option.selected { border-color: var(--ocean); background: rgba(49,109,255,0.06); }
+    .rc-option.selected .rc-option-arrow { color: var(--ocean); opacity: 1; }
+
+    .rc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+    .rc-card { padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-secondary); }
+    .rc-card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--slate); font-weight: 700; }
+    .rc-card-value { font-size: 22px; font-weight: 800; margin-top: 4px; line-height: 1; }
+    .rc-card-desc { font-size: 12px; color: var(--slate); margin-top: 4px; line-height: 1.4; }
+
+    .rc-table { width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-secondary); font-size: 13px; }
+    .rc-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--slate); font-weight: 700; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--line); }
+    .rc-table td { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+    .rc-table tr:last-child td { border-bottom: none; }
+
+    .rc-steps { display: flex; flex-direction: column; }
+    .rc-step { display: flex; gap: 12px; padding: 12px 0; }
+    .rc-step-num { width: 28px; height: 28px; border-radius: 8px; background: var(--ocean); color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+    .rc-step-body { flex: 1; padding-top: 2px; }
+    .rc-step-title { font-size: 14px; font-weight: 700; }
+    .rc-step-desc { font-size: 12px; color: var(--slate); line-height: 1.5; margin-top: 2px; }
+    .rc-step + .rc-step { border-top: 1px solid var(--line); }
+
+    .rc-tree-levels { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 12px; }
+    .rc-tree-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .rc-tree-pill { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--slate); opacity: 0.45; background: transparent; }
+    .rc-tree-pill.selected { opacity: 1; color: var(--ink); background: var(--bg-secondary); border-color: rgba(17,32,51,0.2); }
+    .rc-tree-arrow { color: var(--slate); opacity: 0.3; font-size: 16px; line-height: 1; }
+    .rc-tree-question { font-size: 16px; font-weight: 800; text-align: center; margin: 10px 0; }
+    .rc-tree-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .rc-tree-choice { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-secondary); cursor: pointer; transition: all 0.15s; }
+    .rc-tree-choice:active { transform: scale(0.98); }
+    .rc-tree-choice-body { flex: 1; }
+    .rc-tree-choice-title { font-size: 14px; font-weight: 700; }
+    .rc-tree-choice-desc { font-size: 12px; color: var(--slate); line-height: 1.4; margin-top: 2px; }
+    .rc-tree-choice-arrow { color: var(--slate); opacity: 0.4; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-label" id="statusLabel">Connecting...</div>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="emptyState">No messages yet</div>
+  </div>
+
+  <!-- Composer -->
+  <div class="composer">
+    <textarea id="input" placeholder="Send a message..." rows="1"></textarea>
+    <button class="send-btn" id="sendBtn" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+
+  <script>
+    // Telegram WebApp init
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    var API_BASE = 'https://palindrome-exercise.vercel.app';
+    var FIREBASE_URL = 'https://mercadopago-to-chutesai-bridge-default-rtdb.firebaseio.com';
+    var sessionId = new URLSearchParams(window.location.search).get('session') || '';
+
+    var messagesEl = document.getElementById('messages');
+    var emptyState = document.getElementById('emptyState');
+    var inputEl = document.getElementById('input');
+    var sendBtn = document.getElementById('sendBtn');
+    var statusDot = document.getElementById('statusDot');
+    var statusLabel = document.getElementById('statusLabel');
+
+    var renderedKeys = {};
+    var RICH_BLOCKS = ['timeline', 'options', 'cards', 'table', 'steps', 'tree'];
+
+    if (!sessionId) {
+      statusLabel.textContent = 'No session ID provided';
+      emptyState.textContent = 'Open this page with ?session=SESSION_ID';
+    } else {
+      init();
+    }
+
+    function init() {
+      statusLabel.textContent = 'Session: ' + sessionId.slice(0, 8) + '...';
+      listenMessages();
+      listenStatus();
+    }
+
+    // SSE for messages
+    function listenMessages() {
+      var url = FIREBASE_URL + '/mercadopago-bridge/bridge-messages/' + sessionId + '.json';
+      // Initial load
+      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (data) {
+          var keys = Object.keys(data).sort();
+          for (var i = 0; i < keys.length; i++) {
+            addMessage(keys[i], data[keys[i]]);
+          }
+          scrollBottom();
+        }
+      });
+      // SSE stream
+      var es = new EventSource(url + '?orderBy="$key"&limitToLast=1');
+      es.addEventListener('put', function(e) {
+        try {
+          var payload = JSON.parse(e.data);
+          if (!payload.data) return;
+          if (payload.path === '/') {
+            var keys = Object.keys(payload.data);
+            for (var i = 0; i < keys.length; i++) {
+              addMessage(keys[i], payload.data[keys[i]]);
+            }
+          } else {
+            var key = payload.path.replace('/', '');
+            addMessage(key, payload.data);
+          }
+          scrollBottom();
+        } catch (err) { console.error('SSE parse error', err); }
+      });
+      es.onerror = function() {
+        setTimeout(function() { listenMessages(); }, 5000);
+        es.close();
+      };
+    }
+
+    // SSE for agent status
+    function listenStatus() {
+      var url = FIREBASE_URL + '/mercadopago-bridge/bridge-status/' + sessionId + '.json';
+      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        updateStatus(data);
+      });
+      var es = new EventSource(url);
+      es.addEventListener('put', function(e) {
+        try {
+          var payload = JSON.parse(e.data);
+          updateStatus(payload.data);
+        } catch (err) {}
+      });
+    }
+
+    function updateStatus(data) {
+      if (!data) {
+        statusDot.className = 'status-dot';
+        statusLabel.innerHTML = 'Agent idle';
+        return;
+      }
+      var isActive = data.status === 'working' || data.status === 'running';
+      statusDot.className = 'status-dot' + (isActive ? ' active' : '');
+      var label = isActive ? 'Working' : 'Idle';
+      var task = data.task || data.message || '';
+      statusLabel.innerHTML = label + (task ? ': <span class="task">' + esc(task) + '</span>' : '');
+    }
+
+    function addMessage(key, msg) {
+      if (renderedKeys[key]) return;
+      renderedKeys[key] = true;
+      emptyState.style.display = 'none';
+
+      var div = document.createElement('div');
+      div.className = 'msg';
+
+      var from = msg.from || 'system';
+      var isUser = from !== 'agent' && from !== 'system' && from !== 'bot';
+      var isAgent = from === 'agent' || from === 'bot';
+
+      div.innerHTML =
+        '<div class="' + (isUser ? 'msg-row-user' : 'msg-row-other') + '">' +
+          '<div class="msg-from ' + (isUser ? 'user-msg' : '') + '">' + esc(from) + '</div>' +
+          '<div class="msg-bubble ' + (isUser ? 'from-user' : 'from-agent') + '">' + md(msg.content || '') + '</div>' +
+          (msg.timestamp ? '<div class="msg-time">' + formatTime(msg.timestamp) + '</div>' : '') +
+        '</div>';
+
+      messagesEl.appendChild(div);
+    }
+
+    function scrollBottom() {
+      setTimeout(function() { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+    }
+
+    function formatTime(ts) {
+      try {
+        var d = new Date(ts);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch (e) { return ''; }
+    }
+
+    // Send message
+    inputEl.addEventListener('input', function() {
+      sendBtn.disabled = !inputEl.value.trim();
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+    });
+
+    inputEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    function sendMessage() {
+      var text = inputEl.value.trim();
+      if (!text || !sessionId) return;
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
+        ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
+        : 'User';
+
+      fetch(API_BASE + '/api/bridge/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId, from: username, content: text }),
+      }).catch(function(err) { console.error('Send error', err); });
+    }
+
+    // Option selection
+    function selectOption(el, title) {
+      var siblings = el.parentElement.querySelectorAll('.rc-option');
+      for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('selected');
+      el.classList.add('selected');
+      // Send selection as a message
+      if (sessionId) {
+        var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
+          ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
+          : 'User';
+        fetch(API_BASE + '/api/bridge/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionId, from: username, content: title }),
+        });
+      }
+    }
+
+    // Escape HTML
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Rich block rendering (from chat.html)
+    function renderRichBlock(lang, json) {
+      try {
+        var data = JSON.parse(json);
+        var items = Array.isArray(data) ? data : (data.items || data.eventos || data.opciones || data.pasos || []);
+
+        if (lang === 'timeline') {
+          return '<div class="rc-timeline">' + items.map(function(item) {
+            var date = item.date || item.year || item.fecha || item.año || '';
+            var title = item.title || item.nombre || item.evento || item.event || '';
+            var desc = item.desc || item.descripcion || item.description || '';
+            return '<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>' +
+              '<div class="rc-timeline-content"><div class="rc-timeline-date">' + esc(String(date)) + '</div><div class="rc-timeline-title">' + esc(title) + '</div>' +
+              (desc ? '<div class="rc-timeline-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
+          }).join('') + '</div>';
+        }
+        if (lang === 'options') {
+          return '<div class="rc-options">' + items.map(function(item) {
+            var title = item.title || item.nombre || item.destino || item.opcion || '';
+            var desc = item.desc || item.descripcion || item.description || '';
+            return '<div class="rc-option" onclick="selectOption(this,\'' + esc(title).replace(/'/g, "\\'") + '\')"><div class="rc-option-body"><div class="rc-option-title">' + esc(title) + '</div>' +
+              (desc ? '<div class="rc-option-desc">' + esc(desc) + '</div>' : '') + '</div><div class="rc-option-arrow">&rarr;</div></div>';
+          }).join('') + '</div>';
+        }
+        if (lang === 'cards') {
+          return '<div class="rc-cards">' + items.map(function(item) {
+            var label = item.label || item.etiqueta || item.nombre || '';
+            var value = item.value || item.valor || '';
+            var desc = item.desc || item.descripcion || '';
+            return '<div class="rc-card"><div class="rc-card-label">' + esc(label) + '</div><div class="rc-card-value">' + esc(String(value)) + '</div>' +
+              (desc ? '<div class="rc-card-desc">' + esc(desc) + '</div>' : '') + '</div>';
+          }).join('') + '</div>';
+        }
+        if (lang === 'table') {
+          var headers = data.headers || data.encabezados || data.columnas || [];
+          var rows = data.rows || data.filas || data.datos || [];
+          return '<table class="rc-table"><thead><tr>' + headers.map(function(h) { return '<th>' + esc(String(h)) + '</th>'; }).join('') +
+            '</tr></thead><tbody>' + rows.map(function(row) {
+              var cells = Array.isArray(row) ? row : Object.values(row);
+              return '<tr>' + cells.map(function(c) { return '<td>' + esc(String(c)) + '</td>'; }).join('') + '</tr>';
+            }).join('') + '</tbody></table>';
+        }
+        if (lang === 'steps') {
+          return '<div class="rc-steps">' + items.map(function(item, i) {
+            var title = item.title || item.titulo || item.nombre || item.paso || '';
+            var desc = item.desc || item.descripcion || item.description || '';
+            return '<div class="rc-step"><div class="rc-step-num">' + (i + 1) + '</div><div class="rc-step-body"><div class="rc-step-title">' + esc(title) + '</div>' +
+              (desc ? '<div class="rc-step-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
+          }).join('') + '</div>';
+        }
+        if (lang === 'tree') {
+          var question = data.question || data.pregunta || '';
+          var choices = data.choices || data.opciones || items;
+          var html = '<div class="rc-tree-question">' + esc(question) + '</div>';
+          html += '<div class="rc-tree-choices">' + choices.map(function(c) {
+            var title = c.title || c.nombre || c.label || '';
+            var desc = c.desc || c.descripcion || c.description || '';
+            return '<div class="rc-tree-choice" onclick="selectOption(this,\'' + esc(title).replace(/'/g, "\\'") + '\')"><div class="rc-tree-choice-body"><div class="rc-tree-choice-title">' + esc(title) + '</div>' +
+              (desc ? '<div class="rc-tree-choice-desc">' + esc(desc) + '</div>' : '') + '</div><div class="rc-tree-choice-arrow">&rarr;</div></div>';
+          }).join('') + '</div>';
+          return html;
+        }
+      } catch (e) {
+        return '<div style="color:#ef4444;font-size:12px;padding:6px;">Error rendering component</div>';
+      }
+      return '';
+    }
+
+    // Markdown renderer with rich blocks
+    function md(text) {
+      try {
+        var h = esc(text);
+        var p = h.split('```');
+        if (p.length >= 3) {
+          h = '';
+          for (var i = 0; i < p.length; i++) {
+            if (i % 2 === 0) { h += p[i]; } else {
+              var raw = p[i];
+              var langMatch = raw.match(/^(\w+)\s*\n/);
+              var lang = langMatch ? langMatch[1].toLowerCase() : null;
+              if (lang && RICH_BLOCKS.indexOf(lang) !== -1) {
+                var json = raw.replace(/^\w+\s*\n/, '').trim();
+                h += renderRichBlock(lang, json);
+              } else {
+                var c = raw.replace(/^\w*\n/, '');
+                h += '<pre style="margin:6px 0;padding:10px;border-radius:8px;background:#0f172a;color:#e2e8f0;font-family:\'JetBrains Mono\',monospace;font-size:12px;line-height:1.5;overflow-x:auto;"><code>' + c + '</code></pre>';
+              }
+            }
+          }
+        }
+        h = h.replace(/`([^`\n]+)`/g, '<code style="background:rgba(0,0,0,0.06);padding:1px 4px;border-radius:4px;font-size:12px;font-family:\'JetBrains Mono\',monospace;">$1</code>');
+        h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        h = h.replace(/^### (.+)$/gm, '<div style="font-size:14px;font-weight:800;margin:8px 0 4px;">$1</div>');
+        h = h.replace(/^## (.+)$/gm, '<div style="font-size:16px;font-weight:800;margin:10px 0 4px;">$1</div>');
+        h = h.replace(/^# (.+)$/gm, '<div style="font-size:18px;font-weight:800;margin:12px 0 6px;">$1</div>');
+        h = h.replace(/^[*\-] (.+)$/gm, '<div style="padding-left:14px;">&#8226; $1</div>');
+        h = h.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:14px;">$1. $2</div>');
+        h = h.replace(/\n/g, '<br>');
+        return h;
+      } catch (e) { return esc(text); }
+    }
+  </script>
+</body>
+</html>
