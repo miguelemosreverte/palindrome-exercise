@@ -150,7 +150,7 @@
     }
   </style>
   <script src="app.js"></script>
-  <script>AppBridge.headCheck();</script>
+  <script>if(window.AppBridge)AppBridge.headCheck();</script>
 </head>
 <body class="paper-noise min-h-screen bg-cream text-ink fade-in">
   <!-- Model logo clouds -->
@@ -364,7 +364,6 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
   <script>
     AppBridge.bindAuthLinks();
     AppBridge.checkAutoRedirect();
