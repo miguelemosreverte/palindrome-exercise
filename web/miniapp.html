@@ -584,6 +584,20 @@
       statusLabel.textContent = 'Session: ' + sessionId.slice(0, 8) + '...';
       listenMessages();
       listenStatus();
+
+      // On first connect, send a greeting so the agent starts talking
+      var greeted = localStorage.getItem('bridge-greeted-' + sessionId);
+      if (!greeted) {
+        localStorage.setItem('bridge-greeted-' + sessionId, '1');
+        var username = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user)
+          ? (tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || 'User')
+          : 'User';
+        fetch(API_BASE + '/api/bridge/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionId, from: username, content: 'Hi! Just connected from the app.' }),
+        });
+      }
     }
 
     // SSE for messages — single source of truth, no separate fetch
