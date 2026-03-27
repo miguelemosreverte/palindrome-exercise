@@ -1,6 +1,7 @@
 #!/bin/bash
-# Bridge Agent — a living AI that listens to Telegram and responds via OpenCode or Claude CLI.
-# Prefers a local OpenCode instance; falls back to `claude` CLI if unavailable.
+# Bridge Agent — uses the LOCAL OpenCode instance to chat via Telegram.
+# OpenCode maintains conversation history in its session — no context re-sending needed.
+# Uses whatever model/provider the user has configured in OpenCode (free by default).
 #
 # Usage:
 #   ./scripts/bridge-agent.sh
@@ -13,9 +14,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_BASE="https://palindrome-exercise.vercel.app"
 OPENCODE_URL="${OPENCODE_URL:-http://localhost:9001}"
-OPENCODE_PORT="${OPENCODE_URL##*:}"  # extract port
+OPENCODE_PORT="${OPENCODE_URL##*:}"
+FIREBASE_URL="https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app"
+FB_ROOT="mercadopago-bridge"
 
-# Session
+# ─── Session ───
+
 SESSION="${BRIDGE_SESSION:-}"
 [ -z "$SESSION" ] && [ -f "$HOME/.bridge/session" ] && SESSION=$(cat "$HOME/.bridge/session")
 [ -z "$SESSION" ] && [ -f "$HOME/.bridge-session" ] && SESSION=$(cat "$HOME/.bridge-session")
@@ -25,94 +29,81 @@ if [ -z "$SESSION" ]; then
   exit 1
 fi
 
-SEEN_FILE=$(mktemp)
-INITIALIZED=false
-OC_SESSION_ID=""
-AGENT_MODE=""  # "opencode" or "claude"
+# ─── Detect project ───
 
-# Build project context
-PROJECT_CONTEXT=$(head -100 "$PROJECT_ROOT/CLAUDE.md" 2>/dev/null)
-RECENT_COMMITS=$(cd "$PROJECT_ROOT" && git log --oneline -10 2>/dev/null)
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+if [ -f "$PROJECT_ROOT/package.json" ]; then
+  PROJECT_NAME=$(python3 -c "import json;print(json.load(open('$PROJECT_ROOT/package.json')).get('name','$PROJECT_NAME'))" 2>/dev/null)
+fi
 
-SYSTEM_PROMPT="You are Bridge Agent, an enthusiastic AI assistant living inside the Bridge project (desktop-to-phone AI communication). You communicate with users via Telegram. Keep responses SHORT (under 400 chars). Be enthusiastic but concise. Do not use Markdown formatting."
-
-# ─── OpenCode helpers ───
+# ─── OpenCode setup ───
 
 opencode_is_running() {
   curl -sf "$OPENCODE_URL/global/health" --max-time 2 >/dev/null 2>&1
 }
 
-start_opencode() {
-  echo "[setup] Spawning opencode on port $OPENCODE_PORT..."
-  opencode serve --port "$OPENCODE_PORT" --hostname 127.0.0.1 &
-  OPENCODE_PID=$!
-  # Wait up to 15s for it to become healthy
-  for i in $(seq 1 15); do
-    sleep 1
-    if opencode_is_running; then
-      echo "[setup] OpenCode is healthy (pid $OPENCODE_PID)"
-      return 0
-    fi
-  done
-  echo "[setup] OpenCode failed to start in time"
-  kill "$OPENCODE_PID" 2>/dev/null
-  return 1
-}
-
-create_opencode_session() {
-  OC_SESSION_ID=$(curl -sf -X POST "$OPENCODE_URL/session" \
-    -H "Content-Type: application/json" \
-    -d '{}' | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
-  if [ -n "$OC_SESSION_ID" ]; then
-    echo "[setup] OpenCode session: ${OC_SESSION_ID:0:16}..."
-    return 0
-  fi
-  return 1
-}
-
-# ─── Detect agent mode ───
-
-detect_mode() {
-  # 1. Check if OpenCode is already running
-  if opencode_is_running; then
-    echo "[setup] OpenCode already running at $OPENCODE_URL"
-    AGENT_MODE="opencode"
-    return
-  fi
-
-  # 2. Try to spawn it
+if ! opencode_is_running; then
   if command -v opencode >/dev/null 2>&1; then
-    if start_opencode; then
-      AGENT_MODE="opencode"
-      return
+    echo "[setup] Spawning opencode on port $OPENCODE_PORT..."
+    opencode serve --port "$OPENCODE_PORT" --hostname 127.0.0.1 &
+    OPENCODE_PID=$!
+    for i in $(seq 1 15); do
+      sleep 1
+      opencode_is_running && break
+    done
+    if ! opencode_is_running; then
+      echo "[setup] OpenCode failed to start. Install opencode and retry."
+      kill "$OPENCODE_PID" 2>/dev/null
+      exit 1
     fi
+    echo "[setup] OpenCode is healthy (pid $OPENCODE_PID)"
+  else
+    echo "OpenCode not found. Install it: https://opencode.ai"
+    exit 1
   fi
-
-  # 3. Fall back to claude CLI
-  if command -v claude >/dev/null 2>&1; then
-    echo "[setup] Falling back to claude CLI"
-    AGENT_MODE="claude"
-    return
-  fi
-
-  echo "Neither opencode nor claude found. Install one and retry."
-  exit 1
-}
-
-detect_mode
-
-if [ "$AGENT_MODE" = "opencode" ]; then
-  create_opencode_session || {
-    echo "[setup] Could not create OpenCode session, falling back to claude"
-    AGENT_MODE="claude"
-  }
+else
+  echo "[setup] OpenCode running at $OPENCODE_URL"
 fi
 
-echo "Bridge Agent starting..."
-echo "Session: ${SESSION:0:8}..."
-echo "Using: $AGENT_MODE"
+# Create a session — OpenCode keeps full conversation history in the session
+OC_SESSION_ID=$(curl -sf -X POST "$OPENCODE_URL/session" \
+  -H "Content-Type: application/json" \
+  -d '{}' | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
 
-# ─── Send to Bridge ───
+if [ -z "$OC_SESSION_ID" ]; then
+  echo "[setup] Could not create OpenCode session"
+  exit 1
+fi
+echo "[setup] OpenCode session: ${OC_SESSION_ID:0:16}..."
+
+# ─── Send system context ONCE as the first message ───
+# OpenCode remembers everything in the session — no need to resend
+
+RECENT_COMMITS=$(cd "$PROJECT_ROOT" && git log --oneline -10 2>/dev/null)
+PROJECT_CONTEXT=$(head -80 "$PROJECT_ROOT/CLAUDE.md" 2>/dev/null)
+
+SYSTEM_MSG="You are Bridge Agent for the project '$PROJECT_NAME'.
+You communicate with users via Telegram through the Bridge system.
+Users see your messages on their phone. Keep responses SHORT (under 400 chars).
+Be enthusiastic but concise. Do not use Markdown formatting.
+Do not repeat yourself — you have full conversation history.
+
+Project: $PROJECT_NAME
+Location: $PROJECT_ROOT
+
+Recent commits:
+$RECENT_COMMITS
+
+Project info:
+$PROJECT_CONTEXT
+
+Say hello briefly, mention 1-2 recent things shipped, and ask what to work on next."
+
+echo "Bridge Agent starting..."
+echo "Project: $PROJECT_NAME"
+echo "Session: ${SESSION:0:8}..."
+
+# ─── Send to Bridge (Telegram) ───
 
 send_bridge() {
   local action="$1"
@@ -131,140 +122,68 @@ except: pass
 " "$SESSION" "$action" "$message" "$API_BASE" 2>/dev/null
 }
 
-# ─── Ask the agent ───
+# ─── Send message to OpenCode and get response ───
+# Because OpenCode maintains session history, each message builds on the last.
+# No system prompt re-sending. No history duplication.
 
 ask_opencode() {
   local user_message="$1"
-  local full_prompt="$SYSTEM_PROMPT
 
-Recent commits:
-$RECENT_COMMITS
-
-The user sent this message via Telegram. Respond naturally:
-$user_message"
-
-  # Send message
-  local send_resp
-  send_resp=$(curl -sf -X POST "$OPENCODE_URL/session/$OC_SESSION_ID/message" \
+  # Send message to OpenCode session
+  curl -sf -X POST "$OPENCODE_URL/session/$OC_SESSION_ID/message" \
     -H "Content-Type: application/json" \
-    -d "$(python3 -c 'import json,sys;print(json.dumps({"parts":[{"type":"text","text":sys.argv[1]}]}))' "$full_prompt")" 2>/dev/null)
+    -d "$(python3 -c 'import json,sys;print(json.dumps({"parts":[{"type":"text","text":sys.argv[1]}]}))' "$user_message")" >/dev/null 2>&1
 
-  if [ -z "$send_resp" ]; then
-    echo ""
-    return
-  fi
-
-  # Poll for the assistant response (up to 60s)
+  # Wait for assistant response (OpenCode streams, we poll for completion)
+  local last_msg_id=""
   for i in $(seq 1 30); do
     sleep 2
-    local messages
-    messages=$(curl -sf "$OPENCODE_URL/session/$OC_SESSION_ID/message" 2>/dev/null)
-    if [ -z "$messages" ]; then continue; fi
-
     local answer
-    answer=$(echo "$messages" | python3 -c "
+    answer=$(curl -sf "$OPENCODE_URL/session/$OC_SESSION_ID/message" 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
     msgs = data if isinstance(data, list) else data.get('messages', data.get('data', []))
+    # Find the last assistant message
     for m in reversed(msgs):
-        role = m.get('role', m.get('info',{}).get('role',''))
+        info = m.get('info', {})
+        role = info.get('role', m.get('role', ''))
+        if role != 'assistant':
+            continue
         parts = m.get('parts', [])
-        if role == 'assistant' or (not role and parts):
-            texts = [p.get('text','') for p in parts if p.get('type')=='text']
-            if texts:
+        texts = [p.get('text','') for p in parts if p.get('type')=='text']
+        if texts:
+            msg_id = info.get('id', m.get('id', ''))
+            # Check if generation is complete (has step-finish)
+            has_finish = any(p.get('type')=='step-finish' for p in parts)
+            if has_finish:
                 print(''.join(texts))
-                break
+            break
 except:
     pass
 " 2>/dev/null)
-
     if [ -n "$answer" ]; then
       echo "$answer"
       return
     fi
   done
-  echo ""
 }
 
-ask_claude() {
-  local user_message="$1"
-  claude -p --output-format text --model haiku --tools "" \
-    "$SYSTEM_PROMPT
+# ─── Startup: send system context and get greeting ───
 
-Recent commits:
-$RECENT_COMMITS
+echo "Sending startup context to OpenCode..."
+GREETING=$(ask_opencode "$SYSTEM_MSG")
+if [ -n "$GREETING" ]; then
+  echo "[agent] $GREETING"
+  send_bridge "notify" "$GREETING"
+else
+  echo "[agent] startup failed — OpenCode did not respond"
+fi
 
-The user sent this message via Telegram. Respond naturally:
-$user_message" 2>/dev/null
-}
-
-ask_agent() {
-  if [ "$AGENT_MODE" = "opencode" ]; then
-    ask_opencode "$1"
-  else
-    ask_claude "$1"
-  fi
-}
-
-# ─── Startup greeting ───
-
-startup_greeting() {
-  local greeting
-  local startup_prompt="You are Bridge Agent. You just came online in the Bridge project (desktop-to-phone AI communication system).
-
-Recent commits:
-$RECENT_COMMITS
-
-Project summary:
-$PROJECT_CONTEXT
-
-Introduce yourself in under 500 chars. Mention what was recently shipped and suggest what to build next. Be enthusiastic. Do not use Markdown formatting."
-
-  if [ "$AGENT_MODE" = "opencode" ]; then
-    greeting=$(ask_opencode "$startup_prompt")
-  else
-    greeting=$(claude -p --output-format text --model haiku --tools "" "$startup_prompt" 2>/dev/null)
-  fi
-
-  if [ -n "$greeting" ]; then
-    echo "[agent] $greeting"
-    send_bridge "notify" "$greeting"
-  else
-    echo "[agent] greeting failed"
-  fi
-}
-
-# ─── Firebase SSE stream ───
-
-FIREBASE_URL="https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app"
-FB_ROOT="mercadopago-bridge"
-
-handle_message() {
-  local msg_json="$1"
-  local from content
-  from=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('from','user'))" 2>/dev/null)
-  content=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('content',''))" 2>/dev/null)
-
-  # Skip agent/system messages
-  [ "$from" = "agent" ] || [ "$from" = "system" ] && return
-  [ -z "$content" ] && return
-
-  echo "[$from] $content"
-  local response
-  response=$(ask_agent "$from says: $content")
-  if [ -n "$response" ]; then
-    echo "[agent] $response"
-    send_bridge "notify" "$response"
-  fi
-}
+# ─── Listen for Telegram messages via Firebase SSE ───
 
 echo "Listening for messages via Firebase SSE..."
 
-# Send greeting first
-startup_greeting &
-
-# Use python to handle SSE stream (handles multi-line JSON correctly)
 curl -sN -H "Accept: text/event-stream" \
   "$FIREBASE_URL/$FB_ROOT/bridge-messages/$SESSION.json" 2>/dev/null | \
 python3 -u -c "
@@ -278,7 +197,6 @@ for raw_line in sys.stdin:
     if line.startswith('data: '):
         buf = line[6:]
     elif line == '' and buf:
-        # End of SSE event — parse accumulated data
         try:
             event = json.loads(buf)
             path = event.get('path','')
@@ -293,8 +211,19 @@ for raw_line in sys.stdin:
         buf = ''
     elif buf:
         buf += line
-" 2>/dev/null | while IFS= read -r msg; do
-  handle_message "$msg"
+" 2>/dev/null | while IFS= read -r msg_json; do
+  FROM=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('from','user'))" 2>/dev/null)
+  CONTENT=$(echo "$msg_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('content',''))" 2>/dev/null)
+
+  [ -z "$CONTENT" ] && continue
+  echo "[$FROM] $CONTENT"
+
+  # Send to OpenCode — it already has full conversation history
+  RESPONSE=$(ask_opencode "$FROM says: $CONTENT")
+  if [ -n "$RESPONSE" ]; then
+    echo "[agent] $RESPONSE"
+    send_bridge "notify" "$RESPONSE"
+  fi
 done
 
 echo "SSE stream ended, restarting..."
