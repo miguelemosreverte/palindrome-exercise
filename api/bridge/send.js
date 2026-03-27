@@ -1,7 +1,8 @@
 // Desktop sends a message to all Telegram users in a session
-const { readPath } = require('../../lib/firebase');
+const { readPath, pushPath } = require('../../lib/firebase');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PAIRS_PATH = 'mercadopago-bridge/bridge-pairs';
+const MSGS_PATH = 'mercadopago-bridge/bridge-messages';
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,6 +20,14 @@ module.exports = async function handler(req, res) {
   if (!chatId && !sessionId) return res.status(400).json({ error: 'chatId or sessionId required' });
 
   if (!BOT_TOKEN) return res.status(500).json({ error: 'Bot token not configured' });
+
+  // Write to Firebase for mini app
+  var from = body.from || 'agent';
+  await pushPath(MSGS_PATH + '/' + sessionId, {
+    from: from,
+    content: content,
+    timestamp: new Date().toISOString(),
+  });
 
   // Collect all recipients
   var recipients = [];
