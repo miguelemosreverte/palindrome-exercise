@@ -71,7 +71,16 @@ function createWindow() {
     },
   });
 
+  // Inject persisted session into the page so QR uses the right one
+  var persistedSession = getPersistedSession();
   mainWindow.loadFile('index.html');
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (persistedSession) {
+      mainWindow.webContents.executeJavaScript(
+        'window.__BRIDGE_SESSION__ = ' + JSON.stringify(persistedSession) + ';'
+      );
+    }
+  });
 }
 
 app.whenReady().then(() => {

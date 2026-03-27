@@ -235,14 +235,14 @@
     });
 
     async function init() {
-      // Reuse existing session: IPC from main process > localStorage > create new
-      const persisted = window.bridge ? await window.bridge.getSession() : null;
-      const stored = localStorage.getItem('bridge-desktop-session');
+      // Wait briefly for main process to inject __BRIDGE_SESSION__
+      await new Promise(r => setTimeout(r, 100));
 
-      if (persisted) {
-        sessionId = persisted;
-      } else if (stored) {
-        sessionId = stored;
+      // Reuse session: injected by main > localStorage > create new
+      if (window.__BRIDGE_SESSION__) {
+        sessionId = window.__BRIDGE_SESSION__;
+      } else if (localStorage.getItem('bridge-desktop-session')) {
+        sessionId = localStorage.getItem('bridge-desktop-session');
       } else {
         const res = await fetch(API_BASE + '/api/bridge/sessions', { method: 'POST' });
         const data = await res.json();
