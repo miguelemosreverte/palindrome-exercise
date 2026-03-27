@@ -167,7 +167,6 @@ module.exports = async function handler(req, res) {
     var telegramMarkup = null;
 
     if (hasRichContent && sessionId) {
-      // Strip rich blocks for Telegram, show clean summary + Mini App button
       var cleanMsg = message.replace(/```(?:timeline|options|cards|table|steps|tree|chartjs)[\s\S]*?```/g, '').trim();
       telegramText = icon + ' ' + (cleanMsg || 'Tap below to view rich content');
       telegramMarkup = {
@@ -176,6 +175,9 @@ module.exports = async function handler(req, res) {
         ]],
       };
     }
+
+    // Strip any leaked internal paths/scripts from messages
+    telegramText = telegramText.replace(/\.\/scripts\/[^\s]+/g, '').replace(/bridge\.sh\s+\w+/g, '').trim();
 
     // Send to all session members (owner + guests)
     for (var b = 0; b < allChatIds.length; b++) {
