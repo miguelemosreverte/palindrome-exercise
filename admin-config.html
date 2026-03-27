@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge Admin Config</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sky: #bcecff;
+  --mist: #dff7f2;
+  --cream: #f7f6ef;
+  --shell: rgba(255,255,255,0.72);
+  --ink: #112033;
+  --slate: #56708a;
+  --ocean: #316dff;
+  --mint: #89e0c8;
+  --coral: #ff9f6e;
+  --line: rgba(17,32,51,0.08);
+  --shadow: 0 35px 90px rgba(31,93,149,0.14);
+  --shadow-soft: 0 20px 50px rgba(75,133,178,0.14);
+  --danger: #ef4444;
+  --success: #22c55e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.7), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(137,224,200,0.2), transparent 28%),
+    linear-gradient(180deg, #bcecff 0%, #d8f5f1 42%, #f7f6ef 100%);
+  min-height: 100vh;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 28px; border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.5); backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 10;
+}
+.topbar h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.topbar h1 span { font-size: 11px; font-weight: 600; color: var(--slate); background: var(--line); padding: 2px 8px; border-radius: 6px; }
+.tabs {
+  display: flex; gap: 4px; padding: 12px 28px 0;
+}
+.tab {
+  padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--slate);
+  border-radius: 12px 12px 0 0; transition: all 0.15s;
+}
+.tab:hover { background: rgba(255,255,255,0.4); color: var(--ink); }
+.tab.active { background: rgba(255,255,255,0.8); color: var(--ocean); box-shadow: 0 -2px 0 var(--ocean) inset; }
+.panel {
+  display: none; padding: 28px; max-width: 900px; margin: 0 auto;
+}
+.panel.active { display: block; }
+.card {
+  background: rgba(255,255,255,0.7); border-radius: 16px; border: 1px solid var(--line);
+  padding: 24px; margin-bottom: 20px; backdrop-filter: blur(6px);
+}
+.card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+label { display: block; font-size: 12px; font-weight: 700; color: var(--slate); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+textarea, input[type=text], select {
+  width: 100%; border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; font: inherit; font-size: 14px; color: var(--ink);
+  background: rgba(255,255,255,0.6); outline: none; transition: border 0.15s;
+  resize: vertical;
+}
+textarea:focus, input[type=text]:focus, select:focus { border-color: var(--ocean); }
+textarea { min-height: 120px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: 10px; border: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; transition: all 0.15s;
+}
+.btn-primary { background: var(--ocean); color: #fff; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-secondary { background: var(--line); color: var(--ink); }
+.btn-secondary:hover { background: rgba(0,0,0,0.1); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.row { display: flex; gap: 16px; margin-bottom: 16px; }
+.row > * { flex: 1; }
+.field { margin-bottom: 16px; }
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+  border-radius: 12px; font-size: 13px; font-weight: 600; color: #fff;
+  background: var(--ocean); transform: translateY(80px); opacity: 0;
+  transition: all 0.3s; z-index: 100;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.error { background: var(--danger); }
+.timestamp { font-size: 11px; color: var(--slate); opacity: 0.6; margin-top: 8px; }
+.list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px;
+  margin-bottom: 8px; background: rgba(255,255,255,0.5); cursor: pointer;
+  transition: all 0.15s;
+}
+.list-item:hover { background: rgba(255,255,255,0.9); }
+.list-item .name { font-weight: 600; font-size: 14px; }
+.list-item .meta { font-size: 12px; color: var(--slate); }
+.list-actions { display: flex; gap: 6px; }
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0; border-bottom: 1px solid var(--line);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { font-weight: 600; font-size: 14px; }
+.toggle-desc { font-size: 12px; color: var(--slate); margin-top: 2px; }
+.toggle {
+  width: 44px; height: 24px; border-radius: 12px; border: none;
+  background: var(--line); cursor: pointer; position: relative; transition: background 0.2s;
+}
+.toggle.on { background: var(--ocean); }
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.toggle.on::after { transform: translateX(20px); }
+.preview-box {
+  border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+  background: rgba(255,255,255,0.4); min-height: 60px; margin-top: 12px;
+  font-size: 14px; line-height: 1.6;
+}
+.preview-box h4 { font-size: 12px; font-weight: 700; color: var(--slate); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.empty { text-align: center; padding: 40px; color: var(--slate); font-size: 14px; }
+.form-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center; z-index: 50;
+}
+.form-overlay.show { display: flex; }
+.form-modal {
+  background: #fff; border-radius: 20px; padding: 28px; width: 90%; max-width: 640px;
+  max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow);
+}
+.form-modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+.sim-log {
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+  background: var(--ink); color: var(--mint); padding: 16px; border-radius: 12px;
+  max-height: 300px; overflow-y: auto; line-height: 1.8; margin-top: 12px;
+}
+.sim-log .step { color: var(--sky); }
+.sim-log .event { color: var(--coral); }
+.sim-log .state { color: var(--mint); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Bridge Config <span>Admin</span></h1>
+  <div style="font-size:12px;color:var(--slate)">Firebase RTDB</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('directives')">Bot Directives</button>
+  <button class="tab" onclick="showTab('components')">Components</button>
+  <button class="tab" onclick="showTab('scenarios')">Scenarios</button>
+  <button class="tab" onclick="showTab('ui')">UI Config</button>
+</div>
+
+<!-- DIRECTIVES -->
+<div id="tab-directives" class="panel active">
+  <div class="card">
+    <h3>System Prompt</h3>
+    <div class="field">
+      <label>System directive</label>
+      <textarea id="dir-system" rows="8" placeholder="Enter the system prompt..."></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-primary" onclick="saveDirective('system')">Save System Prompt</button>
+      <span id="dir-system-ts" class="timestamp"></span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Rules</h3>
+    <div class="field">
+      <label>Bot rules</label>
+      <textarea id="dir-rules" rows="8" placeholder="Enter rules (one per line or JSON)..."></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn btn-primary" onclick="saveDirective('rules')">Save Rules</button>
+      <span id="dir-rules-ts" class="timestamp"></span>
+    </div>
+  </div>
+</div>
+
+<!-- COMPONENTS -->
+<div id="tab-components" class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3 style="font-size:15px;font-weight:700">Dynamic Components</h3>
+    <button class="btn btn-primary btn-sm" onclick="openComponentForm()">+ Add Component</button>
+  </div>
+  <div id="comp-list"></div>
+</div>
+
+<!-- SCENARIOS -->
+<div id="tab-scenarios" class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3 style="font-size:15px;font-weight:700">Scenarios</h3>
+    <button class="btn btn-primary btn-sm" onclick="openScenarioForm()">+ Add Scenario</button>
+  </div>
+  <div id="scen-list"></div>
+</div>
+
+<!-- UI CONFIG -->
+<div id="tab-ui" class="panel">
+  <div class="card">
+    <h3>UI Layout Settings</h3>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Threading Mode</div>
+        <div class="toggle-desc">Enable threaded conversations</div>
+      </div>
+      <button class="toggle" id="tog-threading" onclick="toggleUI('threading',this)"></button>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Install Prompt</div>
+        <div class="toggle-desc">Show PWA install banner to users</div>
+      </div>
+      <button class="toggle" id="tog-installPrompt" onclick="toggleUI('installPrompt',this)"></button>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Chat Mode</div>
+        <div class="toggle-desc">Select the interaction mode</div>
+      </div>
+      <select id="sel-chatMode" style="width:160px" onchange="saveChatMode(this.value)">
+        <option value="freeform">Freeform</option>
+        <option value="guided">Guided</option>
+        <option value="hybrid">Hybrid</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- COMPONENT FORM MODAL -->
+<div class="form-overlay" id="comp-modal">
+  <div class="form-modal">
+    <h3 id="comp-modal-title">Add Component</h3>
+    <input type="hidden" id="comp-edit-key">
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="comp-name" placeholder="e.g. timeline">
+    </div>
+    <div class="field">
+      <label>Item Key</label>
+      <input type="text" id="comp-itemKey" placeholder="e.g. items">
+    </div>
+    <div class="field">
+      <label>Template (HTML with &#123;&#123;field&#125;&#125; placeholders)</label>
+      <textarea id="comp-template" rows="6" oninput="updateCompPreview()" placeholder='<div class="item">{{title}}: {{value}}</div>'></textarea>
+    </div>
+    <div class="preview-box">
+      <h4>Live Preview</h4>
+      <div id="comp-preview"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary" onclick="saveComponent()">Save</button>
+      <button class="btn btn-secondary" onclick="closeModal('comp-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCENARIO FORM MODAL -->
+<div class="form-overlay" id="scen-modal">
+  <div class="form-modal">
+    <h3 id="scen-modal-title">Add Scenario</h3>
+    <input type="hidden" id="scen-edit-key">
+    <div class="row">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="scen-name" placeholder="e.g. onboarding">
+      </div>
+      <div class="field">
+        <label>Initial State</label>
+        <input type="text" id="scen-initial" placeholder="e.g. start">
+      </div>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="scen-desc" placeholder="Describe the scenario">
+    </div>
+    <div class="field">
+      <label>States (JSON object)</label>
+      <textarea id="scen-states" rows="5" placeholder='{"start":{"label":"Welcome"},"end":{"label":"Done"}}'></textarea>
+    </div>
+    <div class="field">
+      <label>Transitions (JSON array: [{from, event, to, actions}])</label>
+      <textarea id="scen-transitions" rows="5" placeholder='[{"from":"start","event":"next","to":"end","actions":["greet"]}]'></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary" onclick="saveScenario()">Save</button>
+      <button class="btn btn-success" onclick="simulateScenario()">Play</button>
+      <button class="btn btn-secondary" onclick="closeModal('scen-modal')">Cancel</button>
+    </div>
+    <div id="scen-sim"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FB = 'https://signaling-dcfad-default-rtdb.europe-west1.firebasedatabase.app';
+const BASE = FB + '/mercadopago-bridge/bridge-config';
+
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.textContent.toLowerCase().includes(id.slice(0,4))));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+id));
+}
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function fbGet(path) {
+  const r = await fetch(BASE + path + '.json');
+  return r.json();
+}
+async function fbPut(path, data) {
+  const r = await fetch(BASE + path + '.json', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  return r.json();
+}
+async function fbDelete(path) {
+  await fetch(BASE + path + '.json', { method: 'DELETE' });
+}
+
+// ---- DIRECTIVES ----
+async function loadDirectives() {
+  const sys = await fbGet('/bot-directives/system');
+  const rules = await fbGet('/bot-directives/rules');
+  if (sys && typeof sys === 'object' && sys.value !== undefined) {
+    document.getElementById('dir-system').value = sys.value || '';
+    if (sys.updatedAt) document.getElementById('dir-system-ts').textContent = 'Last saved: ' + new Date(sys.updatedAt).toLocaleString();
+  } else if (typeof sys === 'string') {
+    document.getElementById('dir-system').value = sys;
+  }
+  if (rules && typeof rules === 'object' && rules.value !== undefined) {
+    document.getElementById('dir-rules').value = rules.value || '';
+    if (rules.updatedAt) document.getElementById('dir-rules-ts').textContent = 'Last saved: ' + new Date(rules.updatedAt).toLocaleString();
+  } else if (typeof rules === 'string') {
+    document.getElementById('dir-rules').value = rules;
+  }
+}
+async function saveDirective(key) {
+  const val = document.getElementById('dir-'+key).value;
+  const now = new Date().toISOString();
+  await fbPut('/bot-directives/'+key, { value: val, updatedAt: now });
+  document.getElementById('dir-'+key+'-ts').textContent = 'Last saved: ' + new Date(now).toLocaleString();
+  toast('Saved '+key);
+}
+
+// ---- COMPONENTS ----
+async function loadComponents() {
+  const data = await fbGet('/components');
+  const el = document.getElementById('comp-list');
+  if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="empty">No components yet</div>'; return; }
+  el.innerHTML = Object.entries(data).map(([k,v]) => `
+    <div class="list-item">
+      <div><div class="name">${esc(v.name||k)}</div><div class="meta">Key: ${esc(v.itemKey||'-')} &middot; Template: ${esc((v.template||'').slice(0,60))}</div></div>
+      <div class="list-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editComponent('${k}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteComponent('${k}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+function openComponentForm(data, key) {
+  document.getElementById('comp-modal-title').textContent = key ? 'Edit Component' : 'Add Component';
+  document.getElementById('comp-edit-key').value = key || '';
+  document.getElementById('comp-name').value = data ? data.name||'' : '';
+  document.getElementById('comp-itemKey').value = data ? data.itemKey||'' : '';
+  document.getElementById('comp-template').value = data ? data.template||'' : '';
+  updateCompPreview();
+  document.getElementById('comp-modal').classList.add('show');
+}
+async function editComponent(key) {
+  const data = await fbGet('/components/'+key);
+  openComponentForm(data, key);
+}
+async function deleteComponent(key) {
+  if (!confirm('Delete this component?')) return;
+  await fbDelete('/components/'+key);
+  toast('Deleted'); loadComponents();
+}
+async function saveComponent() {
+  const key = document.getElementById('comp-edit-key').value || document.getElementById('comp-name').value.replace(/\s+/g,'-').toLowerCase();
+  if (!key) { toast('Name required', true); return; }
+  await fbPut('/components/'+key, {
+    name: document.getElementById('comp-name').value,
+    itemKey: document.getElementById('comp-itemKey').value,
+    template: document.getElementById('comp-template').value,
+    updatedAt: new Date().toISOString()
+  });
+  closeModal('comp-modal'); toast('Component saved'); loadComponents();
+}
+function updateCompPreview() {
+  const tmpl = document.getElementById('comp-template').value;
+  const sample = tmpl.replace(/\{\{(\w+)\}\}/g, (_, f) => '<b style="color:var(--ocean)">['+f+']</b>');
+  document.getElementById('comp-preview').innerHTML = sample || '<span style="color:var(--slate)">Type a template to preview</span>';
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ---- SCENARIOS ----
+async function loadScenarios() {
+  const data = await fbGet('/scenarios');
+  const el = document.getElementById('scen-list');
+  if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="empty">No scenarios yet</div>'; return; }
+  el.innerHTML = Object.entries(data).map(([k,v]) => `
+    <div class="list-item">
+      <div><div class="name">${esc(v.name||k)}</div><div class="meta">${esc(v.description||'')} &middot; Initial: ${esc(v.initialState||'-')}</div></div>
+      <div class="list-actions">
+        <button class="btn btn-success btn-sm" onclick="playScenario('${k}')">Play</button>
+        <button class="btn btn-secondary btn-sm" onclick="editScenario('${k}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteScenario('${k}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+function openScenarioForm(data, key) {
+  document.getElementById('scen-modal-title').textContent = key ? 'Edit Scenario' : 'Add Scenario';
+  document.getElementById('scen-edit-key').value = key || '';
+  document.getElementById('scen-name').value = data ? data.name||'' : '';
+  document.getElementById('scen-desc').value = data ? data.description||'' : '';
+  document.getElementById('scen-initial').value = data ? data.initialState||'' : '';
+  document.getElementById('scen-states').value = data && data.states ? JSON.stringify(data.states, null, 2) : '';
+  document.getElementById('scen-transitions').value = data && data.transitions ? JSON.stringify(data.transitions, null, 2) : '';
+  document.getElementById('scen-sim').innerHTML = '';
+  document.getElementById('scen-modal').classList.add('show');
+}
+async function editScenario(key) {
+  const data = await fbGet('/scenarios/'+key);
+  openScenarioForm(data, key);
+}
+async function playScenario(key) {
+  const data = await fbGet('/scenarios/'+key);
+  openScenarioForm(data, key);
+  simulateScenario();
+}
+async function deleteScenario(key) {
+  if (!confirm('Delete this scenario?')) return;
+  await fbDelete('/scenarios/'+key);
+  toast('Deleted'); loadScenarios();
+}
+async function saveScenario() {
+  const key = document.getElementById('scen-edit-key').value || document.getElementById('scen-name').value.replace(/\s+/g,'-').toLowerCase();
+  if (!key) { toast('Name required', true); return; }
+  let states, transitions;
+  try { states = JSON.parse(document.getElementById('scen-states').value || '{}'); } catch(e) { toast('Invalid states JSON', true); return; }
+  try { transitions = JSON.parse(document.getElementById('scen-transitions').value || '[]'); } catch(e) { toast('Invalid transitions JSON', true); return; }
+  await fbPut('/scenarios/'+key, {
+    name: document.getElementById('scen-name').value,
+    description: document.getElementById('scen-desc').value,
+    initialState: document.getElementById('scen-initial').value,
+    states, transitions,
+    updatedAt: new Date().toISOString()
+  });
+  closeModal('scen-modal'); toast('Scenario saved'); loadScenarios();
+}
+function simulateScenario() {
+  let states, transitions;
+  try { states = JSON.parse(document.getElementById('scen-states').value || '{}'); } catch(e) { toast('Invalid states JSON', true); return; }
+  try { transitions = JSON.parse(document.getElementById('scen-transitions').value || '[]'); } catch(e) { toast('Invalid transitions JSON', true); return; }
+  const initial = document.getElementById('scen-initial').value;
+  if (!initial || !states[initial]) { toast('Invalid initial state', true); return; }
+
+  const log = [];
+  let current = initial;
+  const visited = new Set();
+  let step = 0;
+  log.push(`<span class="step">[0]</span> Start at <span class="state">${esc(current)}</span> (${esc(states[current]?.label||'')})`);
+
+  while (step < 50) {
+    if (visited.has(current)) { log.push(`<span class="step">[${step+1}]</span> Loop detected at <span class="state">${esc(current)}</span> - stopping`); break; }
+    visited.add(current);
+    const t = transitions.find(tr => tr.from === current);
+    if (!t) { log.push(`<span class="step">[${step+1}]</span> No transition from <span class="state">${esc(current)}</span> - end`); break; }
+    step++;
+    const actions = (t.actions||[]).map(a => esc(a)).join(', ');
+    log.push(`<span class="step">[${step}]</span> <span class="event">${esc(t.event)}</span> &rarr; <span class="state">${esc(t.to)}</span>${actions ? ' (actions: '+actions+')' : ''}`);
+    current = t.to;
+  }
+  document.getElementById('scen-sim').innerHTML = '<div class="sim-log">' + log.join('<br>') + '</div>';
+}
+
+// ---- UI CONFIG ----
+async function loadUI() {
+  const data = await fbGet('/ui-layout') || {};
+  const thr = document.getElementById('tog-threading');
+  const inst = document.getElementById('tog-installPrompt');
+  const chat = document.getElementById('sel-chatMode');
+  if (data.threading) thr.classList.add('on');
+  if (data.installPrompt) inst.classList.add('on');
+  if (data.chatMode) chat.value = data.chatMode;
+}
+async function toggleUI(key, btn) {
+  btn.classList.toggle('on');
+  const val = btn.classList.contains('on');
+  await fbPut('/ui-layout/'+key, val);
+  toast(key + ': ' + (val ? 'on' : 'off'));
+}
+async function saveChatMode(val) {
+  await fbPut('/ui-layout/chatMode', val);
+  toast('Chat mode: ' + val);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+// Init
+loadDirectives(); loadComponents(); loadScenarios(); loadUI();
+</script>
+</body>
+</html>
