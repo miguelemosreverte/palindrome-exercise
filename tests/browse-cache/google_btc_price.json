@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to google.com, search for \"bitcoin price usd\". Read the price shown. Output a ```cards block: {\"items\":[{\"label\":\"BTC/USD\",\"value\":\"$XX,XXX\",\"desc\":\"Live price from Google\"}]}. Use the REAL price. Output ONLY the ```cards block.",
+  "text": "```cards\n{\"items\":[{\"label\":\"BTC/USD\",\"value\":\"$66,019.85\",\"desc\":\"Live price from Google\"}]}\n```",
+  "date": "2026-03-27T21:00:14.883Z"
+}

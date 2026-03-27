@@ -34,11 +34,14 @@ CRITICAL FORMAT RULES:
 - Do NOT add any text before or after the block unless the test asks for multiple blocks.`;
 
 function askClaude(prompt, timeoutSec) {
+  const fullPrompt = prompt + FORMAT_RULES;
   try {
-    return execSync(
-      `claude --mcp-config ${MCP_CONFIG} --model haiku --output-format text --dangerously-skip-permissions -p ${JSON.stringify(prompt + FORMAT_RULES)}`,
-      { timeout: (timeoutSec || 180) * 1000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 2 * 1024 * 1024 }
+    // Pipe prompt via stdin to avoid shell escaping issues with backticks/quotes
+    const result = execSync(
+      `claude --mcp-config ${MCP_CONFIG} --model haiku --output-format text --dangerously-skip-permissions -p -`,
+      { input: fullPrompt, timeout: (timeoutSec || 240) * 1000, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }
     ).trim();
+    return result;
   } catch (e) {
     return (e.stdout || '').trim();
   }

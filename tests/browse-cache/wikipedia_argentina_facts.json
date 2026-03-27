@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to en.wikipedia.org/wiki/Argentina, read the infobox. Output a ```cards block: {\"items\":[{\"label\":\"Population\",\"value\":\"46.7M\",\"desc\":\"2025 est\"},{\"label\":\"Area\",\"value\":\"2.78M km²\"},{\"label\":\"Capital\",\"value\":\"Buenos Aires\"},{\"label\":\"Currency\",\"value\":\"Peso\"}]}. Use REAL numbers from the Wikipedia page. Output ONLY the ```cards block.",
+  "text": "```cards\n{\"items\":[{\"label\":\"Population\",\"value\":\"46.7M\",\"desc\":\"2025 est\"},{\"label\":\"Area\",\"value\":\"2.78M km²\"},{\"label\":\"Capital\",\"value\":\"Buenos Aires\"},{\"label\":\"Currency\",\"value\":\"Peso\"}]}\n```",
+  "date": "2026-03-27T20:56:16.137Z"
+}

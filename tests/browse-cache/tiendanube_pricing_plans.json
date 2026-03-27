@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to tiendanube.com, find the pricing/planes page. Read the plan names and prices. Output a ```table block: {\"headers\":[\"Plan\",\"Price\",\"Features\"],\"rows\":[...]}. Use REAL data from the site. Output ONLY the ```table block.",
+  "text": "```table\n{\"headers\":[\"Plan\",\"Price\",\"Features\"],\"rows\":[[\"Inicial\",\"Gratis\",\"Sin límites de productos, ventas y visitas; Envío por Andreani; Sin costo por transacción con Pago Nube\"],[\"Esencial\",\"$24.999 ARS/mes\",\"Todo del plan Inicial; Atención por email + messenger; +30 medios de envío; Todos medios de pagos integrados\"],[\"Impulso\",\"$73.999 ARS/mes\",\"Todo del plan Esencial; Atención por email + messenger + WhatsApp; Acciones masivas sobre ventas y productos; Acceso al código fuente\"],[\"Escala\",\"$219.999 ARS/mes\",\"Todo del plan Impulso; Estadísticas avanzadas; Restricción de usuarios; Hasta 3 centros de distribución\"],[\"Evolución\",\"Consultanos\",\"Todo del plan Escala; Atención prioritaria en todos los canales; Especialista en e-commerce dedicado; Migración asistida\"]]}\n```",
+  "date": "2026-03-27T21:03:54.006Z"
+}

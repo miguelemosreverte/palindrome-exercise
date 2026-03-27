@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to mercadolibre.com.ar, search for \"iphone 15\", read the first 3 results. Output a ```cards block with JSON: {\"items\":[{\"label\":\"iPhone 15 128GB\",\"value\":\"$XXX.XXX\",\"desc\":\"Seller name\"}]}. Use REAL data. Output ONLY the ```cards block.",
+  "text": "```cards\n{\"items\":[{\"label\":\"Apple iPhone 15 128 GB Negro - Distribuidor Autorizado\",\"value\":\"$1.549.999\",\"desc\":\"Distribuidor Autorizado\"},{\"label\":\"Apple iPhone 15 Pro (128 GB) - Titanio Negro con Cargador Fast - Excelente (Reacondicionado)\",\"value\":\"$781.619\",\"desc\":\"Reacondicionado\"},{\"label\":\"Apple iPhone 15 (128 GB) - Azul\",\"value\":\"$1.154.000\",\"desc\":\"N/A\"}]}\n```",
+  "date": "2026-03-27T20:59:50.250Z"
+}

@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to google.com, search for \"tech news today\". Read the top 3 headlines. Output a ```timeline block: {\"items\":[{\"date\":\"today\",\"title\":\"Headline\",\"desc\":\"1 sentence summary\"},...]}. Use REAL headlines. Output ONLY the ```timeline block.",
+  "text": "```timeline\n{\n  \"items\": [\n    {\n      \"date\": \"today\",\n      \"title\": \"Tech news: KPMG rolls out KPMG Private\",\n      \"desc\": \"KPMG launches new private offering; Dext launches AI assistant; Acumatica announces 2026 R1 release.\"\n    },\n    {\n      \"date\": \"today\",\n      \"title\": \"Why Nvidia and Nokia are backing AI RAN specialist ODC\",\n      \"desc\": \"Global operators join Nvidia and Nokia to inject $45 million into AI RAN specialist ODC.\"\n    },\n    {\n      \"date\": \"today\",\n      \"title\": \"Top Tech News Today | Apple May Open Siri to External AI Models\",\n      \"desc\": \"Apple may open Siri to Gemini and Claude; US judge blocks Pentagon action against Anthropic; OpenAI pauses adult AI model.\"\n    }\n  ]\n}\n```",
+  "date": "2026-03-27T21:00:40.858Z"
+}

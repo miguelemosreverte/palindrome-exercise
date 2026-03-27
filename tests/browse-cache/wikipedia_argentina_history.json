@@ -1,0 +1,5 @@
+{
+  "prompt": "Use the Playwright browser: navigate to en.wikipedia.org/wiki/Argentina, read the History section. Output a ```timeline block: {\"items\":[{\"date\":\"1816\",\"title\":\"Independence\",\"desc\":\"brief description\"},...]}. Include 4 real historical events with dates. Output ONLY the ```timeline block.",
+  "text": "```timeline\n{\"items\":[{\"date\":\"1502\",\"title\":\"European Arrival\",\"desc\":\"Amerigo Vespucci arrives in the region, marking the beginning of European contact with Argentina\"},{\"date\":\"1536\",\"title\":\"Buenos Aires Founded\",\"desc\":\"Pedro de Mendoza establishes the settlement of Buenos Aires, though it is abandoned in 1541\"},{\"date\":\"1810\",\"title\":\"May Revolution\",\"desc\":\"The 1810 May Revolution replaces Viceroy Baltasar Hidalgo de Cisneros with the First Junta, beginning Argentina's path to independence\"},{\"date\":\"1816\",\"title\":\"Declaration of Independence\",\"desc\":\"On 9 July 1816, the Congress of Tucumán formally declares Argentina's independence from Spain, now celebrated as Independence Day\"}]}\n```",
+  "date": "2026-03-27T20:56:40.651Z"
+}
