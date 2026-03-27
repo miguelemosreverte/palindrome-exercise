@@ -585,14 +585,21 @@
     .state-diagram { background:#fff; border-radius:16px; border:1px solid var(--line); padding:24px; overflow-x:auto; }
     .state-diagram h2 { font-size:12px; font-weight:700; margin-bottom:16px; color:var(--slate); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
     .state-diagram h2::before { content:''; width:8px; height:8px; border-radius:2px; background:var(--ocean); }
-    .state-graph { position:relative; min-height:120px; }
-    .state-graph svg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
-    .state-graph .nodes { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:12px 24px; justify-content:center; align-items:center; padding:16px 0; }
-    .state-node { min-width:80px; padding:8px 14px; border-radius:12px; border:2px solid var(--line); font-size:11px; font-weight:700; text-align:center; transition:all .3s; background:#fff; flex-shrink:0; position:relative; }
+    .nodes { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:8px 0; }
+    .state-node { min-width:70px; padding:7px 12px; border-radius:12px; border:2px solid var(--line); font-size:11px; font-weight:700; text-align:center; transition:all .3s; background:#fff; flex-shrink:0; }
     .state-node.active { border-color:var(--ocean); background:rgba(49,109,255,0.08); color:var(--ocean); box-shadow:0 0 0 4px rgba(49,109,255,0.12); }
     .state-node.visited { border-color:var(--ocean); opacity:.6; }
     .state-node.final { border-style:double; border-width:3px; }
-    .state-edge-label { font-size:9px; fill:var(--slate); font-weight:600; }
+    .edge-arrow { color:var(--line); font-size:16px; flex-shrink:0; }
+    .edge-arrow.active { color:var(--ocean); }
+    .edge-group { display:flex; flex-direction:column; gap:2px; flex-shrink:0; align-items:flex-start; }
+    .edge-label { font-size:9px; font-weight:600; color:var(--slate); display:flex; align-items:center; gap:4px; padding:1px 6px; border-radius:6px; background:rgba(0,0,0,0.03); white-space:nowrap; }
+    .edge-label.active { color:var(--ocean); background:rgba(49,109,255,0.06); }
+    .edge-label .edge-arrow { font-size:12px; }
+    .cycle-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--line); justify-content:center; }
+    .cycle-edge { font-size:10px; font-weight:700; color:var(--slate); padding:4px 10px; border-radius:8px; border:1px dashed var(--line); background:rgba(0,0,0,0.02); display:flex; align-items:center; gap:6px; }
+    .cycle-edge.active { color:var(--ocean); border-color:var(--ocean); background:rgba(49,109,255,0.04); }
+    .cycle-label { font-size:9px; font-weight:500; opacity:.7; }
 
     /* ── Controls ── */
     .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -1597,98 +1604,68 @@
       var main = document.getElementById('main');
       var curState = currentStep >= 0 && currentStep < s.steps.length ? s.steps[currentStep].state : s.states[0];
 
-      // State diagram — real graph with branches and cycles
+      // State diagram — shows nodes + transition edges with branches/cycles
       var visitedStates = {};
-      var visitedEdges = {};
-      for (var i = 0; i <= currentStep && i < s.steps.length; i++) {
-        visitedStates[s.steps[i].state] = true;
-        if (i > 0) visitedEdges[s.steps[i-1].state + '->' + s.steps[i].state] = true;
+      for (var vi = 0; vi <= currentStep && vi < s.steps.length; vi++) visitedStates[s.steps[vi].state] = true;
+
+      // Build adjacency from transitions
+      var edges = {};  // from -> [{to, event}]
+      var backEdges = {};  // to -> [{from, event}] for cycles
+      if (s.transitions) {
+        s.transitions.forEach(function(t) {
+          if (!edges[t.from]) edges[t.from] = [];
+          edges[t.from].push({ to: t.to, event: t.event });
+          // Detect back-edge (cycle)
+          if (s.states.indexOf(t.to) <= s.states.indexOf(t.from)) {
+            if (!backEdges[t.from]) backEdges[t.from] = [];
+            backEdges[t.from].push({ to: t.to, event: t.event });
+          }
+        });
       }
-      // Find final states from FSM def
-      var finalStates = {};
-      if (s.fsm && s.fsm.states) {
-        for (var sk in s.fsm.states) { if (s.fsm.states[sk].final) finalStates[sk] = true; }
-      }
-      // Build node HTML
-      var nodesHTML = s.states.map(function(st) {
+
+      var diagramHTML = '<div class="state-diagram"><h2>State Machine</h2><div class="nodes">';
+      s.states.forEach(function(st, idx) {
         var cls = 'state-node';
         if (st === curState) cls += ' active';
         else if (visitedStates[st]) cls += ' visited';
-        if (finalStates[st]) cls += ' final';
-        return '<div class="' + cls + '" data-state="' + esc(st) + '" id="sn-' + esc(st) + '">' + esc(st) + '</div>';
-      }).join('');
-      var diagramHTML = '<div class="state-diagram"><h2>State Machine</h2>' +
-        '<div class="state-graph" id="stateGraph"><svg id="stateSVG"></svg>' +
-        '<div class="nodes">' + nodesHTML + '</div></div></div>';
+        // Check if final
+        if (s.fsm && s.fsm.states && s.fsm.states[st] && s.fsm.states[st].final) cls += ' final';
+        diagramHTML += '<div class="' + cls + '">' + esc(st) + '</div>';
 
-      // We'll draw SVG edges after DOM render
-      setTimeout(function() {
-        var graph = document.getElementById('stateGraph');
-        var svg = document.getElementById('stateSVG');
-        if (!graph || !svg || !s.transitions) return;
-        var graphRect = graph.getBoundingClientRect();
-        svg.setAttribute('width', graph.offsetWidth);
-        svg.setAttribute('height', graph.offsetHeight);
-        svg.innerHTML = '<defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="currentColor"/></marker>' +
-          '<marker id="ah-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#316dff"/></marker></defs>';
-        var edgeCounts = {}; // track multiple edges between same pair
-        s.transitions.forEach(function(t) {
-          var fromEl = document.getElementById('sn-' + t.from);
-          var toEl = document.getElementById('sn-' + t.to);
-          if (!fromEl || !toEl) return;
-          var fr = fromEl.getBoundingClientRect();
-          var tr = toEl.getBoundingClientRect();
-          var x1 = fr.left + fr.width/2 - graphRect.left;
-          var y1 = fr.top + fr.height/2 - graphRect.top;
-          var x2 = tr.left + tr.width/2 - graphRect.left;
-          var y2 = tr.top + tr.height/2 - graphRect.top;
-          var edgeKey = t.from + '->' + t.to;
-          var reverseKey = t.to + '->' + t.from;
-          edgeCounts[edgeKey] = (edgeCounts[edgeKey] || 0) + 1;
-          var isActive = visitedEdges[edgeKey];
-          var isCycle = s.states.indexOf(t.from) > s.states.indexOf(t.to); // back edge
-          var isReverse = edgeCounts[reverseKey] > 0;
-          var color = isActive ? '#316dff' : '#cbd5e1';
-          var marker = isActive ? 'url(#ah-active)' : 'url(#ah)';
-          var strokeW = isActive ? 2.5 : 1.5;
-          // Offset for cycles/reverse edges
-          var offset = (isCycle || isReverse || edgeCounts[edgeKey] > 1) ? -30 - (edgeCounts[edgeKey] - 1) * 15 : 0;
-          if (t.from === t.to) {
-            // Self-loop
-            var path = 'M' + (x1) + ',' + (y1-20) + ' C' + (x1-30) + ',' + (y1-60) + ' ' + (x1+30) + ',' + (y1-60) + ' ' + (x1) + ',' + (y1-20);
-            svg.innerHTML += '<path d="' + path + '" fill="none" stroke="' + color + '" stroke-width="' + strokeW + '" marker-end="' + marker + '" style="color:' + color + '"/>';
-          } else if (isCycle) {
-            // Curved back-edge (arc below/above the nodes)
-            var midX = (x1 + x2) / 2;
-            var midY = Math.max(y1, y2) + 40 + Math.abs(offset);
-            var path = 'M' + x1 + ',' + (y1+20) + ' Q' + midX + ',' + midY + ' ' + x2 + ',' + (y2+20);
-            svg.innerHTML += '<path d="' + path + '" fill="none" stroke="' + color + '" stroke-width="' + strokeW + '" stroke-dasharray="' + (isActive ? '' : '6,4') + '" marker-end="' + marker + '" style="color:' + color + '"/>';
-            // Label
-            var labelX = midX; var labelY = midY - 4;
-            svg.innerHTML += '<text x="' + labelX + '" y="' + labelY + '" text-anchor="middle" class="state-edge-label" fill="' + color + '">' + esc(t.event || '') + '</text>';
+        // Forward arrows
+        var outs = edges[st] || [];
+        if (idx < s.states.length - 1) {
+          if (outs.length > 1) {
+            // Branch: show multiple labeled arrows
+            diagramHTML += '<div class="edge-group">';
+            outs.forEach(function(e) {
+              var isFwd = s.states.indexOf(e.to) > idx;
+              if (isFwd) {
+                var aCls = visitedStates[e.to] || e.to === curState ? ' active' : '';
+                diagramHTML += '<div class="edge-label' + aCls + '"><span class="edge-arrow">→</span> ' + esc(e.event || e.to) + '</div>';
+              }
+            });
+            diagramHTML += '</div>';
+          } else if (outs.length === 1 && s.states.indexOf(outs[0].to) === idx + 1) {
+            var aCls = visitedStates[outs[0].to] || outs[0].to === curState ? ' active' : '';
+            diagramHTML += '<div class="edge-arrow' + aCls + '">→</div>';
           } else {
-            // Straight or slightly curved forward edge
-            var midX = (x1 + x2) / 2;
-            var midY = (y1 + y2) / 2 + offset;
-            if (offset !== 0) {
-              var path = 'M' + x1 + ',' + y1 + ' Q' + midX + ',' + midY + ' ' + x2 + ',' + y2;
-              svg.innerHTML += '<path d="' + path + '" fill="none" stroke="' + color + '" stroke-width="' + strokeW + '" marker-end="' + marker + '" style="color:' + color + '"/>';
-            } else {
-              // Shorten line to not overlap nodes
-              var angle = Math.atan2(y2-y1, x2-x1);
-              var r = 40;
-              var sx = x1 + Math.cos(angle) * r;
-              var sy = y1 + Math.sin(angle) * r;
-              var ex = x2 - Math.cos(angle) * r;
-              var ey = y2 - Math.sin(angle) * r;
-              svg.innerHTML += '<line x1="' + sx + '" y1="' + sy + '" x2="' + ex + '" y2="' + ey + '" stroke="' + color + '" stroke-width="' + strokeW + '" marker-end="' + marker + '" style="color:' + color + '"/>';
-            }
-            if (t.event && offset !== 0) {
-              svg.innerHTML += '<text x="' + midX + '" y="' + (midY - 4) + '" text-anchor="middle" class="state-edge-label" fill="' + color + '">' + esc(t.event) + '</text>';
-            }
+            diagramHTML += '<div class="edge-arrow">→</div>';
           }
+        }
+      });
+      // Show cycle/back-edges below the main row
+      var cycleHTML = '';
+      for (var bk in backEdges) {
+        backEdges[bk].forEach(function(e) {
+          var aCls = visitedStates[e.to] ? ' active' : '';
+          cycleHTML += '<div class="cycle-edge' + aCls + '">↩ ' + esc(bk) + ' → ' + esc(e.to) + '<span class="cycle-label">' + esc(e.event || '') + '</span></div>';
         });
-      }, 50);
+      }
+      if (cycleHTML) diagramHTML += '<div class="cycle-row">' + cycleHTML + '</div>';
+      diagramHTML += '</div></div>';
+
+      // (SVG edges removed — using CSS-based edge rendering above)
 
       // Controls
       var atStart = currentStep < 0;
