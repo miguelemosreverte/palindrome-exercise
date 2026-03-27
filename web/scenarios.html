@@ -17,7 +17,8 @@
         var date = item.date || item.year || item.fecha || '';
         var title = item.title || item.nombre || item.event || '';
         var desc = item.desc || item.descripcion || item.description || '';
-        return '<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot"></div><div class="rc-timeline-line"></div></div>' +
+        var icon = item.icon || '';
+        return '<div class="rc-timeline-item"><div class="rc-timeline-track"><div class="rc-timeline-dot">' + (icon ? '<span style="font-size:12px">' + icon + '</span>' : '') + '</div><div class="rc-timeline-line"></div></div>' +
           '<div class="rc-timeline-content"><div class="rc-timeline-date">' + esc(date) + '</div><div class="rc-timeline-title">' + esc(title) + '</div>' +
           (desc ? '<div class="rc-timeline-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
       }).join('') + '</div>';
@@ -27,8 +28,11 @@
       return '<div class="rc-options">' + items.map(function(item) {
         var title = item.title || item.nombre || item.opcion || '';
         var desc = item.desc || item.descripcion || item.description || '';
-        return '<div class="rc-option" onclick="BridgeComponents.onSelect(this,\'' + esc(title).replace(/'/g, "\\'") + '\')"><div class="rc-option-body"><div class="rc-option-title">' + esc(title) + '</div>' +
-          (desc ? '<div class="rc-option-desc">' + esc(desc) + '</div>' : '') + '</div><div class="rc-option-arrow">&rarr;</div></div>';
+        var icon = item.icon || '';
+        return '<div class="rc-option" onclick="BridgeComponents.onSelect(this,\'' + esc(title).replace(/'/g, "\\'") + '\')"><div class="rc-option-body">' +
+          (icon ? '<div class="rc-option-icon">' + icon + '</div>' : '') +
+          '<div><div class="rc-option-title">' + esc(title) + '</div>' +
+          (desc ? '<div class="rc-option-desc">' + esc(desc) + '</div>' : '') + '</div></div><div class="rc-option-arrow">&rarr;</div></div>';
       }).join('') + '</div>';
     },
     cards: function(data) {
@@ -37,25 +41,31 @@
         var label = item.label || item.etiqueta || item.title || '';
         var value = item.value || item.valor || '';
         var desc = item.desc || item.descripcion || item.description || '';
-        return '<div class="rc-card"><div class="rc-card-label">' + esc(label) + '</div><div class="rc-card-value">' + esc(value) + '</div>' +
-          (desc ? '<div class="rc-card-desc">' + esc(desc) + '</div>' : '') + '</div>';
+        var trend = item.trend || '';
+        var trendColor = trend.startsWith('+') || trend.startsWith('up') ? '#22c55e' : trend.startsWith('-') || trend.startsWith('down') ? '#ef4444' : 'var(--slate)';
+        return '<div class="rc-card"><div class="rc-card-label">' + esc(label) + '</div><div class="rc-card-value">' + esc(value) +
+          (trend ? '<span style="font-size:12px;margin-left:6px;color:' + trendColor + '">' + esc(trend) + '</span>' : '') +
+          '</div>' + (desc ? '<div class="rc-card-desc">' + esc(desc) + '</div>' : '') + '</div>';
       }).join('') + '</div>';
     },
     table: function(data) {
       var headers = data.headers || data.columnas || [];
       var rows = data.rows || data.filas || [];
-      var html = '<table class="rc-table"><thead><tr>';
+      var html = '<div class="rc-table-wrap"><table class="rc-table"><thead><tr>';
       for (var i = 0; i < headers.length; i++) html += '<th>' + esc(headers[i]) + '</th>';
       html += '</tr></thead><tbody>';
       for (var r = 0; r < rows.length; r++) { html += '<tr>'; var row = rows[r]; for (var c = 0; c < row.length; c++) html += '<td>' + esc(row[c]) + '</td>'; html += '</tr>'; }
-      return html + '</tbody></table>';
+      return html + '</tbody></table></div>';
     },
     steps: function(data) {
       var items = normalizeItems(data);
       return '<div class="rc-steps">' + items.map(function(item, i) {
         var title = item.title || item.nombre || item.paso || '';
         var desc = item.desc || item.descripcion || item.description || '';
-        return '<div class="rc-step"><div class="rc-step-num">' + (i + 1) + '</div><div class="rc-step-body"><div class="rc-step-title">' + esc(title) + '</div>' +
+        var status = item.status || '';
+        var icons = { done: '\u2705', working: '\uD83D\uDD27', pending: '\u23F3', error: '\u274C' };
+        var badge = status ? '<span class="rc-step-badge rc-step-badge--' + status + '">' + (icons[status] || '') + ' ' + status + '</span>' : '';
+        return '<div class="rc-step' + (status ? ' rc-step--' + status : '') + '"><div class="rc-step-num">' + (status === 'done' ? '\u2713' : (i + 1)) + '</div><div class="rc-step-body"><div class="rc-step-title">' + esc(title) + badge + '</div>' +
           (desc ? '<div class="rc-step-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
       }).join('') + '</div>';
     },
@@ -63,8 +73,9 @@
       var label = data.label || data.title || '';
       var value = Math.min(100, Math.max(0, Number(data.value || data.percent || 0)));
       var desc = data.desc || data.description || '';
-      return '<div class="rc-progress"><div class="rc-progress-label">' + esc(label) + ' <span class="rc-progress-value">' + value + '%</span></div>' +
-        '<div class="rc-progress-bar"><div class="rc-progress-fill" style="width:' + value + '%"></div></div>' +
+      var color = value >= 100 ? '#22c55e' : value >= 60 ? 'var(--ocean)' : value >= 30 ? '#f59e0b' : '#ef4444';
+      return '<div class="rc-progress"><div class="rc-progress-label">' + esc(label) + ' <span class="rc-progress-value" style="color:' + color + '">' + value + '%</span></div>' +
+        '<div class="rc-progress-bar"><div class="rc-progress-fill" style="width:' + value + '%;background:' + color + '"></div></div>' +
         (desc ? '<div class="rc-progress-desc">' + esc(desc) + '</div>' : '') + '</div>';
     },
     status: function(data) {
@@ -72,9 +83,48 @@
       return '<div class="rc-status-list">' + items.map(function(item) {
         var label = item.label || item.title || item.task || '';
         var state = item.state || item.status || 'pending';
-        var icons = { done: '\u2705', working: '\uD83D\uDD27', pending: '\u23F3', error: '\uD83D\uDEA8', blocked: '\uD83D\uDEAB' };
-        return '<div class="rc-status-item"><span class="rc-status-icon">' + (icons[state] || '\u23F3') + '</span><span>' + esc(label) + '</span></div>';
+        var desc = item.desc || item.description || '';
+        var icons = { done: '\u2705', working: '\uD83D\uDD27', pending: '\u23F3', error: '\uD83D\uDEA8', blocked: '\uD83D\uDEAB', up: '\uD83D\uDFE2', down: '\uD83D\uDD34', degraded: '\uD83D\uDFE1' };
+        return '<div class="rc-status-item"><span class="rc-status-icon">' + (icons[state] || '\u23F3') + '</span><div><span class="rc-status-label">' + esc(label) + '</span>' +
+          (desc ? '<div class="rc-status-desc">' + esc(desc) + '</div>' : '') + '</div></div>';
       }).join('') + '</div>';
+    },
+    quote: function(data) {
+      var text = data.text || '';
+      var author = data.author || '';
+      var style = data.style || 'info';
+      var colors = { info: '#316dff', warning: '#f59e0b', success: '#22c55e', error: '#ef4444' };
+      var bgs = { info: 'rgba(49,109,255,0.06)', warning: 'rgba(245,158,11,0.06)', success: 'rgba(34,197,94,0.06)', error: 'rgba(239,68,68,0.06)' };
+      var borderColor = colors[style] || colors.info;
+      var bgColor = bgs[style] || bgs.info;
+      return '<div class="rc-quote" style="border-left:4px solid ' + borderColor + ';background:' + bgColor + ';padding:14px 18px;border-radius:0 12px 12px 0;margin:4px 0">' +
+        '<div style="font-size:14px;line-height:1.6;font-style:italic;color:var(--ink)">' + esc(text) + '</div>' +
+        (author ? '<div style="font-size:12px;font-weight:700;color:' + borderColor + ';margin-top:8px">\u2014 ' + esc(author) + '</div>' : '') + '</div>';
+    },
+    diff: function(data) {
+      var file = data.file || '';
+      var additions = data.additions || 0;
+      var deletions = data.deletions || 0;
+      var preview = data.preview || '';
+      var lines = preview.split('\n');
+      var linesHTML = lines.map(function(line) {
+        var cls = 'rc-diff-line';
+        if (line.charAt(0) === '+') cls += ' rc-diff-add';
+        else if (line.charAt(0) === '-') cls += ' rc-diff-del';
+        return '<div class="' + cls + '">' + esc(line) + '</div>';
+      }).join('');
+      return '<div class="rc-diff"><div class="rc-diff-header"><span class="rc-diff-file">' + esc(file) + '</span>' +
+        '<span class="rc-diff-stats"><span class="rc-diff-add-count">+' + additions + '</span> <span class="rc-diff-del-count">-' + deletions + '</span></span></div>' +
+        '<div class="rc-diff-body">' + linesHTML + '</div></div>';
+    },
+    chartjs: function(data) {
+      var id = 'chart-' + Math.random().toString(36).substr(2, 9);
+      setTimeout(function() {
+        var el = document.getElementById(id);
+        if (!el || !window.Chart) return;
+        new Chart(el, data);
+      }, 100);
+      return '<div style="background:#fff;border-radius:12px;padding:12px;border:1px solid var(--line)"><canvas id="' + id + '" height="200"></canvas></div>';
     },
   };
   function normalizeItems(data) { if (Array.isArray(data)) return data; return data.items || data.eventos || data.opciones || data.pasos || []; }
@@ -93,7 +143,74 @@
   function injectCSS() {
     if (document.getElementById('bridge-components-css')) return;
     var style = document.createElement('style'); style.id = 'bridge-components-css';
-    style.textContent = '.rc-timeline{padding:8px 0}.rc-timeline-item{display:flex;gap:12px;position:relative;padding-bottom:20px;align-items:stretch}.rc-timeline-item:last-child{padding-bottom:0}.rc-timeline-track{display:flex;flex-direction:column;align-items:center;width:18px;flex-shrink:0}.rc-timeline-dot{width:10px;height:10px;border-radius:50%;background:var(--ocean,#316dff);border:2px solid rgba(49,109,255,0.2);z-index:1;flex-shrink:0}.rc-timeline-line{width:2px;flex:1;background:var(--line,rgba(0,0,0,0.08));margin-top:4px}.rc-timeline-item:last-child .rc-timeline-line{display:none}.rc-timeline-content{flex:1}.rc-timeline-date{font-size:11px;font-weight:700;color:var(--ocean,#316dff);margin-bottom:2px}.rc-timeline-title{font-size:14px;font-weight:700;line-height:1.3}.rc-timeline-desc{font-size:12px;color:var(--slate,#56708a);line-height:1.5;margin-top:2px}.rc-options{display:flex;flex-direction:column;gap:8px}.rc-option{display:flex;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));cursor:pointer;transition:all .15s}.rc-option:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}.rc-option.selected{border-color:var(--ocean,#316dff);background:rgba(49,109,255,0.06)}.rc-option-body{flex:1}.rc-option-title{font-size:14px;font-weight:700}.rc-option-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}.rc-option-arrow{font-size:18px;color:var(--slate,#56708a);margin-left:8px}.rc-option.selected .rc-option-arrow{color:var(--ocean,#316dff)}.rc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.rc-card{padding:14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08))}.rc-card-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700}.rc-card-value{font-size:22px;font-weight:800;margin-top:2px}.rc-card-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}.rc-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;border:1px solid var(--line,rgba(0,0,0,0.08));font-size:13px}.rc-table th{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700;text-align:left;padding:10px 12px;border-bottom:2px solid var(--line,rgba(0,0,0,0.08))}.rc-table td{padding:8px 12px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08))}.rc-table tr:last-child td{border-bottom:none}.rc-steps{display:flex;flex-direction:column}.rc-step{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--line,rgba(0,0,0,0.08))}.rc-step:first-child{border-top:none}.rc-step-num{width:32px;height:32px;border-radius:10px;background:var(--ocean,#316dff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}.rc-step-body{flex:1}.rc-step-title{font-size:14px;font-weight:700}.rc-step-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}.rc-progress{margin:8px 0}.rc-progress-label{font-size:13px;font-weight:600;display:flex;justify-content:space-between;margin-bottom:6px}.rc-progress-value{color:var(--ocean,#316dff)}.rc-progress-bar{height:8px;border-radius:4px;background:var(--line,rgba(0,0,0,0.08));overflow:hidden}.rc-progress-fill{height:100%;border-radius:4px;background:var(--ocean,#316dff);transition:width .3s}.rc-progress-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}.rc-status-list{display:flex;flex-direction:column;gap:6px}.rc-status-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 0}.rc-status-icon{font-size:16px}';
+    style.textContent = [
+      '.rc-timeline{padding:8px 0}',
+      '.rc-timeline-item{display:flex;gap:12px;position:relative;padding-bottom:20px;align-items:stretch}',
+      '.rc-timeline-item:last-child{padding-bottom:0}',
+      '.rc-timeline-track{display:flex;flex-direction:column;align-items:center;width:18px;flex-shrink:0}',
+      '.rc-timeline-dot{width:14px;height:14px;border-radius:50%;background:var(--ocean,#316dff);border:2px solid rgba(49,109,255,0.2);z-index:1;flex-shrink:0;display:flex;align-items:center;justify-content:center}',
+      '.rc-timeline-line{width:2px;flex:1;background:var(--line,rgba(0,0,0,0.08));margin-top:4px}',
+      '.rc-timeline-item:last-child .rc-timeline-line{display:none}',
+      '.rc-timeline-content{flex:1}',
+      '.rc-timeline-date{font-size:11px;font-weight:700;color:var(--ocean,#316dff);margin-bottom:2px}',
+      '.rc-timeline-title{font-size:14px;font-weight:700;line-height:1.3}',
+      '.rc-timeline-desc{font-size:12px;color:var(--slate,#56708a);line-height:1.5;margin-top:2px}',
+      '.rc-options{display:flex;flex-direction:column;gap:8px}',
+      '.rc-option{display:flex;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));cursor:pointer;transition:all .15s}',
+      '.rc-option:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}',
+      '.rc-option.selected{border-color:var(--ocean,#316dff);background:rgba(49,109,255,0.06)}',
+      '.rc-option-body{flex:1;display:flex;align-items:center;gap:10px}',
+      '.rc-option-icon{font-size:20px}',
+      '.rc-option-title{font-size:14px;font-weight:700}',
+      '.rc-option-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}',
+      '.rc-option-arrow{font-size:18px;color:var(--slate,#56708a);margin-left:8px}',
+      '.rc-option.selected .rc-option-arrow{color:var(--ocean,#316dff)}',
+      '.rc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}',
+      '.rc-card{padding:14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));background:#fff}',
+      '.rc-card-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700}',
+      '.rc-card-value{font-size:22px;font-weight:800;margin-top:2px}',
+      '.rc-card-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}',
+      '.rc-table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line,rgba(0,0,0,0.08))}',
+      '.rc-table{width:100%;border-collapse:collapse;font-size:13px}',
+      '.rc-table th{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate,#56708a);font-weight:700;text-align:left;padding:10px 12px;border-bottom:2px solid var(--line,rgba(0,0,0,0.08));background:rgba(0,0,0,0.02)}',
+      '.rc-table td{padding:8px 12px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08))}',
+      '.rc-table tr:last-child td{border-bottom:none}',
+      '.rc-table tr:hover td{background:rgba(49,109,255,0.03)}',
+      '.rc-steps{display:flex;flex-direction:column}',
+      '.rc-step{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--line,rgba(0,0,0,0.08))}',
+      '.rc-step:first-child{border-top:none}',
+      '.rc-step-num{width:32px;height:32px;border-radius:10px;background:var(--ocean,#316dff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}',
+      '.rc-step--done .rc-step-num{background:#22c55e}',
+      '.rc-step-body{flex:1}',
+      '.rc-step-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}',
+      '.rc-step-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;text-transform:uppercase}',
+      '.rc-step-badge--done{background:rgba(34,197,94,0.1);color:#16a34a}',
+      '.rc-step-badge--working{background:rgba(49,109,255,0.1);color:#316dff}',
+      '.rc-step-badge--pending{background:rgba(0,0,0,0.05);color:#56708a}',
+      '.rc-step-badge--error{background:rgba(239,68,68,0.1);color:#ef4444}',
+      '.rc-step-desc{font-size:12px;color:var(--slate,#56708a);margin-top:2px}',
+      '.rc-progress{margin:8px 0}',
+      '.rc-progress-label{font-size:13px;font-weight:600;display:flex;justify-content:space-between;margin-bottom:6px}',
+      '.rc-progress-value{color:var(--ocean,#316dff)}',
+      '.rc-progress-bar{height:8px;border-radius:4px;background:var(--line,rgba(0,0,0,0.08));overflow:hidden}',
+      '.rc-progress-fill{height:100%;border-radius:4px;background:var(--ocean,#316dff);transition:width .4s ease}',
+      '.rc-progress-desc{font-size:11px;color:var(--slate,#56708a);margin-top:4px}',
+      '.rc-status-list{display:flex;flex-direction:column;gap:6px}',
+      '.rc-status-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;padding:6px 0}',
+      '.rc-status-icon{font-size:16px;flex-shrink:0;margin-top:1px}',
+      '.rc-status-label{font-weight:600}',
+      '.rc-status-desc{font-size:11px;color:var(--slate);margin-top:1px}',
+      '.rc-diff{border-radius:12px;border:1px solid var(--line);overflow:hidden;font-family:"SF Mono",Monaco,Consolas,monospace;font-size:12px;margin:4px 0}',
+      '.rc-diff-header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.03);border-bottom:1px solid var(--line)}',
+      '.rc-diff-file{font-weight:700;color:var(--ink)}',
+      '.rc-diff-stats{display:flex;gap:8px}',
+      '.rc-diff-add-count{color:#22c55e;font-weight:700}',
+      '.rc-diff-del-count{color:#ef4444;font-weight:700}',
+      '.rc-diff-body{background:#fafbfc}',
+      '.rc-diff-line{padding:2px 12px;white-space:pre;line-height:1.7}',
+      '.rc-diff-add{background:rgba(34,197,94,0.1);color:#166534}',
+      '.rc-diff-del{background:rgba(239,68,68,0.1);color:#991b1b;text-decoration:line-through}',
+    ].join('\n');
     document.head.appendChild(style);
   }
   global.BridgeComponents = {
@@ -103,31 +220,42 @@
   };
 })(window);
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root { --sky:#e8f0fe; --ocean:#316dff; --ink:#1a2b3c; --slate:#56708a; --line:rgba(0,0,0,0.08); }
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Instrument Sans',system-ui,sans-serif; background:#f4f6f9; color:var(--ink); min-height:100vh; display:flex; flex-direction:column; }
 
     /* ── Header ── */
-    .header { background:#fff; border-bottom:1px solid var(--line); padding:16px 24px; display:flex; align-items:center; gap:12px; }
-    .header h1 { font-size:20px; font-weight:800; }
-    .header span { font-size:13px; color:var(--slate); }
+    .header { background:linear-gradient(135deg,#1a2b3c 0%,#2a4a6c 100%); padding:20px 28px; display:flex; align-items:center; gap:16px; color:#fff; }
+    .header-logo { width:40px; height:40px; border-radius:12px; background:var(--ocean); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; }
+    .header h1 { font-size:22px; font-weight:800; }
+    .header span { font-size:13px; opacity:.7; }
+    .header-badge { margin-left:auto; font-size:11px; font-weight:700; background:rgba(255,255,255,.15); padding:6px 14px; border-radius:20px; }
 
     /* ── Layout ── */
     .layout { display:flex; flex:1; min-height:0; }
-    .sidebar { width:260px; background:#fff; border-right:1px solid var(--line); overflow-y:auto; flex-shrink:0; }
-    .main { flex:1; display:flex; flex-direction:column; overflow-y:auto; padding:24px; gap:24px; }
+    .sidebar { width:280px; background:#fff; border-right:1px solid var(--line); overflow-y:auto; flex-shrink:0; }
+    .sidebar-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--slate); padding:18px 18px 8px; }
+    .main { flex:1; display:flex; flex-direction:column; overflow-y:auto; padding:24px; gap:20px; }
 
     /* ── Sidebar items ── */
-    .scenario-item { padding:14px 18px; cursor:pointer; border-bottom:1px solid var(--line); transition:background .15s; }
+    .scenario-item { padding:14px 18px; cursor:pointer; border-bottom:1px solid var(--line); transition:all .15s; }
     .scenario-item:hover { background:var(--sky); }
     .scenario-item.active { background:rgba(49,109,255,0.08); border-left:3px solid var(--ocean); }
-    .scenario-item h3 { font-size:14px; font-weight:700; }
-    .scenario-item p { font-size:11px; color:var(--slate); margin-top:2px; }
+    .scenario-item h3 { font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .scenario-item h3 .s-icon { font-size:16px; }
+    .scenario-item p { font-size:11px; color:var(--slate); margin-top:3px; line-height:1.4; }
+    .scenario-item .s-tag { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:2px 8px; border-radius:6px; margin-top:6px; display:inline-block; }
+    .s-tag--flow { background:rgba(49,109,255,.1); color:var(--ocean); }
+    .s-tag--report { background:rgba(34,197,94,.1); color:#16a34a; }
+    .s-tag--action { background:rgba(245,158,11,.1); color:#b45309; }
+    .s-tag--monitor { background:rgba(239,68,68,.1); color:#dc2626; }
 
     /* ── State Diagram ── */
     .state-diagram { background:#fff; border-radius:16px; border:1px solid var(--line); padding:24px; }
-    .state-diagram h2 { font-size:14px; font-weight:700; margin-bottom:16px; color:var(--slate); text-transform:uppercase; letter-spacing:.08em; }
+    .state-diagram h2 { font-size:12px; font-weight:700; margin-bottom:16px; color:var(--slate); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
+    .state-diagram h2::before { content:''; width:8px; height:8px; border-radius:2px; background:var(--ocean); }
     .states-row { display:flex; align-items:center; gap:0; flex-wrap:wrap; justify-content:center; }
     .state-node { width:100px; height:100px; border-radius:50%; border:3px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; text-align:center; padding:8px; transition:all .3s; background:#fff; flex-shrink:0; }
     .state-node.active { border-color:var(--ocean); background:rgba(49,109,255,0.08); color:var(--ocean); box-shadow:0 0 0 6px rgba(49,109,255,0.12); }
@@ -145,13 +273,14 @@
     .step-label { font-size:13px; color:var(--slate); font-weight:600; margin-left:auto; }
 
     /* ── Chat Preview ── */
-    .chat-area { background:#fff; border-radius:16px; border:1px solid var(--line); display:flex; flex-direction:column; min-height:300px; }
-    .chat-header { padding:12px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
-    .chat-header .dot { width:8px; height:8px; border-radius:50%; background:#34d399; }
+    .chat-area { background:#fff; border-radius:16px; border:1px solid var(--line); display:flex; flex-direction:column; min-height:350px; }
+    .chat-header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+    .chat-header .dot { width:8px; height:8px; border-radius:50%; background:#34d399; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
     .chat-header span { font-size:13px; font-weight:700; }
-    .fsm-badge { margin-left:auto; font-size:11px; font-weight:700; background:rgba(49,109,255,0.1); color:var(--ocean); padding:4px 10px; border-radius:8px; }
+    .fsm-badge { margin-left:auto; font-size:11px; font-weight:700; background:rgba(49,109,255,0.1); color:var(--ocean); padding:4px 10px; border-radius:8px; font-family:'SF Mono',Monaco,Consolas,monospace; }
     .chat-messages { flex:1; padding:18px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
-    .msg { max-width:85%; padding:12px 16px; border-radius:18px; font-size:14px; line-height:1.5; animation:msgIn .25s ease; }
+    .msg { max-width:88%; padding:12px 16px; border-radius:18px; font-size:14px; line-height:1.5; animation:msgIn .3s ease; }
     .msg.agent { background:var(--sky); align-self:flex-start; border-bottom-left-radius:4px; }
     .msg.user { background:var(--ocean); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
     .msg-sender { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--slate); margin-bottom:4px; }
@@ -160,7 +289,8 @@
 
     /* ── Event Log ── */
     .event-log { background:#fff; border-radius:16px; border:1px solid var(--line); padding:18px; }
-    .event-log h2 { font-size:14px; font-weight:700; margin-bottom:12px; color:var(--slate); text-transform:uppercase; letter-spacing:.08em; }
+    .event-log h2 { font-size:12px; font-weight:700; margin-bottom:12px; color:var(--slate); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px; }
+    .event-log h2::before { content:''; width:8px; height:8px; border-radius:2px; background:#f59e0b; }
     .log-entry { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
     .log-entry:last-child { border-bottom:none; }
     .log-entry.future { opacity:.3; }
@@ -171,12 +301,15 @@
     .log-state { font-size:11px; color:var(--slate); font-weight:600; }
 
     /* ── Empty state ── */
-    .empty { display:flex; align-items:center; justify-content:center; flex:1; color:var(--slate); font-size:15px; text-align:center; padding:40px; }
+    .empty { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:var(--slate); font-size:15px; text-align:center; padding:60px 40px; gap:16px; }
+    .empty-icon { font-size:48px; opacity:.3; }
+    .empty p { max-width:300px; line-height:1.6; }
 
     /* ── Mobile ── */
     @media(max-width:700px) {
       .layout { flex-direction:column; }
       .sidebar { width:100%; max-height:180px; border-right:none; border-bottom:1px solid var(--line); display:flex; overflow-x:auto; overflow-y:hidden; }
+      .sidebar-title { display:none; }
       .scenario-item { white-space:nowrap; border-bottom:none; border-right:1px solid var(--line); }
       .main { padding:16px; }
       .state-node { width:70px; height:70px; font-size:9px; }
@@ -185,13 +318,20 @@
 </head>
 <body>
   <div class="header">
-    <h1>Bridge Scenarios</h1>
-    <span>Visual scenario replay and storybook</span>
+    <div class="header-logo">B</div>
+    <div>
+      <h1>Bridge Scenarios</h1>
+      <span>Interactive storybook &amp; component showcase</span>
+    </div>
+    <div class="header-badge">12 Scenarios</div>
   </div>
   <div class="layout">
     <div class="sidebar" id="sidebar"></div>
     <div class="main" id="main">
-      <div class="empty">Select a scenario from the sidebar to begin.</div>
+      <div class="empty">
+        <div class="empty-icon">&#9654;</div>
+        <p>Select a scenario from the sidebar to explore interactive demos of Bridge's rich component system.</p>
+      </div>
     </div>
   </div>
 
@@ -202,56 +342,298 @@
 
     // ── Built-in demo scenarios ──
     var DEMO_SCENARIOS = [
+      // ────────────────────────────────────────────
+      // 1. ONBOARDING FLOW
+      // ────────────────────────────────────────────
       {
         id: 'onboarding',
         name: 'Onboarding Flow',
-        desc: 'User connects and explores options',
-        states: ['idle', 'greeting', 'showing-options', 'chatting'],
+        icon: '\uD83D\uDC4B',
+        tag: 'flow',
+        desc: 'First-time user connects, explores capabilities, and starts working with the agent',
+        states: ['idle', 'greeting', 'showing-capabilities', 'option-selected', 'chatting'],
         transitions: [
           { from: 'idle', to: 'greeting', event: 'user-connects' },
-          { from: 'greeting', to: 'showing-options', event: 'user-asks-options' },
-          { from: 'showing-options', to: 'chatting', event: 'option-selected' },
+          { from: 'greeting', to: 'showing-capabilities', event: 'show-capabilities' },
+          { from: 'showing-capabilities', to: 'option-selected', event: 'option-picked' },
+          { from: 'option-selected', to: 'chatting', event: 'agent-responds' },
         ],
         steps: [
-          { event: 'user-connects', state: 'greeting', sender: 'agent', message: "Hey! I'm Bridge Agent for your project. What would you like to do?" },
-          { event: 'user-asks-options', state: 'showing-options', sender: 'agent', message: '```options\n{"items":[{"title":"Check project status","desc":"See what\'s been shipped"},{"title":"Start a new task","desc":"Tell me what to build"},{"title":"View timeline","desc":"See project history"}]}\n```' },
-          { event: 'option-selected', state: 'chatting', sender: 'user', message: 'Check project status' },
-          { event: null, state: 'chatting', sender: 'agent', message: 'Great choice! Let me pull up the project status...' },
+          { event: 'user-connects', state: 'greeting', sender: 'agent', message: "Welcome to Bridge! I'm your AI agent connected to this workspace. I can manage your code, track progress, deploy services, and keep you informed -- all from your phone." },
+          { event: 'show-capabilities', state: 'showing-capabilities', sender: 'agent', message: "Here's what I can help you with:\n\n```options\n{\"items\":[{\"title\":\"Project Status\",\"icon\":\"\uD83D\uDCCA\",\"desc\":\"View commits, PRs, test coverage, and deployment health\"},{\"title\":\"Start a Task\",\"icon\":\"\uD83D\uDE80\",\"desc\":\"Describe what to build and I'll create a plan\"},{\"title\":\"Review Code\",\"icon\":\"\uD83D\uDD0D\",\"desc\":\"Get summaries and approve pending pull requests\"},{\"title\":\"Deploy\",\"icon\":\"\u2601\uFE0F\",\"desc\":\"Trigger builds and monitor deployment pipelines\"}]}\n```" },
+          { event: 'option-picked', state: 'option-selected', sender: 'user', message: 'Project Status' },
+          { event: 'agent-responds', state: 'chatting', sender: 'agent', message: "Great choice! Pulling your project data now...\n\n```status\n{\"items\":[{\"label\":\"API Server\",\"status\":\"up\",\"desc\":\"Healthy, 99.97% uptime\"},{\"label\":\"Web App\",\"status\":\"up\",\"desc\":\"v3.2.1 running\"},{\"label\":\"Mobile App\",\"status\":\"working\",\"desc\":\"v2.0 build in progress\"},{\"label\":\"Docs Site\",\"status\":\"up\",\"desc\":\"Last updated 2h ago\"}]}\n```" },
+          { event: null, state: 'chatting', sender: 'agent', message: "```quote\n{\"text\":\"All systems operational. Your mobile app build should complete in about 12 minutes.\",\"style\":\"success\"}\n```" },
         ],
       },
+      // ────────────────────────────────────────────
+      // 2. APPROVAL FLOW
+      // ────────────────────────────────────────────
       {
         id: 'approval',
         name: 'Approval Flow',
-        desc: 'Agent requests user approval for an action',
-        states: ['idle', 'requesting', 'waiting-approval', 'approved', 'denied'],
+        icon: '\u2705',
+        tag: 'action',
+        desc: 'Agent requests permission to delete legacy files, user reviews impact and approves',
+        states: ['idle', 'analyzing', 'requesting-approval', 'showing-impact', 'approved'],
         transitions: [
-          { from: 'idle', to: 'requesting', event: 'agent-needs-approval' },
-          { from: 'requesting', to: 'waiting-approval', event: 'approval-sent' },
-          { from: 'waiting-approval', to: 'approved', event: 'user-approves' },
-          { from: 'waiting-approval', to: 'denied', event: 'user-denies' },
+          { from: 'idle', to: 'analyzing', event: 'agent-finds-issue' },
+          { from: 'analyzing', to: 'requesting-approval', event: 'show-details' },
+          { from: 'requesting-approval', to: 'showing-impact', event: 'user-asks-impact' },
+          { from: 'showing-impact', to: 'approved', event: 'user-approves' },
         ],
         steps: [
-          { event: 'agent-needs-approval', state: 'requesting', sender: 'agent', message: 'I need to deploy the latest build to production. This will affect 3 services.' },
-          { event: 'approval-sent', state: 'waiting-approval', sender: 'agent', message: '```options\n{"items":[{"title":"Approve deploy","desc":"Push v2.4.1 to production now"},{"title":"Deny","desc":"Cancel this deployment"}]}\n```' },
-          { event: 'user-approves', state: 'approved', sender: 'user', message: 'Approve deploy' },
-          { event: null, state: 'approved', sender: 'agent', message: '```progress\n{"label":"Deploying to production","value":100,"desc":"All 3 services updated successfully"}\n```' },
+          { event: 'agent-finds-issue', state: 'analyzing', sender: 'agent', message: "I found 14 legacy files that are no longer imported anywhere in the codebase. They're adding 2,847 lines of dead code." },
+          { event: 'show-details', state: 'requesting-approval', sender: 'agent', message: "Here's what I'd like to remove:\n\n```table\n{\"headers\":[\"File\",\"Lines\",\"Last Modified\",\"Reason\"],\"rows\":[[\"src/utils/legacy-auth.js\",\"342\",\"8 months ago\",\"Replaced by OAuth module\"],[\"src/api/v1-endpoints.js\",\"891\",\"6 months ago\",\"API v1 deprecated\"],[\"src/components/OldDashboard.tsx\",\"567\",\"5 months ago\",\"Redesigned in Q3\"],[\"src/helpers/date-polyfill.js\",\"124\",\"11 months ago\",\"Native Date API used now\"],[\"lib/xml-parser.js\",\"923\",\"1 year ago\",\"Switched to JSON\"]]}\n```" },
+          { event: 'user-asks-impact', state: 'showing-impact', sender: 'agent', message: "Impact analysis:\n\n```cards\n{\"items\":[{\"label\":\"Files to Delete\",\"value\":\"14\"},{\"label\":\"Lines Removed\",\"value\":\"2,847\"},{\"label\":\"Bundle Size Saved\",\"value\":\"~48 KB\"},{\"label\":\"Test Files Affected\",\"value\":\"0\"}]}\n```\n\n```quote\n{\"text\":\"No active imports reference these files. All tests pass without them. Safe to delete.\",\"style\":\"info\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Approve Deletion\",\"icon\":\"\u2705\",\"desc\":\"Remove all 14 files and create a cleanup commit\"},{\"title\":\"Review Each File\",\"icon\":\"\uD83D\uDD0D\",\"desc\":\"Show me each file before deleting\"},{\"title\":\"Cancel\",\"icon\":\"\u274C\",\"desc\":\"Keep all files as-is\"}]}\n```" },
+          { event: 'user-approves', state: 'approved', sender: 'user', message: 'Approve Deletion' },
+          { event: null, state: 'approved', sender: 'agent', message: "Done! Created commit `a3f7c21` -- \"chore: remove 14 legacy files (2,847 LOC)\"\n\n```progress\n{\"label\":\"Cleanup complete\",\"value\":100,\"desc\":\"14 files deleted, all tests passing, bundle reduced by 48 KB\"}\n```" },
         ],
       },
+      // ────────────────────────────────────────────
+      // 3. PROJECT STATUS REPORT
+      // ────────────────────────────────────────────
       {
         id: 'status-report',
         name: 'Project Status Report',
-        desc: 'User asks for status, gets rich report',
-        states: ['idle', 'gathering', 'reporting'],
+        icon: '\uD83D\uDCCA',
+        tag: 'report',
+        desc: 'Comprehensive project health report with metrics, status, and recent activity timeline',
+        states: ['idle', 'gathering', 'reporting-status', 'reporting-metrics', 'reporting-timeline'],
         transitions: [
           { from: 'idle', to: 'gathering', event: 'user-asks-status' },
-          { from: 'gathering', to: 'reporting', event: 'data-ready' },
+          { from: 'gathering', to: 'reporting-status', event: 'status-ready' },
+          { from: 'reporting-status', to: 'reporting-metrics', event: 'show-metrics' },
+          { from: 'reporting-metrics', to: 'reporting-timeline', event: 'show-timeline' },
         ],
         steps: [
-          { event: 'user-asks-status', state: 'gathering', sender: 'user', message: 'How is the project going?' },
-          { event: null, state: 'gathering', sender: 'agent', message: 'Gathering project data...' },
-          { event: 'data-ready', state: 'reporting', sender: 'agent', message: '```status\n{"items":[{"label":"API endpoints","status":"done"},{"label":"Auth module","status":"done"},{"label":"Dashboard UI","status":"working"},{"label":"Mobile app","status":"pending"}]}\n```' },
-          { event: null, state: 'reporting', sender: 'agent', message: '```cards\n{"items":[{"label":"Commits this week","value":"42"},{"label":"Open PRs","value":"3"},{"label":"Tests passing","value":"98%"},{"label":"Deploy count","value":"7"}]}\n```' },
-          { event: null, state: 'reporting', sender: 'agent', message: '```timeline\n{"items":[{"date":"Today","title":"Dashboard redesign","desc":"New layout with responsive grid"},{"date":"Yesterday","title":"Auth refactor","desc":"Switched to JWT with refresh tokens"},{"date":"2 days ago","title":"API v2 released","desc":"Breaking changes documented"}]}\n```' },
+          { event: 'user-asks-status', state: 'gathering', sender: 'user', message: 'Give me a full status report on the project.' },
+          { event: null, state: 'gathering', sender: 'agent', message: 'Scanning repository, CI pipelines, and deployment logs...' },
+          { event: 'status-ready', state: 'reporting-status', sender: 'agent', message: "Here's your project health overview:\n\n```status\n{\"items\":[{\"label\":\"Authentication Service\",\"status\":\"done\",\"desc\":\"JWT + refresh tokens, fully tested\"},{\"label\":\"REST API (v2)\",\"status\":\"done\",\"desc\":\"42 endpoints, OpenAPI spec complete\"},{\"label\":\"Dashboard UI\",\"status\":\"working\",\"desc\":\"Charts module in progress, 70% complete\"},{\"label\":\"Mobile App\",\"status\":\"working\",\"desc\":\"Flutter build passing, login flow done\"},{\"label\":\"E2E Tests\",\"status\":\"pending\",\"desc\":\"Scheduled for next sprint\"},{\"label\":\"Docs Migration\",\"status\":\"blocked\",\"desc\":\"Waiting on API v2 finalization\"}]}\n```" },
+          { event: 'show-metrics', state: 'reporting-metrics', sender: 'agent', message: "```cards\n{\"items\":[{\"label\":\"Commits This Week\",\"value\":\"47\",\"trend\":\"+12 vs last week\",\"desc\":\"By 4 contributors\"},{\"label\":\"Open PRs\",\"value\":\"5\",\"trend\":\"-2 since yesterday\",\"desc\":\"Oldest: 3 days\"},{\"label\":\"Test Coverage\",\"value\":\"94.2%\",\"trend\":\"+1.8%\",\"desc\":\"1,247 tests passing\"},{\"label\":\"Build Time\",\"value\":\"2m 14s\",\"trend\":\"-18s\",\"desc\":\"After Vite migration\"}]}\n```" },
+          { event: 'show-timeline', state: 'reporting-timeline', sender: 'agent', message: "Recent activity:\n\n```timeline\n{\"items\":[{\"date\":\"Today, 10:32 AM\",\"title\":\"Dashboard chart component merged\",\"desc\":\"PR #127 by @sarah -- adds real-time line charts with WebSocket updates\"},{\"date\":\"Today, 8:15 AM\",\"title\":\"Auth rate-limiting deployed\",\"desc\":\"Max 100 req/min per IP, Redis-backed counter\"},{\"date\":\"Yesterday\",\"title\":\"API v2 endpoints finalized\",\"desc\":\"42 endpoints documented, breaking changes from v1 listed\"},{\"date\":\"2 days ago\",\"title\":\"Mobile app login flow shipped\",\"desc\":\"Biometric auth + OAuth2 PKCE flow for iOS and Android\"},{\"date\":\"3 days ago\",\"title\":\"Vite migration completed\",\"desc\":\"Build time reduced from 3m 42s to 2m 14s\"}]}\n```" },
+          { event: null, state: 'reporting-timeline', sender: 'agent', message: "```quote\n{\"text\":\"Overall the project is in good shape. Main risk is the E2E tests being deferred -- I'd recommend prioritizing those in the next sprint.\",\"author\":\"Bridge Agent\",\"style\":\"warning\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 4. SPRINT PLANNING
+      // ────────────────────────────────────────────
+      {
+        id: 'sprint-planning',
+        name: 'Sprint Planning',
+        icon: '\uD83C\uDFAF',
+        tag: 'flow',
+        desc: 'Agent proposes tasks, user picks priorities, agent creates a structured sprint plan',
+        states: ['idle', 'proposing-tasks', 'user-prioritizing', 'sprint-plan', 'estimates'],
+        transitions: [
+          { from: 'idle', to: 'proposing-tasks', event: 'start-planning' },
+          { from: 'proposing-tasks', to: 'user-prioritizing', event: 'show-options' },
+          { from: 'user-prioritizing', to: 'sprint-plan', event: 'priorities-set' },
+          { from: 'sprint-plan', to: 'estimates', event: 'show-estimates' },
+        ],
+        steps: [
+          { event: 'start-planning', state: 'proposing-tasks', sender: 'user', message: "Let's plan Sprint 24. What should we work on?" },
+          { event: 'show-options', state: 'user-prioritizing', sender: 'agent', message: "Based on the backlog, open bugs, and team capacity (3 devs, 2 weeks), here are my recommendations:\n\n```options\n{\"items\":[{\"title\":\"Real-time Notifications\",\"icon\":\"\uD83D\uDD14\",\"desc\":\"WebSocket push for order updates, 8 story points. High user demand.\"},{\"title\":\"Search Performance\",\"icon\":\"\u26A1\",\"desc\":\"Elasticsearch indexing rewrite, 5 points. P99 latency at 2.3s, target <500ms.\"},{\"title\":\"User Settings Page\",\"icon\":\"\u2699\uFE0F\",\"desc\":\"Profile, preferences, notification toggles. 5 points. Blocks mobile app.\"},{\"title\":\"Payment Retry Logic\",\"icon\":\"\uD83D\uDCB3\",\"desc\":\"Auto-retry failed payments with exponential backoff. 3 points. Revenue impact.\"},{\"title\":\"Admin Dashboard\",\"icon\":\"\uD83D\uDCCB\",\"desc\":\"Analytics panel for internal ops team. 8 points. Requested by CEO.\"},{\"title\":\"Bug Bash (7 open bugs)\",\"icon\":\"\uD83D\uDC1B\",\"desc\":\"Fix all P1/P2 bugs. 5 points total. Improves stability.\"}]}\n```" },
+          { event: 'priorities-set', state: 'sprint-plan', sender: 'user', message: 'Top priorities: Payment Retry, Search Performance, Bug Bash, and User Settings.' },
+          { event: null, state: 'sprint-plan', sender: 'agent', message: "Great picks. Total: 18 story points across 2 weeks with 3 devs. Here's the plan:\n\n```steps\n{\"items\":[{\"title\":\"Week 1: Payment Retry Logic\",\"desc\":\"@miguel -- Implement retry queue, exponential backoff, idempotency keys. Write integration tests with Stripe sandbox.\",\"status\":\"pending\"},{\"title\":\"Week 1: Search Performance\",\"desc\":\"@sarah -- Reindex Elasticsearch, implement query caching, add search analytics. Target: P99 < 500ms.\",\"status\":\"pending\"},{\"title\":\"Week 1-2: Bug Bash\",\"desc\":\"@carlos -- Fix 7 open P1/P2 bugs. Start with checkout flow race condition (BUG-342).\",\"status\":\"pending\"},{\"title\":\"Week 2: User Settings Page\",\"desc\":\"@sarah -- After search ships. Profile editor, notification prefs, timezone selector. Unblocks mobile app.\",\"status\":\"pending\"}]}\n```" },
+          { event: 'show-estimates', state: 'estimates', sender: 'agent', message: "Story point breakdown:\n\n```cards\n{\"items\":[{\"label\":\"Total Capacity\",\"value\":\"24 pts\",\"desc\":\"3 devs x 8 pts/sprint\"},{\"label\":\"Committed\",\"value\":\"18 pts\",\"desc\":\"75% utilization\"},{\"label\":\"Buffer\",\"value\":\"6 pts\",\"desc\":\"For unexpected work\"},{\"label\":\"Sprint Goal\",\"value\":\"4 items\",\"desc\":\"Ship by March 28\"}]}\n```\n\n```quote\n{\"text\":\"Leaving 25% buffer is wise given we have 7 open bugs. If the bug bash finishes early, we can pull in Real-time Notifications.\",\"author\":\"Bridge Agent\",\"style\":\"info\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 5. BUG TRIAGE
+      // ────────────────────────────────────────────
+      {
+        id: 'bug-triage',
+        name: 'Bug Triage',
+        icon: '\uD83D\uDC1B',
+        tag: 'action',
+        desc: 'Review open bugs, sort by severity, and decide which to tackle first',
+        states: ['idle', 'loading-bugs', 'showing-table', 'sorted', 'action-selected'],
+        transitions: [
+          { from: 'idle', to: 'loading-bugs', event: 'user-asks-bugs' },
+          { from: 'loading-bugs', to: 'showing-table', event: 'bugs-loaded' },
+          { from: 'showing-table', to: 'sorted', event: 'user-sorts' },
+          { from: 'sorted', to: 'action-selected', event: 'user-picks-bug' },
+        ],
+        steps: [
+          { event: 'user-asks-bugs', state: 'loading-bugs', sender: 'user', message: 'Show me all open bugs.' },
+          { event: 'bugs-loaded', state: 'showing-table', sender: 'agent', message: "Found 7 open bugs across the project:\n\n```table\n{\"headers\":[\"ID\",\"Title\",\"Severity\",\"Assignee\",\"Age\"],\"rows\":[[\"BUG-342\",\"Checkout race condition on double-click\",\"P1 Critical\",\"Unassigned\",\"5 days\"],[\"BUG-338\",\"Search returns stale results after edit\",\"P2 High\",\"@sarah\",\"8 days\"],[\"BUG-351\",\"Mobile nav menu doesn't close\",\"P2 High\",\"Unassigned\",\"2 days\"],[\"BUG-329\",\"Email notifications sent twice\",\"P2 High\",\"@carlos\",\"12 days\"],[\"BUG-347\",\"Dark mode toggle resets on refresh\",\"P3 Medium\",\"Unassigned\",\"4 days\"],[\"BUG-344\",\"Avatar upload fails for PNGs > 2MB\",\"P3 Medium\",\"@miguel\",\"6 days\"],[\"BUG-350\",\"Footer links misaligned on Safari\",\"P4 Low\",\"Unassigned\",\"3 days\"]]}\n```" },
+          { event: 'user-sorts', state: 'sorted', sender: 'user', message: 'Sort by severity. Which should we fix first?' },
+          { event: null, state: 'sorted', sender: 'agent', message: "Sorted by severity and age. My recommendation:\n\n```quote\n{\"text\":\"BUG-342 is a P1 affecting checkout -- this is revenue-impacting and should be fixed immediately. BUG-329 (duplicate emails) has been open 12 days and is causing user complaints.\",\"style\":\"error\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Fix BUG-342 (Checkout race condition)\",\"icon\":\"\uD83D\uDEA8\",\"desc\":\"P1 Critical, 5 days old, affects payment flow. I can add a debounce + idempotency key.\"},{\"title\":\"Fix BUG-329 (Duplicate emails)\",\"icon\":\"\uD83D\uDCE7\",\"desc\":\"P2 High, 12 days old. Likely a missing deduplication check in the queue worker.\"},{\"title\":\"Fix BUG-338 (Stale search)\",\"icon\":\"\uD83D\uDD0D\",\"desc\":\"P2 High, 8 days old. Cache invalidation issue in Elasticsearch.\"},{\"title\":\"Assign all unassigned bugs\",\"icon\":\"\uD83D\uDC65\",\"desc\":\"Auto-assign based on code ownership and current workload.\"}]}\n```" },
+          { event: 'user-picks-bug', state: 'action-selected', sender: 'user', message: 'Fix BUG-342 first.' },
+          { event: null, state: 'action-selected', sender: 'agent', message: "On it. Here's my plan for BUG-342:\n\n```steps\n{\"items\":[{\"title\":\"Add debounce to checkout button\",\"desc\":\"Disable button after first click, re-enable after response or 10s timeout\"},{\"title\":\"Add idempotency key to payment API\",\"desc\":\"Generate UUID per checkout session, reject duplicate charges\"},{\"title\":\"Write regression test\",\"desc\":\"Simulate rapid double-click in Playwright E2E test\"},{\"title\":\"Deploy hotfix\",\"desc\":\"Cherry-pick to release branch, deploy to production\"}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 6. CODE REVIEW
+      // ────────────────────────────────────────────
+      {
+        id: 'code-review',
+        name: 'Code Review',
+        icon: '\uD83D\uDD0D',
+        tag: 'action',
+        desc: 'Agent summarizes a PR with diffs, commit timeline, and review actions',
+        states: ['idle', 'loading-pr', 'showing-summary', 'showing-diffs', 'review-action'],
+        transitions: [
+          { from: 'idle', to: 'loading-pr', event: 'user-asks-review' },
+          { from: 'loading-pr', to: 'showing-summary', event: 'pr-loaded' },
+          { from: 'showing-summary', to: 'showing-diffs', event: 'show-diffs' },
+          { from: 'showing-diffs', to: 'review-action', event: 'show-actions' },
+        ],
+        steps: [
+          { event: 'user-asks-review', state: 'loading-pr', sender: 'user', message: 'Review PR #142 for me.' },
+          { event: 'pr-loaded', state: 'showing-summary', sender: 'agent', message: "PR #142: \"Refactor auth to use JWT with refresh tokens\"\nBy @sarah, opened 6 hours ago, 3 commits.\n\n```cards\n{\"items\":[{\"label\":\"Files Changed\",\"value\":\"12\"},{\"label\":\"Insertions\",\"value\":\"+347\",\"desc\":\"Mostly new auth logic\"},{\"label\":\"Deletions\",\"value\":\"-203\",\"desc\":\"Removed legacy session code\"},{\"label\":\"Net Change\",\"value\":\"+144 lines\"}]}\n```\n\n```timeline\n{\"items\":[{\"date\":\"6h ago\",\"title\":\"Initial commit: JWT implementation\",\"desc\":\"Added jsonwebtoken, created auth middleware, token generation\"},{\"date\":\"4h ago\",\"title\":\"Add refresh token rotation\",\"desc\":\"Secure httpOnly cookies, 7-day expiry, one-time use\"},{\"date\":\"2h ago\",\"title\":\"Update tests and fix edge cases\",\"desc\":\"Added 18 new tests, fixed token expiry race condition\"}]}\n```" },
+          { event: 'show-diffs', state: 'showing-diffs', sender: 'agent', message: "Key changes:\n\n```diff\n{\"file\":\"src/middleware/auth.js\",\"additions\":45,\"deletions\":28,\"preview\":\"+  const token = jwt.sign({ userId, role }, SECRET, { expiresIn: '15m' });\\n+  const refreshToken = crypto.randomBytes(64).toString('hex');\\n+  await RefreshToken.create({ token: refreshToken, userId, expiresAt });\\n-  const session = await Session.create({ userId });\\n-  res.cookie('sessionId', session.id);\"}\n```\n\n```diff\n{\"file\":\"src/api/routes/auth.js\",\"additions\":32,\"deletions\":15,\"preview\":\"+  router.post('/refresh', async (req, res) => {\\n+    const { refreshToken } = req.cookies;\\n+    const stored = await RefreshToken.findOne({ token: refreshToken });\\n+    if (!stored || stored.expiresAt < Date.now()) {\\n+      return res.status(401).json({ error: 'Token expired' });\\n+    }\\n-  router.post('/session', async (req, res) => {\\n-    // Legacy session-based auth\"}\n```\n\n```diff\n{\"file\":\"tests/auth.test.js\",\"additions\":87,\"deletions\":12,\"preview\":\"+  describe('JWT refresh flow', () => {\\n+    it('should issue new access token with valid refresh token', async () => {\\n+      const res = await request(app).post('/api/refresh');\\n+      expect(res.status).toBe(200);\\n+      expect(res.body).toHaveProperty('accessToken');\\n+    });\"}\n```" },
+          { event: 'show-actions', state: 'review-action', sender: 'agent', message: "```quote\n{\"text\":\"Code quality is good. Auth logic follows OWASP best practices. Test coverage is comprehensive. One concern: the refresh token rotation should invalidate all tokens for a user if a reused token is detected (to handle token theft).\",\"author\":\"Bridge Agent\",\"style\":\"info\"}\n```\n\n```options\n{\"items\":[{\"title\":\"Approve PR\",\"icon\":\"\u2705\",\"desc\":\"LGTM -- merge when ready\"},{\"title\":\"Request Changes\",\"icon\":\"\uD83D\uDD04\",\"desc\":\"Ask @sarah to add stolen token detection\"},{\"title\":\"Comment Only\",\"icon\":\"\uD83D\uDCAC\",\"desc\":\"Leave review notes without blocking merge\"}]}\n```" },
+          { event: null, state: 'review-action', sender: 'user', message: 'Request Changes' },
+          { event: null, state: 'review-action', sender: 'agent', message: "Done. Left a review on PR #142 requesting stolen token detection. Comment posted:\n\n```quote\n{\"text\":\"Great work on the JWT migration! One security concern: if a refresh token is reused (indicating potential theft), all refresh tokens for that user should be invalidated. See: https://auth0.com/blog/refresh-tokens-what-are-they-and-when-to-use-them/\",\"author\":\"Review comment on PR #142\",\"style\":\"warning\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 7. DEPLOYMENT PIPELINE
+      // ────────────────────────────────────────────
+      {
+        id: 'deploy-pipeline',
+        name: 'Deployment Pipeline',
+        icon: '\uD83D\uDE80',
+        tag: 'monitor',
+        desc: 'Watch a deployment progress through build, test, staging, and production stages',
+        states: ['idle', 'building', 'testing', 'staging', 'deploying-prod', 'deployed'],
+        transitions: [
+          { from: 'idle', to: 'building', event: 'deploy-triggered' },
+          { from: 'building', to: 'testing', event: 'build-done' },
+          { from: 'testing', to: 'staging', event: 'tests-passed' },
+          { from: 'staging', to: 'deploying-prod', event: 'staging-verified' },
+          { from: 'deploying-prod', to: 'deployed', event: 'prod-deployed' },
+        ],
+        steps: [
+          { event: 'deploy-triggered', state: 'building', sender: 'agent', message: "Deployment triggered for v2.5.0 (commit `e7a3f1b`).\n\n```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"Compiling TypeScript, bundling with Vite\",\"status\":\"working\"},{\"title\":\"Test\",\"desc\":\"1,247 unit tests + 89 integration tests\",\"status\":\"pending\"},{\"title\":\"Staging\",\"desc\":\"Deploy to staging.app.com for verification\",\"status\":\"pending\"},{\"title\":\"Production\",\"desc\":\"Rolling deploy to 4 regions\",\"status\":\"pending\"}]}\n```\n\n```progress\n{\"label\":\"Build\",\"value\":35,\"desc\":\"Compiling 847 TypeScript files...\"}\n```" },
+          { event: 'build-done', state: 'testing', sender: 'agent', message: "Build complete in 2m 14s.\n\n```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"Compiled in 2m 14s, bundle: 1.2 MB (gzipped: 340 KB)\",\"status\":\"done\"},{\"title\":\"Test\",\"desc\":\"Running test suite...\",\"status\":\"working\"},{\"title\":\"Staging\",\"desc\":\"Waiting for tests\",\"status\":\"pending\"},{\"title\":\"Production\",\"desc\":\"Waiting for staging verification\",\"status\":\"pending\"}]}\n```\n\n```progress\n{\"label\":\"Tests\",\"value\":62,\"desc\":\"783 / 1,247 tests passed so far...\"}\n```" },
+          { event: 'tests-passed', state: 'staging', sender: 'agent', message: "All 1,336 tests passed (1,247 unit + 89 integration).\n\n```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"2m 14s\",\"status\":\"done\"},{\"title\":\"Test\",\"desc\":\"1,336 tests passed in 4m 31s\",\"status\":\"done\"},{\"title\":\"Staging\",\"desc\":\"Deploying to staging.app.com...\",\"status\":\"working\"},{\"title\":\"Production\",\"desc\":\"Awaiting staging verification\",\"status\":\"pending\"}]}\n```\n\n```progress\n{\"label\":\"Staging Deploy\",\"value\":88,\"desc\":\"Containers starting, running health checks...\"}\n```" },
+          { event: 'staging-verified', state: 'deploying-prod', sender: 'agent', message: "Staging is live and healthy. Smoke tests passed.\n\n```cards\n{\"items\":[{\"label\":\"Staging URL\",\"value\":\"staging.app.com\",\"desc\":\"Click to verify\"},{\"label\":\"Health Check\",\"value\":\"All Green\",\"desc\":\"4/4 services healthy\"},{\"label\":\"Response Time\",\"value\":\"142ms\",\"desc\":\"P50 latency\"},{\"label\":\"Error Rate\",\"value\":\"0.00%\",\"desc\":\"No errors detected\"}]}\n```\n\nProceeding to production rolling deploy...\n\n```progress\n{\"label\":\"Production Deploy\",\"value\":25,\"desc\":\"Region 1/4: us-east-1 deploying...\"}\n```" },
+          { event: 'prod-deployed', state: 'deployed', sender: 'agent', message: "v2.5.0 is live in production across all 4 regions!\n\n```steps\n{\"items\":[{\"title\":\"Build\",\"desc\":\"2m 14s\",\"status\":\"done\"},{\"title\":\"Test\",\"desc\":\"1,336 tests, 4m 31s\",\"status\":\"done\"},{\"title\":\"Staging\",\"desc\":\"Verified, smoke tests passed\",\"status\":\"done\"},{\"title\":\"Production\",\"desc\":\"4/4 regions live, total time: 12m 47s\",\"status\":\"done\"}]}\n```\n\n```progress\n{\"label\":\"Deployment Complete\",\"value\":100,\"desc\":\"v2.5.0 deployed to us-east-1, us-west-2, eu-west-1, ap-southeast-1\"}\n```\n\n```quote\n{\"text\":\"Zero-downtime deployment successful. Monitoring for anomalies over the next 30 minutes.\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 8. TEAM STANDUP
+      // ────────────────────────────────────────────
+      {
+        id: 'team-standup',
+        name: 'Team Standup',
+        icon: '\uD83D\uDC65',
+        tag: 'report',
+        desc: 'Async standup summary with each team member\'s status, blockers, and daily summary',
+        states: ['idle', 'collecting', 'showing-individual', 'showing-summary', 'action-items'],
+        transitions: [
+          { from: 'idle', to: 'collecting', event: 'standup-requested' },
+          { from: 'collecting', to: 'showing-individual', event: 'data-collected' },
+          { from: 'showing-individual', to: 'showing-summary', event: 'show-table' },
+          { from: 'showing-summary', to: 'action-items', event: 'show-actions' },
+        ],
+        steps: [
+          { event: 'standup-requested', state: 'collecting', sender: 'user', message: "What's the team status for today?" },
+          { event: 'data-collected', state: 'showing-individual', sender: 'agent', message: "Here's the team standup for Tuesday, March 26:\n\n```status\n{\"items\":[{\"label\":\"@miguel (Lead)\",\"status\":\"working\",\"desc\":\"Working on payment retry logic, 60% done\"},{\"label\":\"@sarah (Frontend)\",\"status\":\"done\",\"desc\":\"Completed dashboard chart component, PR #127 merged\"},{\"label\":\"@carlos (Backend)\",\"status\":\"blocked\",\"desc\":\"Blocked on Elasticsearch cluster upgrade -- needs DevOps approval\"},{\"label\":\"@ana (Mobile)\",\"status\":\"working\",\"desc\":\"Flutter login flow, testing biometric auth on Android\"}]}\n```" },
+          { event: 'show-table', state: 'showing-summary', sender: 'agent', message: "Detailed breakdown:\n\n```table\n{\"headers\":[\"Person\",\"Yesterday\",\"Today\",\"Blockers\"],\"rows\":[[\"@miguel\",\"Designed retry queue schema, wrote migration\",\"Implementing exponential backoff + tests\",\"None\"],[\"@sarah\",\"Finished real-time chart component with WebSocket\",\"Starting user settings page\",\"Waiting on API v2 docs\"],[\"@carlos\",\"Fixed 2 bugs (BUG-329, BUG-338)\",\"Elasticsearch reindexing\",\"Cluster upgrade needs DevOps\"],[\"@ana\",\"Built login UI, integrated OAuth flow\",\"Biometric auth + error handling\",\"iOS simulator crashing\"]]}\n```" },
+          { event: 'show-actions', state: 'action-items', sender: 'agent', message: "Action items I can help with:\n\n```options\n{\"items\":[{\"title\":\"Unblock Carlos\",\"icon\":\"\uD83D\uDD13\",\"desc\":\"Ping DevOps on Slack about the Elasticsearch cluster upgrade\"},{\"title\":\"Help Ana with iOS\",\"icon\":\"\uD83D\uDCF1\",\"desc\":\"Check Xcode logs and suggest simulator fix\"},{\"title\":\"Update Sarah's API docs\",\"icon\":\"\uD83D\uDCDD\",\"desc\":\"Generate OpenAPI docs from the finalized v2 endpoints\"},{\"title\":\"Schedule retro\",\"icon\":\"\uD83D\uDCC5\",\"desc\":\"Sprint 23 ended yesterday -- should we schedule a retrospective?\"}]}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 9. ARCHITECTURE DECISION
+      // ────────────────────────────────────────────
+      {
+        id: 'architecture-decision',
+        name: 'Architecture Decision',
+        icon: '\uD83C\uDFD7\uFE0F',
+        tag: 'flow',
+        desc: 'Agent presents architecture options with trade-offs, user decides, agent creates implementation plan',
+        states: ['idle', 'presenting-problem', 'showing-options', 'option-chosen', 'implementation-plan'],
+        transitions: [
+          { from: 'idle', to: 'presenting-problem', event: 'user-asks' },
+          { from: 'presenting-problem', to: 'showing-options', event: 'show-options' },
+          { from: 'showing-options', to: 'option-chosen', event: 'user-picks' },
+          { from: 'option-chosen', to: 'implementation-plan', event: 'show-plan' },
+        ],
+        steps: [
+          { event: 'user-asks', state: 'presenting-problem', sender: 'user', message: 'We need real-time updates for the dashboard. What are our options?' },
+          { event: null, state: 'presenting-problem', sender: 'agent', message: "Good question. There are 3 main approaches for real-time data delivery, each with different trade-offs:\n\n```cards\n{\"items\":[{\"label\":\"Current Latency\",\"value\":\"30s\",\"desc\":\"Polling every 30 seconds\"},{\"label\":\"Target Latency\",\"value\":\"<1s\",\"desc\":\"Near real-time updates\"},{\"label\":\"Active Users\",\"value\":\"~2,400\",\"desc\":\"Concurrent dashboard sessions\"},{\"label\":\"Data Events\",\"value\":\"~850/min\",\"desc\":\"Updates to push\"}]}\n```" },
+          { event: 'show-options', state: 'showing-options', sender: 'agent', message: "```options\n{\"items\":[{\"title\":\"WebSockets (Socket.IO)\",\"icon\":\"\uD83D\uDD0C\",\"desc\":\"Persistent bidirectional connection. Latency: <100ms. Pros: Real-time, efficient. Cons: Requires sticky sessions, complex scaling with load balancers, ~40% more server memory.\"},{\"title\":\"Server-Sent Events (SSE)\",\"icon\":\"\uD83D\uDCE1\",\"desc\":\"Unidirectional server-to-client stream. Latency: <200ms. Pros: Simple, HTTP-native, auto-reconnect. Cons: One-way only, limited to ~6 connections per domain in HTTP/1.1.\"},{\"title\":\"Long Polling + Redis Pub/Sub\",\"icon\":\"\uD83D\uDD04\",\"desc\":\"Enhanced polling with server-side event queue. Latency: <500ms. Pros: Works everywhere, simple infra. Cons: Higher server load, not truly real-time, more bandwidth.\"}]}\n```" },
+          { event: 'user-picks', state: 'option-chosen', sender: 'user', message: 'Go with SSE. Simpler and we only need server-to-client.' },
+          { event: 'show-plan', state: 'implementation-plan', sender: 'agent', message: "Solid choice. SSE is perfect for one-way dashboard updates. Here's the implementation plan:\n\n```timeline\n{\"items\":[{\"date\":\"Day 1-2\",\"title\":\"SSE endpoint + event emitter\",\"desc\":\"Create /api/events/stream endpoint with Redis Pub/Sub backend for multi-instance support\"},{\"date\":\"Day 3\",\"title\":\"Client-side EventSource integration\",\"desc\":\"Replace polling with EventSource in dashboard components, add reconnection logic\"},{\"date\":\"Day 4\",\"title\":\"Event filtering & compression\",\"desc\":\"Per-user event filtering (only send relevant updates), gzip compression for large payloads\"},{\"date\":\"Day 5\",\"title\":\"Load testing & monitoring\",\"desc\":\"Simulate 2,400 concurrent connections, add Grafana dashboard for SSE metrics\"},{\"date\":\"Day 6\",\"title\":\"Gradual rollout\",\"desc\":\"Feature flag: 10% -> 50% -> 100% of users over 3 days, fallback to polling\"}]}\n```\n\n```quote\n{\"text\":\"Estimated effort: 6 days for one developer. Expected result: dashboard latency drops from 30s to <200ms with minimal infrastructure changes.\",\"author\":\"Bridge Agent\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 10. INCIDENT RESPONSE
+      // ────────────────────────────────────────────
+      {
+        id: 'incident-response',
+        name: 'Incident Response',
+        icon: '\uD83D\uDEA8',
+        tag: 'monitor',
+        desc: 'Agent detects an outage, shows service status, event timeline, and mitigation options',
+        states: ['idle', 'alert-triggered', 'showing-impact', 'showing-timeline', 'mitigation'],
+        transitions: [
+          { from: 'idle', to: 'alert-triggered', event: 'alert-fires' },
+          { from: 'alert-triggered', to: 'showing-impact', event: 'impact-assessed' },
+          { from: 'showing-impact', to: 'showing-timeline', event: 'show-events' },
+          { from: 'showing-timeline', to: 'mitigation', event: 'show-mitigation' },
+        ],
+        steps: [
+          { event: 'alert-fires', state: 'alert-triggered', sender: 'agent', message: "```quote\n{\"text\":\"INCIDENT DETECTED: Payment service returning 503 errors. Error rate spiked to 23% in the last 5 minutes. 342 users affected.\",\"style\":\"error\"}\n```\n\n```status\n{\"items\":[{\"label\":\"Payment Service\",\"status\":\"down\",\"desc\":\"503 errors, 23% error rate\"},{\"label\":\"API Gateway\",\"status\":\"up\",\"desc\":\"Healthy, routing correctly\"},{\"label\":\"Database (Primary)\",\"status\":\"up\",\"desc\":\"Connections normal\"},{\"label\":\"Database (Read Replica)\",\"status\":\"degraded\",\"desc\":\"Replication lag: 4.2s\"},{\"label\":\"Redis Cache\",\"status\":\"up\",\"desc\":\"Memory: 78%, healthy\"},{\"label\":\"CDN\",\"status\":\"up\",\"desc\":\"All edge nodes operational\"}]}\n```" },
+          { event: 'impact-assessed', state: 'showing-impact', sender: 'agent', message: "Impact assessment:\n\n```cards\n{\"items\":[{\"label\":\"Error Rate\",\"value\":\"23.4%\",\"trend\":\"+22.8%\",\"desc\":\"Normally 0.6%\"},{\"label\":\"Users Affected\",\"value\":\"342\",\"desc\":\"Active checkout sessions\"},{\"label\":\"Revenue at Risk\",\"value\":\"$4,200/min\",\"desc\":\"Based on avg checkout value\"},{\"label\":\"Incident Duration\",\"value\":\"5m 32s\",\"desc\":\"Since first error\"}]}\n```" },
+          { event: 'show-events', state: 'showing-timeline', sender: 'agent', message: "Event timeline:\n\n```timeline\n{\"items\":[{\"date\":\"14:23:01\",\"title\":\"Read replica replication lag spike\",\"desc\":\"Lag increased from 200ms to 4.2s after a large batch query\"},{\"date\":\"14:24:18\",\"title\":\"Payment service connection pool exhausted\",\"desc\":\"Max connections (50) reached due to slow queries hitting lagging replica\"},{\"date\":\"14:24:45\",\"title\":\"First 503 errors logged\",\"desc\":\"Payment service starts rejecting requests\"},{\"date\":\"14:25:12\",\"title\":\"PagerDuty alert triggered\",\"desc\":\"Error rate exceeded 5% threshold\"},{\"date\":\"14:28:33\",\"title\":\"Bridge Agent detected incident\",\"desc\":\"Correlated replica lag with payment failures\"}]}\n```" },
+          { event: 'show-mitigation', state: 'mitigation', sender: 'agent', message: "```quote\n{\"text\":\"Root cause identified: A batch analytics query is saturating the read replica, causing connection pool exhaustion in the payment service.\",\"style\":\"warning\"}\n```\n\nRecommended actions:\n\n```options\n{\"items\":[{\"title\":\"Kill the batch query\",\"icon\":\"\u26A1\",\"desc\":\"Immediately terminate the long-running analytics query on the read replica. Fastest fix (~30s to recover).\"},{\"title\":\"Failover payments to primary DB\",\"icon\":\"\uD83D\uDD04\",\"desc\":\"Route payment reads to primary database temporarily. Adds ~15% load to primary.\"},{\"title\":\"Increase connection pool\",\"icon\":\"\uD83D\uDCCA\",\"desc\":\"Bump max connections from 50 to 100. Bandaid fix, doesn't address root cause.\"},{\"title\":\"Scale up read replica\",\"icon\":\"\u2B06\uFE0F\",\"desc\":\"Resize replica from db.r6g.large to db.r6g.xlarge. Takes 5-8 minutes.\"}]}\n```" },
+          { event: null, state: 'mitigation', sender: 'user', message: 'Kill the batch query and failover to primary.' },
+          { event: null, state: 'mitigation', sender: 'agent', message: "Executing both actions...\n\n```progress\n{\"label\":\"Killing batch query\",\"value\":100,\"desc\":\"Query PID 47293 terminated on read replica\"}\n```\n\n```progress\n{\"label\":\"Failover to primary\",\"value\":100,\"desc\":\"Payment service now routing reads to primary DB\"}\n```\n\n```quote\n{\"text\":\"Error rate dropping: 23.4% -> 8.1% -> 1.2% -> 0.5%. Services recovering. Will schedule the analytics query for off-peak hours (3 AM UTC) going forward.\",\"style\":\"success\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 11. DATA DASHBOARD
+      // ────────────────────────────────────────────
+      {
+        id: 'data-dashboard',
+        name: 'Data Dashboard',
+        icon: '\uD83D\uDCC8',
+        tag: 'report',
+        desc: 'API performance dashboard with charts, metrics cards, and slowest endpoints table',
+        states: ['idle', 'loading-data', 'showing-chart', 'showing-metrics', 'showing-table'],
+        transitions: [
+          { from: 'idle', to: 'loading-data', event: 'user-asks-metrics' },
+          { from: 'loading-data', to: 'showing-chart', event: 'chart-ready' },
+          { from: 'showing-chart', to: 'showing-metrics', event: 'show-cards' },
+          { from: 'showing-metrics', to: 'showing-table', event: 'show-endpoints' },
+        ],
+        steps: [
+          { event: 'user-asks-metrics', state: 'loading-data', sender: 'user', message: 'Show me API performance metrics for the last 24 hours.' },
+          { event: null, state: 'loading-data', sender: 'agent', message: 'Querying Datadog and CloudWatch for the last 24 hours...' },
+          { event: 'chart-ready', state: 'showing-chart', sender: 'agent', message: "API latency by endpoint (P95, last 24h):\n\n```chartjs\n{\"type\":\"bar\",\"data\":{\"labels\":[\"/api/auth\",\"/api/users\",\"/api/payments\",\"/api/search\",\"/api/orders\",\"/api/products\"],\"datasets\":[{\"label\":\"P95 Latency (ms)\",\"data\":[45,82,156,312,94,67],\"backgroundColor\":[\"rgba(49,109,255,0.7)\",\"rgba(49,109,255,0.7)\",\"rgba(245,158,11,0.7)\",\"rgba(239,68,68,0.7)\",\"rgba(49,109,255,0.7)\",\"rgba(49,109,255,0.7)\"],\"borderRadius\":6}]},\"options\":{\"responsive\":true,\"plugins\":{\"legend\":{\"display\":false},\"title\":{\"display\":true,\"text\":\"P95 Latency by Endpoint (ms)\",\"font\":{\"size\":14,\"weight\":\"bold\"}}},\"scales\":{\"y\":{\"beginAtZero\":true,\"title\":{\"display\":true,\"text\":\"Latency (ms)\"}}}}}\n```" },
+          { event: 'show-cards', state: 'showing-metrics', sender: 'agent', message: "```cards\n{\"items\":[{\"label\":\"Uptime (24h)\",\"value\":\"99.97%\",\"trend\":\"+0.02%\",\"desc\":\"1 brief degradation at 14:23 UTC\"},{\"label\":\"P99 Latency\",\"value\":\"487ms\",\"trend\":\"-23ms\",\"desc\":\"Improved after caching changes\"},{\"label\":\"Error Rate\",\"value\":\"0.12%\",\"trend\":\"-0.05%\",\"desc\":\"47 errors out of 39,241 requests\"},{\"label\":\"Total Requests\",\"value\":\"39.2K\",\"trend\":\"+8%\",\"desc\":\"Compared to previous 24h\"},{\"label\":\"Avg Response\",\"value\":\"94ms\",\"trend\":\"-11ms\",\"desc\":\"Across all endpoints\"},{\"label\":\"Cache Hit Rate\",\"value\":\"87.3%\",\"trend\":\"+4.1%\",\"desc\":\"Redis cache effectiveness\"}]}\n```" },
+          { event: 'show-endpoints', state: 'showing-table', sender: 'agent', message: "Slowest endpoints (need attention):\n\n```table\n{\"headers\":[\"Endpoint\",\"P50\",\"P95\",\"P99\",\"Requests\",\"Errors\",\"Status\"],\"rows\":[[\"/api/search\",\"148ms\",\"312ms\",\"891ms\",\"4,210\",\"12\",\"Needs optimization\"],[\"api/payments/process\",\"89ms\",\"156ms\",\"423ms\",\"2,847\",\"8\",\"Acceptable\"],[\"api/users/profile\",\"42ms\",\"82ms\",\"198ms\",\"8,923\",\"3\",\"Good\"],[\"api/orders/history\",\"51ms\",\"94ms\",\"167ms\",\"3,102\",\"5\",\"Good\"],[\"api/products/catalog\",\"31ms\",\"67ms\",\"112ms\",\"12,847\",\"2\",\"Excellent\"]]}\n```\n\n```quote\n{\"text\":\"The /api/search endpoint is the main bottleneck -- P99 at 891ms. The Elasticsearch query optimizer should be the top priority for the next performance sprint.\",\"author\":\"Bridge Agent\",\"style\":\"warning\"}\n```" },
+        ],
+      },
+      // ────────────────────────────────────────────
+      // 12. RELEASE NOTES
+      // ────────────────────────────────────────────
+      {
+        id: 'release-notes',
+        name: 'Release Notes',
+        icon: '\uD83D\uDCE6',
+        tag: 'report',
+        desc: 'Agent compiles release notes with feature timeline, version cards, and breaking changes',
+        states: ['idle', 'compiling', 'features-timeline', 'version-info', 'breaking-changes'],
+        transitions: [
+          { from: 'idle', to: 'compiling', event: 'user-requests-notes' },
+          { from: 'compiling', to: 'features-timeline', event: 'notes-compiled' },
+          { from: 'features-timeline', to: 'version-info', event: 'show-version' },
+          { from: 'version-info', to: 'breaking-changes', event: 'show-breaking' },
+        ],
+        steps: [
+          { event: 'user-requests-notes', state: 'compiling', sender: 'user', message: 'Compile release notes for v2.5.0.' },
+          { event: null, state: 'compiling', sender: 'agent', message: 'Analyzing 47 commits, 12 merged PRs, and 3 closed issues since v2.4.1...' },
+          { event: 'notes-compiled', state: 'features-timeline', sender: 'agent', message: "Release v2.5.0 -- \"Phoenix\"\n\nFeatures shipped:\n\n```timeline\n{\"items\":[{\"date\":\"PR #142\",\"title\":\"JWT Authentication with Refresh Tokens\",\"desc\":\"Replaced legacy session-based auth. Secure httpOnly cookies, 15-min access tokens, 7-day refresh tokens with rotation.\"},{\"date\":\"PR #138\",\"title\":\"Real-time Dashboard Charts\",\"desc\":\"WebSocket-powered live charts for order volume, revenue, and API latency. Built with Chart.js + custom streaming adapter.\"},{\"date\":\"PR #135\",\"title\":\"Payment Retry with Exponential Backoff\",\"desc\":\"Failed payments auto-retry up to 3 times with exponential backoff. Idempotency keys prevent duplicate charges.\"},{\"date\":\"PR #131\",\"title\":\"Elasticsearch Search Optimization\",\"desc\":\"Reindexed with custom analyzers. P99 search latency reduced from 2.3s to 487ms.\"},{\"date\":\"PR #127\",\"title\":\"User Settings & Preferences Page\",\"desc\":\"Profile editor, notification toggles, timezone selector, dark mode preference.\"}]}\n```" },
+          { event: 'show-version', state: 'version-info', sender: 'agent', message: "```cards\n{\"items\":[{\"label\":\"Version\",\"value\":\"2.5.0\",\"desc\":\"Codename: Phoenix\"},{\"label\":\"Commits\",\"value\":\"47\",\"desc\":\"By 4 contributors\"},{\"label\":\"PRs Merged\",\"value\":\"12\",\"desc\":\"Avg review time: 4.2h\"},{\"label\":\"Issues Closed\",\"value\":\"8\",\"desc\":\"3 bugs, 5 features\"},{\"label\":\"Lines Changed\",\"value\":\"+3,847 / -1,203\",\"desc\":\"Net: +2,644 lines\"},{\"label\":\"Test Coverage\",\"value\":\"94.2%\",\"trend\":\"+3.1% vs v2.4.1\",\"desc\":\"127 new tests added\"}]}\n```\n\n```diff\n{\"file\":\"package.json\",\"additions\":1,\"deletions\":1,\"preview\":\"+  \\\"version\\\": \\\"2.5.0\\\",\\n-  \\\"version\\\": \\\"2.4.1\\\",\"}\n```" },
+          { event: 'show-breaking', state: 'breaking-changes', sender: 'agent', message: "Breaking changes:\n\n```table\n{\"headers\":[\"Change\",\"Affected\",\"Migration\"],\"rows\":[[\"Session-based auth removed\",\"All API clients\",\"Replace session cookies with Bearer token in Authorization header\"],[\"GET /api/v1/* endpoints removed\",\"v1 API consumers\",\"Update to /api/v2/* -- see migration guide\"],[\"Search response format changed\",\"Search integrations\",\"Results now in data.hits[] instead of results[]. Total in data.total.\"]]}\n```\n\n```quote\n{\"text\":\"Migration guide available at docs.app.com/migration/v2.5. For questions, the team is available in #releases on Slack.\",\"author\":\"Bridge Agent\",\"style\":\"info\"}\n```\n\nFull release notes formatted and ready. Want me to post them to GitHub Releases, Slack #releases, or both?" },
+          { event: null, state: 'breaking-changes', sender: 'user', message: 'Post to both GitHub and Slack.' },
+          { event: null, state: 'breaking-changes', sender: 'agent', message: "Done!\n\n```status\n{\"items\":[{\"label\":\"GitHub Release v2.5.0\",\"status\":\"done\",\"desc\":\"Published with full changelog and assets\"},{\"label\":\"Slack #releases\",\"status\":\"done\",\"desc\":\"Posted formatted announcement with highlights\"}]}\n```\n\n```quote\n{\"text\":\"Release v2.5.0 Phoenix is officially out. Great sprint, team.\",\"style\":\"success\"}\n```" },
         ],
       },
     ];
@@ -282,9 +664,14 @@
 
     function renderSidebar() {
       var sb = document.getElementById('sidebar');
-      sb.innerHTML = scenarios.map(function(s) {
+      var tagMap = { flow: 's-tag--flow', report: 's-tag--report', action: 's-tag--action', monitor: 's-tag--monitor' };
+      var tagLabels = { flow: 'Flow', report: 'Report', action: 'Action', monitor: 'Monitor' };
+      sb.innerHTML = '<div class="sidebar-title">Scenarios</div>' + scenarios.map(function(s) {
+        var tagCls = tagMap[s.tag] || 's-tag--flow';
+        var tagLabel = tagLabels[s.tag] || s.tag || '';
         return '<div class="scenario-item' + (currentScenario && currentScenario.id === s.id ? ' active' : '') + '" onclick="loadScenario(\'' + s.id + '\')">' +
-          '<h3>' + esc(s.name) + '</h3><p>' + esc(s.desc || '') + '</p></div>';
+          '<h3><span class="s-icon">' + (s.icon || '') + '</span>' + esc(s.name) + '</h3><p>' + esc(s.desc || '') + '</p>' +
+          (tagLabel ? '<span class="s-tag ' + tagCls + '">' + tagLabel + '</span>' : '') + '</div>';
       }).join('');
     }
 
@@ -377,7 +764,7 @@
 
     window.toggleAutoplay = function() {
       if (autoplayTimer) { stopAutoplay(); renderMain(); }
-      else { autoplayTimer = setInterval(function() { stepForward(); }, 1200); renderMain(); }
+      else { autoplayTimer = setInterval(function() { stepForward(); }, 1500); renderMain(); }
     };
 
     function stopAutoplay() {
