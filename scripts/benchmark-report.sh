@@ -88,23 +88,62 @@ IMPORTANT: Start with the actual findings. Numbers first, methodology last. Be s
 
 echo "Analysis complete ($(echo "$MARKDOWN" | wc -c | tr -d ' ') chars)"
 
-# Step 2: Extract chart data from benchmarks for Chart.js
-CHART_DATA=$(python3 -c "
+# Step 2: Extract charts from BOTH benchmark timings AND actual collected data
+CHART_DATA=$(node -e "
+const db = require('./lib/db');
+const charts = [];
+
+// 1. Step timing chart from benchmark
+const bench = db.getLatestBenchmark('hr-research') || db.getLatestBenchmark('HR Scala LATAM Research');
+if (bench) {
+  const steps = JSON.parse(bench.steps || '[]');
+  charts.push({
+    type: 'bar', title: 'Pipeline Step Duration (seconds)',
+    labels: steps.map(s => s.name || ''), data: steps.map(s => s.time || 0),
+    colors: ['#6366f1','#8b5cf6','#a78bfa','#c4b5fd','#ddd6fe']
+  });
+}
+
+// 2. Extract data-driven charts from collected data
+const allData = db.getData('hr-research').concat(db.getData('web-browse'));
+for (const row of allData) {
+  try {
+    const d = JSON.parse(row.data);
+    const text = d.text || '';
+    // Find chartjs blocks already generated
+    const chartMatch = text.match(/\x60\x60\x60chartjs\s*\n([\s\S]*?)\x60\x60\x60/);
+    if (chartMatch) {
+      const cfg = JSON.parse(chartMatch[1]);
+      charts.push({
+        type: cfg.type, title: cfg.options?.plugins?.title?.text || cfg.data?.datasets?.[0]?.label || row.collection.split('/').pop(),
+        raw: cfg  // pass full Chart.js config
+      });
+    }
+    // Find table blocks — extract for the sortable table
+    const tableMatch = text.match(/\x60\x60\x60table\s*\n([\s\S]*?)\x60\x60\x60/);
+    if (tableMatch) {
+      try {
+        const tbl = JSON.parse(tableMatch[1]);
+        if (tbl.headers && tbl.rows) {
+          // Store as a chart of type 'table' for the report
+          charts.push({ type: 'table', title: row.collection.split('/').pop().replace(/_/g,' '), headers: tbl.headers, rows: tbl.rows });
+        }
+      } catch(e) {}
+    }
+  } catch(e) {}
+}
+
+console.log(JSON.stringify(charts));
+" 2>/dev/null)
+
+# Also extract chart data from benchmarks JSON (fallback)
+CHART_DATA_EXTRA=$(python3 -c "
 import json
 benchmarks = json.loads('''$BENCH_DATA''')
 charts = []
 if benchmarks:
-    b = benchmarks[0]  # latest
+    b = benchmarks[0]
     steps = b.get('steps', [])
-    # Step timing chart
-    charts.append({
-        'type': 'bar',
-        'title': 'Step Duration (seconds)',
-        'labels': [s.get('name','') for s in steps],
-        'data': [s.get('time',0) for s in steps],
-        'colors': ['#6366f1','#8b5cf6','#a78bfa','#c4b5fd','#ddd6fe']
-    })
-    # Data points chart
     charts.append({
         'type': 'bar',
         'title': 'Data Points per Step',
@@ -178,37 +217,69 @@ html_content = '\n'.join(result_lines)
 html_content = html_content.replace('\n\n', '</p><p class="mb-4 text-gray-700 leading-relaxed">')
 html_content = '<p class="mb-4 text-gray-700 leading-relaxed">' + html_content + '</p>'
 
-# Build chart canvases
+# Build chart canvases AND sortable data tables
 chart_html = ''
-for i, chart in enumerate(charts):
-    chart_html += f'<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">{chart["title"]}</h3><canvas id="chart{i}" height="200"></canvas></div>'
-
-# Chart.js init script
 chart_js = 'document.addEventListener("DOMContentLoaded", function() {\n'
+chart_idx = 0
+
 for i, chart in enumerate(charts):
-    cfg = {
-        'type': chart['type'],
-        'data': {
-            'labels': chart['labels'],
-            'datasets': [{
-                'label': chart['title'],
-                'data': chart['data'],
-                'backgroundColor': chart.get('colors', ['#6366f1']),
-                'borderColor': chart.get('colors', ['#6366f1'])[0] if chart['type'] == 'line' else chart.get('colors', ['#6366f1']),
-                'borderWidth': 2,
-                'borderRadius': 6 if chart['type'] == 'bar' else 0,
-                'tension': 0.3,
-                'fill': chart['type'] == 'line',
-            }]
-        },
-        'options': {
-            'responsive': True,
-            'plugins': {'legend': {'display': False}},
-            'scales': {'y': {'beginAtZero': True, 'grid': {'color': '#f3f4f6'}}, 'x': {'grid': {'display': False}}}
+    if chart.get('type') == 'table':
+        # Sortable data table
+        title = chart.get('title', 'Data')
+        headers = chart.get('headers', [])
+        rows = chart.get('rows', [])
+        th = ''.join(f'<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:text-indigo-600" onclick="sortTable(this)">{h} ↕</th>' for h in headers)
+        tr = ''
+        for row in rows:
+            cells = ''.join(f'<td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{c}</td>' for c in row)
+            tr += f'<tr class="hover:bg-gray-50">{cells}</tr>'
+        chart_html += f'''<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
+          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="min-w-full divide-y divide-gray-200 sortable">
+              <thead class="bg-gray-50 sticky top-0"><tr>{th}</tr></thead>
+              <tbody class="bg-white divide-y divide-gray-200">{tr}</tbody>
+            </table>
+          </div>
+          <div class="text-xs text-gray-400 mt-2">{len(rows)} rows — click headers to sort</div>
+        </div>'''
+    elif chart.get('raw'):
+        # Full Chart.js config from collected data
+        cid = f'chart{chart_idx}'
+        chart_html += f'<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">{chart["title"]}</h3><canvas id="{cid}" height="200"></canvas></div>'
+        chart_js += f'  new Chart(document.getElementById("{cid}"), {json.dumps(chart["raw"])});\n'
+        chart_idx += 1
+    else:
+        # Simple chart from labels/data
+        cid = f'chart{chart_idx}'
+        chart_html += f'<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">{chart["title"]}</h3><canvas id="{cid}" height="200"></canvas></div>'
+        cfg = {
+            'type': chart['type'],
+            'data': {'labels': chart.get('labels',[]), 'datasets': [{'label': chart['title'], 'data': chart.get('data',[]),
+              'backgroundColor': chart.get('colors',['#6366f1']), 'borderColor': chart.get('colors',['#6366f1'])[0] if chart['type']=='line' else chart.get('colors',['#6366f1']),
+              'borderWidth': 2, 'borderRadius': 6 if chart['type']=='bar' else 0, 'tension': 0.3, 'fill': chart['type']=='line'}]},
+            'options': {'responsive': True, 'plugins': {'legend': {'display': False}}, 'scales': {'y': {'beginAtZero': True, 'grid': {'color': '#f3f4f6'}}, 'x': {'grid': {'display': False}}}}
         }
-    }
-    chart_js += f'  new Chart(document.getElementById("chart{i}"), {json.dumps(cfg)});\n'
-chart_js += '});'
+        chart_js += f'  new Chart(document.getElementById("{cid}"), {json.dumps(cfg)});\n'
+        chart_idx += 1
+
+chart_js += '''
+  // Sortable table handler
+  window.sortTable = function(th) {
+    var table = th.closest("table");
+    var idx = Array.from(th.parentNode.children).indexOf(th);
+    var rows = Array.from(table.tBodies[0].rows);
+    var asc = th.dataset.asc !== "true";
+    th.dataset.asc = asc;
+    rows.sort(function(a, b) {
+      var av = a.cells[idx].textContent, bv = b.cells[idx].textContent;
+      var an = parseFloat(av.replace(/[^\\d.-]/g, "")), bn = parseFloat(bv.replace(/[^\\d.-]/g, ""));
+      if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    rows.forEach(function(r) { table.tBodies[0].appendChild(r); });
+  };
+});'''
 
 # Summary stats
 total_time = bench_data[0].get('totalTime', 0) if bench_data else 0
