@@ -21,6 +21,10 @@ const PAIRS_PATH = 'mercadopago-bridge/bridge-pairs';
 const MSGS_PATH = 'mercadopago-bridge/bridge-messages';
 const STATUS_PATH = 'mercadopago-bridge/bridge-status';
 const APPROVALS_PATH = 'mercadopago-bridge/bridge-approvals';
+const MINIAPP_BASE = 'https://palindrome-exercise.vercel.app/miniapp.html';
+
+// Rich content block patterns (timeline, options, cards, table, steps)
+var RICH_BLOCK_RE = /```(timeline|options|cards|table|steps|tree|chartjs)\b/;
 
 const ICONS = {
   notify: '🔔',
@@ -157,17 +161,35 @@ module.exports = async function handler(req, res) {
         formattedMsg = icon + ' ' + message;
     }
 
-    // Send to all session members (owner + guests)
-    for (var b = 0; b < allChatIds.length; b++) {
-      await sendTelegram(allChatIds[b], formattedMsg, 'Markdown');
+    // Detect rich content — send clean text to Telegram, full content to Firebase/Mini App
+    var hasRichContent = RICH_BLOCK_RE.test(message);
+    var telegramText = formattedMsg;
+    var telegramMarkup = null;
+
+    if (hasRichContent && sessionId) {
+      // Strip rich blocks for Telegram, show clean summary + Mini App button
+      var cleanMsg = message.replace(/```(?:timeline|options|cards|table|steps|tree|chartjs)[\s\S]*?```/g, '').trim();
+      telegramText = icon + ' ' + (cleanMsg || 'Tap below to view rich content');
+      telegramMarkup = {
+        inline_keyboard: [[
+          { text: '📱 View in Mini App', web_app: { url: MINIAPP_BASE + '?session=' + sessionId } },
+        ]],
+      };
     }
 
-    // Store in message history
+    // Send to all session members (owner + guests)
+    for (var b = 0; b < allChatIds.length; b++) {
+      await sendTelegram(allChatIds[b], telegramText, 'Markdown', telegramMarkup);
+    }
+
+    // Store in message history (full content with rich blocks for Mini App)
+    var model = metadata.model || metadata.modelID || null;
     if (sessionId) {
       await pushPath(MSGS_PATH + '/' + sessionId, {
         from: 'agent',
         action: action,
         content: message,
+        model: model,
         timestamp: new Date().toISOString(),
       });
     }

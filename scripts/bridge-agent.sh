@@ -105,21 +105,28 @@ echo "Session: ${SESSION:0:8}..."
 
 # ─── Send to Bridge (Telegram) ───
 
+LAST_MODEL=""  # filled by ask_opencode
+
 send_bridge() {
   local action="$1"
   local message="$2"
   python3 -c "
 import json, sys, urllib.request
-data = json.dumps({
+payload = {
     'sessionId': sys.argv[1],
     'action': sys.argv[2],
-    'message': sys.argv[3]
-}).encode()
+    'message': sys.argv[3],
+    'metadata': {}
+}
+model = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else None
+if model:
+    payload['metadata']['model'] = model
+data = json.dumps(payload).encode()
 req = urllib.request.Request(sys.argv[4] + '/api/bridge/agent', data=data,
     headers={'Content-Type': 'application/json'})
 try: urllib.request.urlopen(req)
 except: pass
-" "$SESSION" "$action" "$message" "$API_BASE" 2>/dev/null
+" "$SESSION" "$action" "$message" "$API_BASE" "$LAST_MODEL" 2>/dev/null
 }
 
 # ─── Send message to OpenCode and get response ───
@@ -144,7 +151,6 @@ import sys, json
 try:
     data = json.load(sys.stdin)
     msgs = data if isinstance(data, list) else data.get('messages', data.get('data', []))
-    # Find the last assistant message
     for m in reversed(msgs):
         info = m.get('info', {})
         role = info.get('role', m.get('role', ''))
@@ -153,17 +159,29 @@ try:
         parts = m.get('parts', [])
         texts = [p.get('text','') for p in parts if p.get('type')=='text']
         if texts:
-            msg_id = info.get('id', m.get('id', ''))
-            # Check if generation is complete (has step-finish)
             has_finish = any(p.get('type')=='step-finish' for p in parts)
             if has_finish:
+                # Print model info on first line, text on second
+                model = info.get('modelID', info.get('model', 'unknown'))
+                provider = info.get('providerID', '')
+                print(provider + '::' + model if provider else model)
                 print(''.join(texts))
             break
 except:
     pass
 " 2>/dev/null)
     if [ -n "$answer" ]; then
-      echo "$answer"
+      # First line is model, rest is the text
+      LAST_MODEL=$(echo "$answer" | head -1)
+      local text
+      text=$(echo "$answer" | tail -n +2)
+      if [ -n "$text" ]; then
+        echo "$text"
+      else
+        # Fallback: no model line, entire thing is text
+        LAST_MODEL=""
+        echo "$answer"
+      fi
       return
     fi
   done
