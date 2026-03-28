@@ -13,8 +13,7 @@
 #   - Reportable: generates HTML report after each iteration
 #
 # Usage:
-#   ./scripts/task-runner.sh <taskId>                # one iteration
-#   ./scripts/task-runner.sh <taskId> --loop          # keep going until stopped
+#   ./scripts/task-runner.sh <taskId>                # run the task
 #   ./scripts/task-runner.sh <taskId> --dry-run       # show steps without executing
 #   ./scripts/task-runner.sh <taskId> --report        # generate report from existing data
 
@@ -41,12 +40,10 @@ fi
 # Args
 TASK_ID="${1:-${TASK_ID:-}}"
 DRY_RUN=false
-LOOP_MODE=false
 REPORT_ONLY=false
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
-    --loop) LOOP_MODE=true ;;
     --report) REPORT_ONLY=true ;;
   esac
 done
@@ -431,28 +428,6 @@ if [ "$TASK_STATUS" = "stopped" ] || [ "$TASK_STATUS" = "cancelled" ]; then
   RUNNING=false
 fi
 
-if [ "$LOOP_MODE" = true ] && [ "$RUNNING" = true ]; then
-  ITERATION=$((ITERATION + 1))
-  echo ""
-  echo "⏳ Next iteration (#$ITERATION) in 30s... (Ctrl+C or /stop to end)"
-  for i in $(seq 1 30); do
-    [ "$RUNNING" = false ] && break
-    sleep 1
-  done
-
-  if [ "$RUNNING" = true ]; then
-    # Reset step counter for next iteration
-    fb_patch "$TASKS_PATH/$TASK_ID" "{\"currentStep\":0,\"status\":\"running\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
-    # Re-read task (steps might have been updated by user/admin)
-    TASK_JSON=$(fb_read "$TASKS_PATH/$TASK_ID")
-    CURRENT_STEP=0
-    STEP_INDEX=0
-    RESULTS_JSON="{}"
-    # Loop back
-    exec "$0" "$TASK_ID" --loop
-  fi
-else
-  fb_patch "$TASKS_PATH/$TASK_ID" "{\"status\":\"completed\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
-  notify "success" "Task completed: $GOAL ($CUMULATIVE)"
-  echo "Done."
-fi
+fb_patch "$TASKS_PATH/$TASK_ID" "{\"status\":\"completed\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
+notify "success" "Task completed: $GOAL ($CUMULATIVE)"
+echo "Done."

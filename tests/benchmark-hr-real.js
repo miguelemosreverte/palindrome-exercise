@@ -22,7 +22,6 @@ const TASKS_PATH = 'mercadopago-bridge/bridge-tasks';
 const TASK_ID = 'hr-scala-latam';
 
 const args = process.argv.slice(2);
-const loop = args.includes('--loop') || args.includes('--daemon');
 const report = args.includes('--report');
 
 // Task definition — the steps that the task-runner will execute
@@ -89,19 +88,12 @@ try {
 }
 
 // Run the task-runner (the core primitive)
-const flags = [];
-if (loop) flags.push('--loop');
-if (report) flags.push('--report');
-
-const cmd = `${REPO}/scripts/task-runner.sh ${TASK_ID} ${flags.join(' ')}`;
-console.log(`Running: task-runner.sh ${TASK_ID} ${flags.join(' ')}\n`);
+const flag = report ? '--report' : '';
+const cmd = `${REPO}/scripts/task-runner.sh ${TASK_ID} ${flag}`;
+console.log(`Running: task-runner.sh ${TASK_ID} ${flag}\n`);
 
 try {
-  execSync(cmd, { stdio: 'inherit', timeout: loop ? 0 : 600000 });
+  execSync(cmd, { stdio: 'inherit', timeout: 600000 });
 } catch (e) {
-  if (e.signal === 'SIGINT') {
-    console.log('\nStopped by user.');
-  } else {
-    console.error('Task runner error:', e.message);
-  }
+  console.error('Task runner error:', e.message);
 }
