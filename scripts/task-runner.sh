@@ -94,7 +94,38 @@ print(str(v).replace('\\\\', '\\\\\\\\').replace('\"', '\\\\\"').replace('\n', '
   echo "$output"
 }
 
-# --- Execute a single step via Claude CLI ---
+# --- LLM Engine Detection ---
+# Our system uses whatever engine is available, in priority order:
+# 1. OpenCode (if running locally with MCP support)
+# 2. ChutesAI (if API key available — MiniMax M2.5 with tool calling)
+# 3. Claude CLI (if installed — as fallback)
+
+detect_engine() {
+  # 1. Check OpenCode
+  if curl -sf "http://localhost:9001/global/health" --max-time 2 >/dev/null 2>&1; then
+    echo "opencode"
+    return
+  fi
+  # 2. Check ChutesAI
+  if [ -n "${CHUTESAI_API_KEY:-}" ] || [ -f "$REPO_DIR/.env" ]; then
+    [ -z "${CHUTESAI_API_KEY:-}" ] && source "$REPO_DIR/.env" 2>/dev/null
+    if [ -n "${CHUTESAI_API_KEY:-}" ]; then
+      echo "chutesai"
+      return
+    fi
+  fi
+  # 3. Check Claude CLI
+  if command -v claude >/dev/null 2>&1; then
+    echo "claude"
+    return
+  fi
+  echo "none"
+}
+
+ENGINE=$(detect_engine)
+echo "Engine: $ENGINE"
+
+# --- Execute a single step through our system ---
 
 execute_step() {
   local prompt="$1"
@@ -105,8 +136,76 @@ execute_step() {
     return 0
   fi
 
-  local result
-  result=$(echo "$prompt" | claude --mcp-config "$MCP_CONFIG" --model haiku --output-format text --dangerously-skip-permissions -p - 2>&1) || true
+  local result=""
+
+  case "$ENGINE" in
+    opencode)
+      # Create session, send message, poll for response
+      local oc_sid
+      oc_sid=$(python3 -c "
+import urllib.request, json
+req = urllib.request.Request('http://localhost:9001/session', data=b'{}', headers={'Content-Type':'application/json'}, method='POST')
+print(json.loads(urllib.request.urlopen(req).read()).get('id',''))
+" 2>/dev/null)
+      if [ -n "$oc_sid" ]; then
+        python3 -c "
+import urllib.request, json, sys
+msg = json.dumps({'parts':[{'type':'text','text':sys.argv[1]}]}).encode()
+req = urllib.request.Request('http://localhost:9001/session/'+sys.argv[2]+'/message', data=msg, headers={'Content-Type':'application/json'}, method='POST')
+urllib.request.urlopen(req)
+" "$prompt" "$oc_sid" 2>/dev/null
+        # Poll for response
+        for i in $(seq 1 60); do
+          sleep 3
+          result=$(python3 -c "
+import urllib.request, json
+msgs = json.loads(urllib.request.urlopen('http://localhost:9001/session/$oc_sid/message').read())
+for m in reversed(msgs if isinstance(msgs, list) else []):
+    info = m.get('info',{})
+    if info.get('role') != 'assistant': continue
+    parts = m.get('parts',[])
+    if any(p.get('type')=='step-finish' for p in parts):
+        texts = [p.get('text','') for p in parts if p.get('type')=='text']
+        print(''.join(texts))
+        break
+" 2>/dev/null)
+          [ -n "$result" ] && break
+        done
+      fi
+      ;;
+
+    chutesai)
+      # Call ChutesAI API with MiniMax (supports tool calling)
+      [ -z "${CHUTESAI_API_KEY:-}" ] && source "$REPO_DIR/.env" 2>/dev/null
+      result=$(python3 -c "
+import urllib.request, json, sys, os
+key = os.environ.get('CHUTESAI_API_KEY','')
+req = urllib.request.Request(
+    'https://llm.chutes.ai/v1/chat/completions',
+    data=json.dumps({
+        'model': 'MiniMaxAI/MiniMax-M2.5-TEE',
+        'messages': [{'role':'user','content':sys.argv[1]}],
+        'max_tokens': 4096,
+        'temperature': 0.3
+    }).encode(),
+    headers={'Content-Type':'application/json','Authorization':'Bearer '+key}
+)
+resp = json.loads(urllib.request.urlopen(req, timeout=$timeout_sec).read())
+print(resp.get('choices',[{}])[0].get('message',{}).get('content',''))
+" "$prompt" 2>/dev/null)
+      ;;
+
+    claude)
+      # Claude CLI with Playwright MCP
+      result=$(echo "$prompt" | claude --mcp-config "$MCP_CONFIG" --model haiku --output-format text --dangerously-skip-permissions -p - 2>&1) || true
+      ;;
+
+    *)
+      echo "ERROR: No LLM engine available (install opencode, set CHUTESAI_API_KEY, or install claude)"
+      return 1
+      ;;
+  esac
+
   echo "$result"
 }
 
@@ -197,9 +296,17 @@ result = sys.stdin.read()
 print(json.dumps(result))
 " <<< "$STEP_RESULT")
 
+  # Persist to Firebase (real-time sync with phone)
   fb_patch "$TASKS_PATH/$TASK_ID/steps/$STEP_INDEX" "{\"status\":\"$STEP_STATUS\",\"result\":$ESCAPED_RESULT}" > /dev/null
   fb_patch "$TASKS_PATH/$TASK_ID/results" "{\"$STEP_NAME\":$ESCAPED_RESULT}" > /dev/null
   fb_patch "$TASKS_PATH/$TASK_ID" "{\"currentStep\":$((STEP_INDEX + 1)),\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
+
+  # Persist to SQLite (durable local storage)
+  node -e "
+    const db = require('./lib/db');
+    db.completeStep('$TASK_ID', $STEP_INDEX, $ESCAPED_RESULT, 0, 0);
+    db.saveData('$TASK_ID', 'task-results/$STEP_NAME', $ESCAPED_RESULT, 'text');
+  " 2>/dev/null || true
 
   # Update local results for template expansion of subsequent steps
   RESULTS_JSON=$(echo "$RESULTS_JSON" | python3 -c "

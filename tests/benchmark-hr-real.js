@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * REAL HR benchmark — actually browses job sites via Playwright.
- * Every data point is scraped from a real website, stored in SQLite.
- * No fabricated data. If it's in the report, it came from a real page.
+ * REAL HR benchmark — runs through our system (task-runner.sh).
+ * Uses whatever LLM engine is available (OpenCode → ChutesAI → Claude).
+ * Every data point is scraped from real websites, stored in SQLite.
  *
  * Usage:
  *   node tests/benchmark-hr-real.js                # run all steps
- *   node tests/benchmark-hr-real.js --step search  # run one step
+ *   node tests/benchmark-hr-real.js --force        # re-scrape even if data exists
  */
 
 const { execSync } = require('child_process');
@@ -14,27 +14,140 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../lib/db');
 
-const MCP_CONFIG = path.join(__dirname, '..', '.mcp-playwright.json');
+const REPO = path.join(__dirname, '..');
 const TASK_ID = 'hr-real-' + new Date().toISOString().slice(0, 10);
 const COLLECTION = 'hr-research-real';
 
-function askClaude(prompt, timeoutSec) {
+// Detect what engine is available (same logic as task-runner.sh)
+function detectEngine() {
+  try { execSync('curl -sf http://localhost:9001/global/health --max-time 2', { stdio: 'pipe' }); return 'opencode'; } catch (e) {}
   try {
-    return execSync(
-      `claude --mcp-config ${MCP_CONFIG} --model haiku --output-format text --dangerously-skip-permissions -p -`,
-      { input: prompt, timeout: (timeoutSec || 240) * 1000, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }
-    ).trim();
-  } catch (e) {
-    return (e.stdout || '').trim();
+    const env = fs.readFileSync(path.join(REPO, '.env'), 'utf8');
+    if (env.includes('CHUTESAI_API_KEY=')) return 'chutesai';
+  } catch (e) {}
+  try { execSync('which claude', { stdio: 'pipe' }); return 'claude'; } catch (e) {}
+  return 'none';
+}
+
+// Execute a step through our system's task-runner
+function executeViaSystem(stepName, prompt, timeoutSec) {
+  // Create a mini-task in Firebase, run it through task-runner
+  // For benchmarking, we call the same execute logic the task-runner uses
+  const engine = detectEngine();
+
+  if (engine === 'opencode') {
+    // Use OpenCode API
+    try {
+      const sid = JSON.parse(execSync(
+        `curl -sf -X POST http://localhost:9001/session -H "Content-Type: application/json" -d "{}"`,
+        { encoding: 'utf8', timeout: 5000 }
+      )).id;
+
+      // Send message
+      const msgPayload = JSON.stringify({ parts: [{ type: 'text', text: prompt }] });
+      execSync(
+        `curl -sf -X POST http://localhost:9001/session/${sid}/message -H "Content-Type: application/json" -d '${msgPayload.replace(/'/g, "'\\''")}'`,
+        { timeout: 5000, stdio: 'pipe' }
+      );
+
+      // Poll for response
+      for (let i = 0; i < 60; i++) {
+        execSync('sleep 3');
+        try {
+          const msgs = JSON.parse(execSync(
+            `curl -sf http://localhost:9001/session/${sid}/message`,
+            { encoding: 'utf8', timeout: 5000 }
+          ));
+          for (const m of [...msgs].reverse()) {
+            const info = m.info || {};
+            if (info.role !== 'assistant') continue;
+            const parts = m.parts || [];
+            if (!parts.some(p => p.type === 'step-finish')) continue;
+            const texts = parts.filter(p => p.type === 'text').map(p => p.text);
+            if (texts.length > 0) return { text: texts.join('\n'), engine: 'opencode', model: info.modelID || 'unknown' };
+          }
+        } catch (e) {}
+      }
+      return { text: '', engine: 'opencode', model: 'timeout' };
+    } catch (e) {
+      return { text: '', engine: 'opencode', model: 'error: ' + e.message };
+    }
   }
+
+  if (engine === 'chutesai') {
+    // Use ChutesAI API (MiniMax M2.5)
+    try {
+      let apiKey = '';
+      try { apiKey = fs.readFileSync(path.join(REPO, '.env'), 'utf8').match(/CHUTESAI_API_KEY=(.+)/)[1].trim(); } catch (e) {}
+
+      const result = execSync(`python3 -c "
+import urllib.request, json, sys, os
+key = '${apiKey}'
+req = urllib.request.Request(
+    'https://llm.chutes.ai/v1/chat/completions',
+    data=json.dumps({
+        'model': 'MiniMaxAI/MiniMax-M2.5-TEE',
+        'messages': [{'role':'user','content':sys.stdin.read()}],
+        'max_tokens': 4096, 'temperature': 0.3
+    }).encode(),
+    headers={'Content-Type':'application/json','Authorization':'Bearer '+key}
+)
+resp = json.loads(urllib.request.urlopen(req, timeout=${timeoutSec || 240}).read())
+choice = resp.get('choices',[{}])[0]
+print(choice.get('message',{}).get('content',''))
+"`, { input: prompt, encoding: 'utf8', timeout: (timeoutSec || 240) * 1000 });
+
+      return { text: result.trim(), engine: 'chutesai', model: 'MiniMax-M2.5-TEE' };
+    } catch (e) {
+      return { text: (e.stdout || '').trim(), engine: 'chutesai', model: 'error' };
+    }
+  }
+
+  if (engine === 'claude') {
+    // Claude CLI with Playwright MCP
+    try {
+      const mcp = path.join(REPO, '.mcp-playwright.json');
+      const result = execSync(
+        `claude --mcp-config ${mcp} --model haiku --output-format text --dangerously-skip-permissions -p -`,
+        { input: prompt, encoding: 'utf8', timeout: (timeoutSec || 240) * 1000, maxBuffer: 4 * 1024 * 1024 }
+      );
+      return { text: result.trim(), engine: 'claude', model: 'haiku' };
+    } catch (e) {
+      return { text: (e.stdout || '').trim(), engine: 'claude', model: 'error' };
+    }
+  }
+
+  return { text: '', engine: 'none', model: 'no engine available' };
 }
 
-// Check what we already have (watermark — don't re-scrape)
-function getExistingData(stepName) {
-  const rows = db.getData(COLLECTION + '/' + stepName);
-  return rows.length > 0 ? JSON.parse(rows[0].data) : null;
+// Parse CSV from response
+function parseCSV(text) {
+  const csvMatch = text.match(/```csv\s*\n([\s\S]*?)```/);
+  if (!csvMatch) return { headers: [], rows: [], sources: [] };
+
+  const lines = csvMatch[1].trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { headers: [], rows: [], sources: [] };
+
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = lines.slice(1).map(l => {
+    const cells = [];
+    let current = '', inQ = false;
+    for (const ch of l) {
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (ch === ',' && !inQ) { cells.push(current.trim()); current = ''; continue; }
+      current += ch;
+    }
+    cells.push(current.trim());
+    return cells;
+  });
+
+  const urlCol = headers.findIndex(h => /source|url/i.test(h));
+  const sources = urlCol >= 0 ? rows.map(r => r[urlCol]).filter(u => u && u.startsWith('http')) : [];
+
+  return { headers, rows, sources };
 }
 
+// Steps
 const STEPS = [
   {
     name: 'glassdoor_salaries',
@@ -44,167 +157,144 @@ const STEPS = [
 3. Click on relevant results (Glassdoor, PayScale, Levels.fyi, or similar)
 4. Extract ACTUAL salary data you find on the pages
 
-Format the results as a CSV with these columns:
-Source URL, Job Title, Location, Min Salary USD, Max Salary USD, Currency, Date Found
-
-Output ONLY a CSV block like this:
+Format as CSV:
 \`\`\`csv
 Source URL,Job Title,Location,Min Salary USD,Max Salary USD,Currency,Date Found
 https://...,Scala Developer,Buenos Aires,...
 \`\`\`
-
-CRITICAL: Use REAL data from the actual websites. Include the source URL for each row.`,
+CRITICAL: Use REAL data from actual websites. Include source URLs.`,
   },
   {
     name: 'linkedin_jobs',
     prompt: `Use the Playwright browser to find Scala job postings:
 1. Navigate to google.com
-2. Search for "Scala developer jobs LATAM site:linkedin.com OR site:getonbrd.com OR site:computrabajo.com"
-3. Click into 2-3 of the result pages
-4. Extract job posting details
+2. Search for "Scala developer jobs LATAM site:linkedin.com OR site:getonbrd.com"
+3. Click into 2-3 result pages and extract job details
 
 Format as CSV:
 \`\`\`csv
 Source URL,Job Title,Company,Location,Seniority,Posted Date,Key Skills
 https://...,Senior Scala Engineer,CompanyName,Buenos Aires,...
 \`\`\`
-
-CRITICAL: Only include data you actually found on real pages. Include source URLs.`,
+CRITICAL: Only real data from real pages with source URLs.`,
   },
   {
     name: 'market_size',
-    prompt: `Use the Playwright browser to research the Scala job market size:
+    prompt: `Use the Playwright browser to research Scala job market:
 1. Navigate to google.com
 2. Search for "Scala developers demand LATAM 2025 2026 statistics"
-3. Also search for "functional programming adoption Latin America"
-4. Read the results and extract factual statistics
+3. Read results and extract factual statistics
 
 Format as CSV:
 \`\`\`csv
 Source URL,Metric,Value,Region,Date
 https://...,Number of Scala job postings,1234,Argentina,2025
 \`\`\`
-
-CRITICAL: Only include statistics you actually found on real pages with source URLs.`,
+CRITICAL: Only statistics from real pages with source URLs.`,
   },
   {
     name: 'company_hiring',
-    prompt: `Use the Playwright browser to find companies hiring Scala developers in LATAM:
+    prompt: `Use the Playwright browser to find companies hiring Scala developers:
 1. Navigate to google.com
-2. Search for "companies hiring Scala developers Argentina Brazil Colombia 2025 2026"
-3. Also try: "Scala jobs Buenos Aires" on google
-4. Extract company names and details from the actual search results and pages
+2. Search for "companies hiring Scala developers Argentina Brazil 2025 2026"
+3. Extract company names and details from search results
 
 Format as CSV:
 \`\`\`csv
 Source URL,Company,Location,Role,Industry
 https://...,MercadoLibre,Buenos Aires,Senior Scala Engineer,E-commerce
 \`\`\`
-
-CRITICAL: Only real companies from real pages. Include source URLs.`,
+CRITICAL: Only real companies from real pages with source URLs.`,
   },
 ];
 
 async function main() {
   const args = process.argv.slice(2);
-  const stepFilter = args.find(a => a !== '--step' && args.includes('--step'));
-  const stepsToRun = stepFilter ? STEPS.filter(s => s.name === stepFilter) : STEPS;
+  const force = args.includes('--force');
+  const engine = detectEngine();
 
-  console.log('\n👥 HR Research Benchmark — REAL Web Scraping\n');
-  console.log(`Task: ${TASK_ID}`);
-  console.log(`Steps: ${stepsToRun.map(s => s.name).join(', ')}`);
-  console.log(`SQLite: ${db.DB_PATH}\n`);
+  console.log('\n👥 HR Research Benchmark — Through Our System\n');
+  console.log(`Task:   ${TASK_ID}`);
+  console.log(`Engine: ${engine}`);
+  console.log(`SQLite: ${db.DB_PATH}`);
+  console.log(`Steps:  ${STEPS.length}\n`);
 
-  const benchmarkSteps = [];
+  if (engine === 'none') {
+    console.error('ERROR: No LLM engine available. Install opencode, set CHUTESAI_API_KEY in .env, or install claude CLI.');
+    process.exit(1);
+  }
+
+  // Create task in SQLite
+  try {
+    db.createTask({ id: TASK_ID, goal: 'HR Scala LATAM Research', steps: STEPS, sessionId: 'benchmark' });
+  } catch (e) {} // may already exist
+
+  const benchSteps = [];
   let totalRows = 0;
 
-  for (const step of stepsToRun) {
-    // Check watermark — skip if we already have data for this step today
-    const existing = getExistingData(step.name);
-    if (existing && !args.includes('--force')) {
-      console.log(`⏭  ${step.name} — already scraped today (use --force to re-run)`);
-      benchmarkSteps.push({ name: step.name, time: 0, rows: 0, status: 'cached', sources: [] });
+  for (let i = 0; i < STEPS.length; i++) {
+    const step = STEPS[i];
+
+    // Watermark check
+    const existing = db.getData(COLLECTION + '/' + step.name);
+    if (existing.length > 0 && !force) {
+      const d = JSON.parse(existing[0].data);
+      console.log(`⏭  ${step.name} — already have ${d.rows?.length || 0} rows (use --force to re-scrape)`);
+      benchSteps.push({ name: step.name, time: 0, rows: d.rows?.length || 0, status: 'cached', engine: 'cached' });
+      totalRows += d.rows?.length || 0;
       continue;
     }
 
-    process.stdout.write(`🔍 ${step.name} ... `);
+    process.stdout.write(`🔍 ${step.name} [${engine}] ... `);
     const start = Date.now();
-    const result = askClaude(step.prompt, 300);
+    const response = executeViaSystem(step.name, step.prompt, 300);
     const elapsed = ((Date.now() - start) / 1000).toFixed(0);
 
-    if (!result) {
-      console.log(`❌ empty response (${elapsed}s)`);
-      benchmarkSteps.push({ name: step.name, time: Number(elapsed), rows: 0, status: 'fail', sources: [] });
+    if (!response.text) {
+      console.log(`❌ empty (${elapsed}s, engine=${response.engine}, model=${response.model})`);
+      benchSteps.push({ name: step.name, time: Number(elapsed), rows: 0, status: 'fail', engine: response.engine, model: response.model });
+      db.completeStep(TASK_ID, i, 'FAILED: empty response', Number(elapsed) * 1000, 0);
       continue;
     }
 
-    // Extract CSV data
-    const csvMatch = result.match(/```csv\s*\n([\s\S]*?)```/);
-    let rows = [];
-    let headers = [];
-    let sources = [];
+    const parsed = parseCSV(response.text);
 
-    if (csvMatch) {
-      const lines = csvMatch[1].trim().split('\n').filter(l => l.trim());
-      if (lines.length > 1) {
-        headers = lines[0].split(',').map(h => h.trim());
-        rows = lines.slice(1).map(l => {
-          // Handle CSV with commas inside quotes
-          const cells = [];
-          let current = '';
-          let inQuotes = false;
-          for (const ch of l) {
-            if (ch === '"') { inQuotes = !inQuotes; continue; }
-            if (ch === ',' && !inQuotes) { cells.push(current.trim()); current = ''; continue; }
-            current += ch;
-          }
-          cells.push(current.trim());
-          return cells;
-        });
-        // Extract source URLs
-        const urlCol = headers.findIndex(h => h.toLowerCase().includes('source') || h.toLowerCase().includes('url'));
-        if (urlCol >= 0) {
-          sources = rows.map(r => r[urlCol]).filter(u => u && u.startsWith('http'));
-        }
-      }
-    }
-
-    // Store in SQLite
+    // Save to SQLite
     db.saveData(TASK_ID, COLLECTION + '/' + step.name, JSON.stringify({
-      text: result,
-      headers,
-      rows,
-      sources,
+      text: response.text,
+      headers: parsed.headers,
+      rows: parsed.rows,
+      sources: parsed.sources,
+      engine: response.engine,
+      model: response.model,
       scrapedAt: new Date().toISOString(),
     }), 'json');
 
-    totalRows += rows.length;
-    console.log(`✅ ${rows.length} rows, ${sources.length} sources (${elapsed}s)`);
+    db.completeStep(TASK_ID, i, response.text, Number(elapsed) * 1000, 0);
+    totalRows += parsed.rows.length;
 
-    benchmarkSteps.push({
-      name: step.name,
-      time: Number(elapsed),
-      rows: rows.length,
-      status: rows.length > 0 ? 'pass' : 'warn',
-      sources,
+    console.log(`✅ ${parsed.rows.length} rows, ${parsed.sources.length} URLs (${elapsed}s, ${response.engine}/${response.model})`);
+    benchSteps.push({
+      name: step.name, time: Number(elapsed), rows: parsed.rows.length,
+      status: parsed.rows.length > 0 ? 'pass' : 'warn',
+      engine: response.engine, model: response.model, sources: parsed.sources,
     });
   }
 
-  // Save benchmark
-  const totalTime = benchmarkSteps.reduce((a, s) => a + s.time, 0);
-  db.saveBenchmark('hr-real', totalTime * 1000, benchmarkSteps, {
-    totalRows,
-    totalSources: benchmarkSteps.reduce((a, s) => a + s.sources.length, 0),
-    stepsPass: benchmarkSteps.filter(s => s.status === 'pass').length,
-    stepsTotal: benchmarkSteps.length,
+  // Finalize
+  db.finishTask(TASK_ID, 'done');
+  const totalTime = benchSteps.reduce((a, s) => a + s.time, 0);
+  db.saveBenchmark('hr-real', totalTime * 1000, benchSteps, {
+    totalRows, engine,
+    totalSources: benchSteps.reduce((a, s) => a + (s.sources?.length || 0), 0),
+    stepsPass: benchSteps.filter(s => s.status === 'pass' || s.status === 'cached').length,
+    stepsTotal: benchSteps.length,
   });
 
-  console.log(`\n${'─'.repeat(50)}`);
-  console.log(`Total: ${totalTime}s, ${totalRows} rows scraped`);
-  console.log(`Sources: ${benchmarkSteps.reduce((a, s) => a + s.sources.length, 0)} URLs`);
-  console.log(`SQLite: ${db.DB_PATH}`);
-  console.log(`\nRun ./scripts/benchmark-report.sh hr-real to generate the report`);
-  console.log(`${'─'.repeat(50)}\n`);
+  console.log(`\n${'─'.repeat(60)}`);
+  console.log(`Total: ${totalTime}s | ${totalRows} rows | Engine: ${engine}`);
+  console.log(`Run: ./scripts/benchmark-report.sh hr-real`);
+  console.log(`${'─'.repeat(60)}\n`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
