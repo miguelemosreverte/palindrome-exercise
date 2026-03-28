@@ -287,7 +287,7 @@ while [ "$STEP_INDEX" -lt "$TOTAL_STEPS" ]; do
   # Watermark: inject existing data so the LLM finds NEW sources
   EXISTING_URLS=$(node -e "
     const db = require('./lib/db');
-    const data = db.getData('task-results/$STEP_NAME');
+    const data = db.getData('$TASK_ID/$STEP_NAME');
     const urls = [];
     for (const r of data) {
       try { const d = JSON.parse(r.data); (d.sources||[]).forEach(u => urls.push(u)); } catch(e) {
@@ -358,7 +358,7 @@ print(json.dumps(result))
   node -e "
     const db = require('./lib/db');
     db.completeStep('$TASK_ID', $STEP_INDEX, $ESCAPED_RESULT, 0, 0);
-    db.saveData('$TASK_ID', 'task-results/$STEP_NAME', $ESCAPED_RESULT, 'text');
+    db.saveData('$TASK_ID', '$TASK_ID/$STEP_NAME', $ESCAPED_RESULT, 'text');
   " 2>/dev/null || true
 
   # Update local results for template expansion of subsequent steps
@@ -382,7 +382,7 @@ ITERATION_TIME=$((ITERATION_END - $(date -d "${TASK_JSON_DATE:-now}" +%s 2>/dev/
 # Save benchmark to SQLite
 node -e "
   const db = require('./lib/db');
-  const data = db.getData('task-results');
+  const data = db.getData('$TASK_ID');
   let totalRows = 0;
   for (const r of data) { try { totalRows += (JSON.parse(r.data).rows||[]).length; } catch(e) {} }
   db.saveBenchmark('$TASK_ID', ${ITERATION_TIME:-0} * 1000, [], { totalRows, iteration: $((ITERATION + 1)) });
@@ -391,7 +391,7 @@ node -e "
 # Cumulative stats
 CUMULATIVE=$(node -e "
   const db = require('./lib/db');
-  const data = db.getData('task-results');
+  const data = db.getData('$TASK_ID');
   let rows = 0, urls = new Set();
   for (const r of data) {
     try {
@@ -410,7 +410,7 @@ echo "Cumulative: $CUMULATIVE"
 
 # Generate report
 if [ -f "$REPO_DIR/scripts/benchmark-report.sh" ]; then
-  "$REPO_DIR/scripts/benchmark-report.sh" "$TASK_ID" > /dev/null 2>&1 && echo "Report updated." || true
+  node "$REPO_DIR/scripts/generate-report.js" "$TASK_ID" > /dev/null 2>&1 && echo "Report updated." || true
 fi
 
 notify "status" "Iteration done. $CUMULATIVE"
