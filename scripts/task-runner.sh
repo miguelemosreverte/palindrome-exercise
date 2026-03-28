@@ -1,13 +1,22 @@
 #!/bin/bash
-# Task Runner — durable autonomous agent runtime
+# Task Runner — the core primitive of the Bridge system.
 #
-# Reads a task from Firebase, executes each step via Claude CLI + Playwright MCP,
-# persists progress after each step, and resumes from where it left off on restart.
+# A task is: retrieve data → ingest into SQLite → process → report.
+# Each run is an "iteration" that adds to the accumulated dataset.
+# The runner keeps going until the user stops it.
+#
+# Features:
+#   - Durable: persists after every step (Firebase + SQLite), resumes on crash
+#   - Incremental: watermarks prevent re-scraping, each iteration adds NEW data
+#   - Measurable: benchmarks every iteration (time, rows, quality)
+#   - Interruptible: user can stop via Telegram /stop or Ctrl+C
+#   - Reportable: generates HTML report after each iteration
 #
 # Usage:
-#   ./scripts/task-runner.sh <taskId>
-#   ./scripts/task-runner.sh <taskId> --dry-run    # show steps without executing
-#   TASK_ID=abc123 ./scripts/task-runner.sh
+#   ./scripts/task-runner.sh <taskId>                # one iteration
+#   ./scripts/task-runner.sh <taskId> --loop          # keep going until stopped
+#   ./scripts/task-runner.sh <taskId> --dry-run       # show steps without executing
+#   ./scripts/task-runner.sh <taskId> --report        # generate report from existing data
 
 set -euo pipefail
 
@@ -32,12 +41,31 @@ fi
 # Args
 TASK_ID="${1:-${TASK_ID:-}}"
 DRY_RUN=false
-[ "${2:-}" = "--dry-run" ] && DRY_RUN=true
+LOOP_MODE=false
+REPORT_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --loop) LOOP_MODE=true ;;
+    --report) REPORT_ONLY=true ;;
+  esac
+done
 
 if [ -z "$TASK_ID" ]; then
-  echo "Usage: task-runner.sh <taskId> [--dry-run]"
+  echo "Usage: task-runner.sh <taskId> [--loop] [--dry-run] [--report]"
   exit 1
 fi
+
+# Report-only mode
+if [ "$REPORT_ONLY" = true ]; then
+  echo "Generating report for $TASK_ID..."
+  "$SCRIPT_DIR/benchmark-report.sh" "$TASK_ID" 2>/dev/null || echo "Report generation failed"
+  exit 0
+fi
+
+# Graceful shutdown
+RUNNING=true
+trap 'echo ""; echo "Stopping..."; RUNNING=false' INT TERM
 
 # --- Firebase helpers ---
 
@@ -211,7 +239,8 @@ print(resp.get('choices',[{}])[0].get('message',{}).get('content',''))
 
 # --- Main loop ---
 
-echo "Task Runner starting: $TASK_ID"
+ITERATION="${ITERATION:-0}"
+echo "Task Runner starting: $TASK_ID (iteration $ITERATION)"
 
 # Read task from Firebase
 TASK_JSON=$(fb_read "$TASKS_PATH/$TASK_ID")
@@ -257,6 +286,33 @@ while [ "$STEP_INDEX" -lt "$TOTAL_STEPS" ]; do
 
   # Expand template variables with previous results
   EXPANDED_PROMPT=$(expand_template "$STEP_PROMPT" "$RESULTS_JSON")
+
+  # Watermark: inject existing data so the LLM finds NEW sources
+  EXISTING_URLS=$(node -e "
+    const db = require('./lib/db');
+    const data = db.getData('task-results/$STEP_NAME');
+    const urls = [];
+    for (const r of data) {
+      try { const d = JSON.parse(r.data); (d.sources||[]).forEach(u => urls.push(u)); } catch(e) {
+        // try extracting URLs from raw text
+        const m = (typeof r.data === 'string' ? r.data : '').match(/https?:\/\/[^\s\"']+/g);
+        if (m) m.forEach(u => urls.push(u));
+      }
+    }
+    const unique = [...new Set(urls)];
+    if (unique.length > 0) console.log(unique.slice(0,20).join('\n'));
+  " 2>/dev/null)
+
+  if [ -n "$EXISTING_URLS" ]; then
+    URL_COUNT=$(echo "$EXISTING_URLS" | wc -l | tr -d ' ')
+    echo "  (watermark: $URL_COUNT existing URLs — searching for NEW data)"
+    EXPANDED_PROMPT="$EXPANDED_PROMPT
+
+IMPORTANT: I already have data from these URLs. Do NOT visit these again. Find DIFFERENT sources:
+$EXISTING_URLS
+
+Search deeper — page 2+, different queries, related sites."
+  fi
 
   # Mark step as running
   fb_patch "$TASKS_PATH/$TASK_ID/steps/$STEP_INDEX" "{\"status\":\"running\"}" > /dev/null
@@ -322,22 +378,81 @@ print(json.dumps(data))
   STEP_INDEX=$((STEP_INDEX + 1))
 done
 
-# All steps done — compile summary
+# Iteration complete — benchmark and report
+ITERATION_END=$(date +%s)
+ITERATION_TIME=$((ITERATION_END - $(date -d "${TASK_JSON_DATE:-now}" +%s 2>/dev/null || echo $ITERATION_END)))
+
+# Save benchmark to SQLite
+node -e "
+  const db = require('./lib/db');
+  const data = db.getData('task-results');
+  let totalRows = 0;
+  for (const r of data) { try { totalRows += (JSON.parse(r.data).rows||[]).length; } catch(e) {} }
+  db.saveBenchmark('$TASK_ID', ${ITERATION_TIME:-0} * 1000, [], { totalRows, iteration: $((ITERATION + 1)) });
+" 2>/dev/null || true
+
+# Cumulative stats
+CUMULATIVE=$(node -e "
+  const db = require('./lib/db');
+  const data = db.getData('task-results');
+  let rows = 0, urls = new Set();
+  for (const r of data) {
+    try {
+      const d = JSON.parse(r.data);
+      rows += (d.rows||[]).length;
+      (d.sources||[]).forEach(u => urls.add(u));
+    } catch(e) {}
+  }
+  const bytes = JSON.stringify(data.map(r=>r.data)).length;
+  console.log(rows + ' rows | ' + urls.size + ' URLs | ' + Math.round(bytes/1024) + 'KB');
+" 2>/dev/null || echo "unknown")
+
 echo ""
-echo "=== Task Complete ==="
+echo "=== Iteration Complete ==="
+echo "Cumulative: $CUMULATIVE"
 
-SUMMARY=$(python3 -c "
-import json, sys
-results = json.loads('''$RESULTS_JSON''')
-parts = []
-for k, v in results.items():
-    snippet = str(v)[:200]
-    parts.append(f'- {k}: {snippet}')
-print('\n'.join(parts))
-" 2>/dev/null || echo "Task completed with $TOTAL_STEPS steps")
+# Generate report
+if [ -f "$REPO_DIR/scripts/benchmark-report.sh" ]; then
+  "$REPO_DIR/scripts/benchmark-report.sh" "$TASK_ID" > /dev/null 2>&1 && echo "Report updated." || true
+fi
 
-fb_patch "$TASKS_PATH/$TASK_ID" "{\"status\":\"completed\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
-notify "success" "Task completed: $GOAL"
-notify "summary" "Results for: $GOAL\n\n$SUMMARY"
+notify "status" "Iteration done. $CUMULATIVE"
 
-echo "Done."
+# Check if user wants to stop (read task status from Firebase)
+TASK_STATUS=$(python3 -c "
+import urllib.request, json
+url = '$FIREBASE_URL/$TASKS_PATH/$TASK_ID/status.json'
+print(json.loads(urllib.request.urlopen(url).read()))
+" 2>/dev/null || echo "running")
+
+if [ "$TASK_STATUS" = "stopped" ] || [ "$TASK_STATUS" = "cancelled" ]; then
+  echo "Task stopped by user."
+  notify "status" "Task stopped. Final: $CUMULATIVE"
+  RUNNING=false
+fi
+
+if [ "$LOOP_MODE" = true ] && [ "$RUNNING" = true ]; then
+  ITERATION=$((ITERATION + 1))
+  echo ""
+  echo "⏳ Next iteration (#$ITERATION) in 30s... (Ctrl+C or /stop to end)"
+  for i in $(seq 1 30); do
+    [ "$RUNNING" = false ] && break
+    sleep 1
+  done
+
+  if [ "$RUNNING" = true ]; then
+    # Reset step counter for next iteration
+    fb_patch "$TASKS_PATH/$TASK_ID" "{\"currentStep\":0,\"status\":\"running\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
+    # Re-read task (steps might have been updated by user/admin)
+    TASK_JSON=$(fb_read "$TASKS_PATH/$TASK_ID")
+    CURRENT_STEP=0
+    STEP_INDEX=0
+    RESULTS_JSON="{}"
+    # Loop back
+    exec "$0" "$TASK_ID" --loop
+  fi
+else
+  fb_patch "$TASKS_PATH/$TASK_ID" "{\"status\":\"completed\",\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
+  notify "success" "Task completed: $GOAL ($CUMULATIVE)"
+  echo "Done."
+fi
