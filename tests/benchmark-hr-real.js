@@ -246,14 +246,24 @@ async function main() {
   for (let i = 0; i < STEPS.length; i++) {
     const step = STEPS[i];
 
-    // Watermark check
+    // Watermark: gather what we already have so we can ask for MORE, not the same
     const existing = db.getData(COLLECTION + '/' + step.name);
-    if (existing.length > 0 && !force) {
-      const d = JSON.parse(existing[0].data);
-      console.log(`⏭  ${step.name} — already have ${d.rows?.length || 0} rows (use --force to re-scrape)`);
-      benchSteps.push({ name: step.name, time: 0, rows: d.rows?.length || 0, status: 'cached', engine: 'cached' });
-      totalRows += d.rows?.length || 0;
-      continue;
+    let existingUrls = [];
+    let existingRows = 0;
+    for (const ex of existing) {
+      try {
+        const d = JSON.parse(ex.data);
+        existingRows += (d.rows || []).length;
+        existingUrls = existingUrls.concat(d.sources || []);
+      } catch (e) {}
+    }
+    // Augment the prompt with watermark — ask for NEW data
+    let augmentedPrompt = step.prompt;
+    if (existingUrls.length > 0) {
+      augmentedPrompt += `\n\nIMPORTANT: I already have data from these ${existingUrls.length} URLs. Do NOT visit these again. Find DIFFERENT sources, pages, or results:\n${existingUrls.slice(0, 20).join('\n')}\n\nSearch for page 2 of results, or use different search queries to find NEW data I don't have yet.`;
+    }
+    if (existingRows > 0) {
+      console.log(`  (watermark: ${existingRows} existing rows from ${existingUrls.length} URLs — searching for NEW data)`);
     }
 
     // Try each engine in priority order until one works
@@ -269,13 +279,13 @@ async function main() {
         try {
           const mcp = path.join(REPO, '.mcp-playwright.json');
           const r = execSync(`claude --mcp-config ${mcp} --model haiku --output-format text --dangerously-skip-permissions -p -`,
-            { input: step.prompt, encoding: 'utf8', timeout: 300000, maxBuffer: 4*1024*1024 });
+            { input: augmentedPrompt, encoding: 'utf8', timeout: 300000, maxBuffer: 4*1024*1024 });
           response = { text: r.trim(), engine: 'claude', model: 'haiku' };
         } catch (e) { response = { text: (e.stdout||'').trim(), engine: 'claude', model: 'error' }; }
       } else if (eng === 'chutesai') {
-        response = executeViaSystem(step.name, step.prompt, 300);
+        response = executeViaSystem(step.name, augmentedPrompt, 300);
       } else {
-        response = executeViaSystem(step.name, step.prompt, 300);
+        response = executeViaSystem(step.name, augmentedPrompt, 300);
       }
       elapsed = ((Date.now() - start) / 1000).toFixed(0);
 
