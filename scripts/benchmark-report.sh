@@ -33,6 +33,34 @@ const benchName = benchMap['$BENCH_NAME'] || '$BENCH_NAME';
 const bench = db.getLatestBenchmark(benchName);
 
 // Extract every piece of structured data
+// Benchmark history — ALL runs for progress-over-time charts
+const allBenchmarks = db.getBenchmarks(benchName, 50);
+let cumulativeRows = 0;
+const history = allBenchmarks.reverse().map(b => {
+  const r = JSON.parse(b.results || '{}');
+  cumulativeRows += (r.totalRows || 0);
+  return {
+    date: b.created_at,
+    time: b.total_time_ms / 1000,
+    rows: r.totalRows || 0,
+    cumulative: cumulativeRows,
+    sources: r.totalSources || 0,
+    engine: r.engine || 'unknown',
+  };
+});
+
+// Total data in SQLite for this collection
+const allData = db.getData(collection);
+let totalStoredRows = 0;
+let uniqueUrls = new Set();
+for (const r of allData) {
+  try {
+    const d = JSON.parse(r.data);
+    totalStoredRows += (d.rows || []).length;
+    (d.sources || []).forEach(u => uniqueUrls.add(u));
+  } catch(e) {}
+}
+
 const output = {
   benchmark: bench ? {
     totalTime: bench.total_time_ms / 1000,
@@ -40,11 +68,13 @@ const output = {
     results: JSON.parse(bench.results || '{}'),
     date: bench.created_at
   } : null,
-  charts: [],    // chartjs configs found in data
-  tables: [],    // table data found
-  cards: [],     // card data found
-  csvData: [],   // CSV raw data
-  rawTexts: [],  // unstructured text
+  history: history,
+  totals: { rows: totalStoredRows, urls: uniqueUrls.size, runs: history.length, dataSize: JSON.stringify(allData.map(r=>JSON.parse(r.data))).length },
+  charts: [],
+  tables: [],
+  cards: [],
+  csvData: [],
+  rawTexts: [],
 };
 
 for (const r of records) {
@@ -264,11 +294,32 @@ const html = `<!DOCTYPE html>
     <p class="text-gray-500 text-sm">${bench.date || 'No benchmark data'} · ${bench.totalTime}s total · ${passCount}/${bench.steps.length} steps passed</p>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Total Time</div><div class="text-2xl font-extrabold mt-1">${bench.totalTime}s</div></div>
-    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Steps</div><div class="text-2xl font-extrabold mt-1">${passCount}/${bench.steps.length}</div></div>
-    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Data Records</div><div class="text-2xl font-extrabold mt-1">${data.tables.reduce((a,t)=>a+t.rows.length,0) + data.charts.reduce((a,c)=>a+c.dataTable.rows.length,0)}</div></div>
-    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Charts</div><div class="text-2xl font-extrabold mt-1">${data.charts.length}</div></div>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Runs</div><div class="text-2xl font-extrabold mt-1">${data.history.length}</div></div>
+    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Total Rows</div><div class="text-2xl font-extrabold mt-1">${data.totals.rows}</div></div>
+    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Unique URLs</div><div class="text-2xl font-extrabold mt-1">${data.totals.urls}</div></div>
+    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Data Size</div><div class="text-2xl font-extrabold mt-1">${Math.round(data.totals.dataSize/1024)}KB</div></div>
+    <div class="bg-white rounded-xl shadow-sm border p-4"><div class="text-xs font-semibold text-gray-500 uppercase">Last Run</div><div class="text-lg font-bold mt-1">${bench.totalTime}s</div><div class="text-xs text-gray-400">${passCount}/${bench.steps.length} steps</div></div>
+  </div>
+
+  <!-- Progress over time -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm border p-6">
+      <h3 class="text-base font-bold text-gray-800 mb-3">Cumulative Data Growth</h3>
+      <canvas id="progressChart" height="200"></canvas>
+      <div class="overflow-x-auto mt-3 border rounded-lg max-h-48 overflow-y-auto"><table class="min-w-full text-xs">
+        <thead class="bg-gray-50 sticky top-0"><tr><th class="px-3 py-2 text-left font-semibold text-gray-600">Run</th><th class="px-3 py-2 text-left font-semibold text-gray-600">Date</th><th class="px-3 py-2 text-left font-semibold text-gray-600">New Rows</th><th class="px-3 py-2 text-left font-semibold text-gray-600">Cumulative</th><th class="px-3 py-2 text-left font-semibold text-gray-600">Engine</th></tr></thead>
+        <tbody>${data.history.map((h,i) => '<tr class="border-t"><td class="px-3 py-2">#'+(i+1)+'</td><td class="px-3 py-2">'+h.date.slice(5,16)+'</td><td class="px-3 py-2 font-mono">+'+h.rows+'</td><td class="px-3 py-2 font-mono font-bold">'+h.cumulative+'</td><td class="px-3 py-2">'+h.engine+'</td></tr>').join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border p-6">
+      <h3 class="text-base font-bold text-gray-800 mb-3">Time per Run</h3>
+      <canvas id="timeChart" height="200"></canvas>
+      <div class="overflow-x-auto mt-3 border rounded-lg max-h-48 overflow-y-auto"><table class="min-w-full text-xs">
+        <thead class="bg-gray-50 sticky top-0"><tr><th class="px-3 py-2 text-left font-semibold text-gray-600">Run</th><th class="px-3 py-2 text-left font-semibold text-gray-600">Time (s)</th><th class="px-3 py-2 text-left font-semibold text-gray-600">Rows</th><th class="px-3 py-2 text-left font-semibold text-gray-600">URLs</th></tr></thead>
+        <tbody>${data.history.map((h,i) => '<tr class="border-t"><td class="px-3 py-2">#'+(i+1)+'</td><td class="px-3 py-2 font-mono">'+h.time+'</td><td class="px-3 py-2 font-mono">'+h.rows+'</td><td class="px-3 py-2 font-mono">'+h.sources+'</td></tr>').join('')}</tbody>
+      </table></div>
+    </div>
   </div>
 
   <div class="bg-white rounded-xl shadow-sm border p-8 mb-8">
@@ -288,6 +339,12 @@ const html = `<!DOCTYPE html>
 </div>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
+// Progress over time charts
+var hist = ${JSON.stringify(data.history)};
+if (hist.length > 0) {
+  new Chart(document.getElementById('progressChart'),{type:'line',data:{labels:hist.map(function(h,i){return '#'+(i+1)}),datasets:[{label:'Cumulative Rows',data:hist.map(function(h){return h.cumulative}),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,0.1)',fill:true,tension:0.3,pointRadius:6,pointBackgroundColor:'#6366f1'},{label:'New Rows per Run',data:hist.map(function(h){return h.rows}),borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,0.1)',fill:true,tension:0.3,pointRadius:4,borderDash:[5,5]}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#f3f4f6'}},x:{grid:{display:false}}}}});
+  new Chart(document.getElementById('timeChart'),{type:'bar',data:{labels:hist.map(function(h,i){return '#'+(i+1)}),datasets:[{label:'Time (s)',data:hist.map(function(h){return h.time}),backgroundColor:hist.map(function(h){return h.time>0?'#f59e0b':'#d1d5db'}),borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{grid:{display:false}}}}});
+}
 ${chartJs}
 });
 window.sortTbl=function(th){var t=th.closest('table'),i=Array.from(th.parentNode.children).indexOf(th),rows=Array.from(t.tBodies[0].rows),a=th.dataset.a!=='1';th.dataset.a=a?'1':'0';rows.sort(function(x,y){var av=x.cells[i].textContent,bv=y.cells[i].textContent,an=parseFloat(av.replace(/[^\\d.-]/g,'')),bn=parseFloat(bv.replace(/[^\\d.-]/g,''));if(!isNaN(an)&&!isNaN(bn))return a?an-bn:bn-an;return a?av.localeCompare(bv):bv.localeCompare(av)});rows.forEach(function(r){t.tBodies[0].appendChild(r)})};
