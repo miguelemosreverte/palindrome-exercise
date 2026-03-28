@@ -1,0 +1,20 @@
+{
+  "name": "opencode-ingest",
+  "version": "0.1.0",
+  "description": "Agent-driven incremental data ingestion framework with Puppeteer, SQLite, and live HTML reports",
+  "type": "module",
+  "scripts": {
+    "ingest": "node src/ingest.js",
+    "ingest-raw": "node src/ingest-raw.js",
+    "report": "node src/report.js",
+    "serve": "npx serve output -p 3333",
+    "md2html": "node src/md2html.js"
+  },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "neo4j-driver": "^6.0.1",
+    "playwright": "^1.58.2",
+    "puppeteer": "^23.0.0",
+    "sql.js": "^1.11.0"
+  }
+}
