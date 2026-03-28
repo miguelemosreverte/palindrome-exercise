@@ -224,6 +224,17 @@ async function main() {
     process.exit(1);
   }
 
+  // For browsing tasks, we need tool calling. OpenCode's free model doesn't support it.
+  // Cascade: try the engine, if it fails with 0 rows, try the next one.
+  const enginePriority = ['opencode', 'chutesai', 'claude'].filter(e => {
+    if (e === 'opencode') try { execSync('curl -sf http://localhost:9001/global/health --max-time 2', { stdio: 'pipe' }); return true; } catch(ex) { return false; }
+    if (e === 'chutesai') try { return fs.readFileSync(path.join(REPO, '.env'), 'utf8').includes('CHUTESAI_API_KEY='); } catch(ex) { return false; }
+    if (e === 'claude') try { execSync('which claude', { stdio: 'pipe' }); return true; } catch(ex) { return false; }
+    return false;
+  });
+  console.log(`Available engines: ${enginePriority.join(' → ')}`);
+  console.log(`Will cascade on failure\n`);
+
   // Create task in SQLite
   try {
     db.createTask({ id: TASK_ID, goal: 'HR Scala LATAM Research', steps: STEPS, sessionId: 'benchmark' });
@@ -245,10 +256,34 @@ async function main() {
       continue;
     }
 
-    process.stdout.write(`🔍 ${step.name} [${engine}] ... `);
-    const start = Date.now();
-    const response = executeViaSystem(step.name, step.prompt, 300);
-    const elapsed = ((Date.now() - start) / 1000).toFixed(0);
+    // Try each engine in priority order until one works
+    let response = { text: '', engine: 'none', model: 'none' };
+    let elapsed = 0;
+    for (const eng of enginePriority) {
+      process.stdout.write(`🔍 ${step.name} [${eng}] ... `);
+      const start = Date.now();
+      // Override engine detection for this call
+      const savedEngine = engine;
+      // Direct call based on engine
+      if (eng === 'claude') {
+        try {
+          const mcp = path.join(REPO, '.mcp-playwright.json');
+          const r = execSync(`claude --mcp-config ${mcp} --model haiku --output-format text --dangerously-skip-permissions -p -`,
+            { input: step.prompt, encoding: 'utf8', timeout: 300000, maxBuffer: 4*1024*1024 });
+          response = { text: r.trim(), engine: 'claude', model: 'haiku' };
+        } catch (e) { response = { text: (e.stdout||'').trim(), engine: 'claude', model: 'error' }; }
+      } else if (eng === 'chutesai') {
+        response = executeViaSystem(step.name, step.prompt, 300);
+      } else {
+        response = executeViaSystem(step.name, step.prompt, 300);
+      }
+      elapsed = ((Date.now() - start) / 1000).toFixed(0);
+
+      if (response.text && response.text.length > 20) {
+        break; // success — don't try next engine
+      }
+      console.log(`⚠️  empty, cascading...`);
+    }
 
     if (!response.text) {
       console.log(`❌ empty (${elapsed}s, engine=${response.engine}, model=${response.model})`);
