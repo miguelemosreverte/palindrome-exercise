@@ -336,10 +336,84 @@ async function main() {
     stepsTotal: benchSteps.length,
   });
 
+  // Check cumulative totals
+  const allData = db.getData(COLLECTION);
+  let cumRows = 0;
+  for (const r of allData) { try { cumRows += (JSON.parse(r.data).rows || []).length; } catch(e) {} }
+
   console.log(`\n${'─'.repeat(60)}`);
-  console.log(`Total: ${totalTime}s | ${totalRows} rows | Engine: ${engine}`);
-  console.log(`Run: ./scripts/benchmark-report.sh hr-real`);
-  console.log(`${'─'.repeat(60)}\n`);
+  console.log(`This run: ${totalTime}s | +${totalRows} new rows | Engine: ${engine}`);
+  console.log(`Cumulative: ${cumRows} total rows in SQLite`);
+  console.log(`${'─'.repeat(60)}`);
+
+  return { totalTime, totalRows, cumRows };
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+async function run() {
+  const args = process.argv.slice(2);
+  const daemon = args.includes('--daemon');
+
+  if (!daemon) {
+    await main();
+    console.log(`\nRun ./scripts/benchmark-report.sh hr-real to generate report`);
+    console.log(`Use --daemon to keep running continuously\n`);
+    return;
+  }
+
+  // Daemon mode: keep running until stopped
+  console.log('\n🔄 DAEMON MODE — will keep accumulating data until stopped (Ctrl+C)\n');
+  let iteration = 0;
+
+  // Handle graceful shutdown
+  let running = true;
+  process.on('SIGINT', () => {
+    console.log('\n\nStopping daemon...');
+    running = false;
+  });
+  process.on('SIGTERM', () => { running = false; });
+
+  while (running) {
+    iteration++;
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`ITERATION ${iteration} — ${new Date().toISOString().slice(11, 19)}`);
+    console.log(`${'═'.repeat(60)}`);
+
+    try {
+      const result = await main();
+
+      // Generate report after each iteration
+      try {
+        execSync('./scripts/benchmark-report.sh hr-real', { stdio: 'pipe', timeout: 60000 });
+        console.log('📊 Report updated');
+      } catch (e) {}
+
+      // Notify via Telegram
+      try {
+        const session = fs.readFileSync(path.join(process.env.HOME, '.bridge/session'), 'utf8').trim();
+        if (session) {
+          const msg = `Iteration ${iteration}: +${result.totalRows} rows (${result.cumRows} total, ${result.totalTime}s)`;
+          execSync(`curl -sf -X POST https://palindrome-exercise.vercel.app/api/bridge/agent -H "Content-Type: application/json" -d '{"sessionId":"${session}","action":"status","message":"${msg}"}'`, { stdio: 'pipe', timeout: 5000 });
+        }
+      } catch (e) {}
+
+      if (!running) break;
+
+      // Wait between iterations (shorter if we got new data, longer if not)
+      const waitSec = result.totalRows > 0 ? 30 : 120;
+      console.log(`\n⏳ Next iteration in ${waitSec}s... (Ctrl+C to stop)`);
+      for (let w = 0; w < waitSec && running; w++) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } catch (e) {
+      console.error('Iteration error:', e.message);
+      if (!running) break;
+      console.log('Retrying in 60s...');
+      await new Promise(r => setTimeout(r, 60000));
+    }
+  }
+
+  console.log(`\nDaemon stopped after ${iteration} iterations.`);
+  console.log(`Run: ./scripts/benchmark-report.sh hr-real\n`);
+}
+
+run().catch(e => { console.error(e); process.exit(1); });
