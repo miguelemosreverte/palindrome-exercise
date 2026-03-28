@@ -355,10 +355,45 @@ print(json.dumps(result))
   fb_patch "$TASKS_PATH/$TASK_ID" "{\"currentStep\":$((STEP_INDEX + 1)),\"updatedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /dev/null
 
   # Persist to SQLite (durable local storage)
+  # Parse and ingest structured data into SQLite
   node -e "
     const db = require('./lib/db');
-    db.completeStep('$TASK_ID', $STEP_INDEX, $ESCAPED_RESULT, 0, 0);
-    db.saveData('$TASK_ID', '$TASK_ID/$STEP_NAME', $ESCAPED_RESULT, 'text');
+    const raw = $ESCAPED_RESULT;
+    db.completeStep('$TASK_ID', $STEP_INDEX, raw, 0, 0);
+
+    // Parse CSV from response
+    const csvMatch = raw.match(/\x60\x60\x60csv\s*\n([\s\S]*?)\x60\x60\x60/);
+    if (csvMatch) {
+      const lines = csvMatch[1].trim().split('\n').filter(l => l.trim());
+      if (lines.length > 1) {
+        const headers = lines[0].split(',').map(h => h.trim());
+        const rows = lines.slice(1).map(l => {
+          const cells = []; let cur = '', inQ = false;
+          for (const ch of l) { if(ch==='\"'){inQ=!inQ;continue;} if(ch===','&&!inQ){cells.push(cur.trim());cur='';continue;} cur+=ch; }
+          cells.push(cur.trim()); return cells;
+        });
+        const urlCol = headers.findIndex(h => /source|url/i.test(h));
+        const sources = urlCol >= 0 ? rows.map(r => r[urlCol]).filter(u => u && u.startsWith('http')) : [];
+
+        db.saveData('$TASK_ID', '$TASK_ID/$STEP_NAME', JSON.stringify({
+          text: raw,
+          headers: headers,
+          rows: rows,
+          sources: sources,
+          scrapedAt: new Date().toISOString(),
+          iteration: $ITERATION,
+        }), 'json');
+        console.log('Ingested: ' + rows.length + ' rows, ' + sources.length + ' URLs');
+      } else {
+        db.saveData('$TASK_ID', '$TASK_ID/$STEP_NAME', raw, 'text');
+      }
+    } else {
+      // Extract any URLs from raw text for watermarking
+      const urls = (raw.match(/https?:\/\/[^\s\"',\\\]]+/g) || []);
+      db.saveData('$TASK_ID', '$TASK_ID/$STEP_NAME', JSON.stringify({
+        text: raw, sources: urls, scrapedAt: new Date().toISOString(), iteration: $ITERATION,
+      }), 'json');
+    }
   " 2>/dev/null || true
 
   # Update local results for template expansion of subsequent steps
