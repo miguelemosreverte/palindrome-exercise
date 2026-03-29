@@ -202,13 +202,6 @@ function buildGraph(records, columns) {
   const skillsCol = columns.find(c => /skills|tech/i.test(c));
   const urlCol = columns.find(c => /url|profileUrl|link/i.test(c));
 
-  // Filter out junk records
-  const junkNames = new Set(['registrarse', 'regístrate', 'sign up', 'linkedin', 'conectar', '']);
-  records = records.filter(r => {
-    const name = (r[nameCol] || '').toLowerCase();
-    return name && !junkNames.has(name) && name.length > 2;
-  });
-
   // Build stats — only count real companies
   const companies = {};
   const seniorities = {};
@@ -303,12 +296,10 @@ function buildDataScript(layout, data) {
   const nodes = [];
   const links = [];
   const nodeSet = new Set();
-  const junkNames = new Set(['registrarse', 'regístrate', 'sign up', 'linkedin', 'conectar', '']);
-
   records.forEach(r => {
     const name = r[nameCol];
     const company = r[companyCol];
-    if (!name || junkNames.has(name.toLowerCase()) || name.length < 3) return;
+    if (!name || name.length < 3) return;
     if (!company || company.length < 2) return; // skip disconnected nodes
     if (!nodeSet.has(name)) { nodeSet.add(name); nodes.push({ id: name, type: 'person' }); }
     if (!nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company' }); }
