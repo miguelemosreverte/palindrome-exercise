@@ -9,8 +9,9 @@ export function parseProfile(html, filename) {
   const name = (titleMatch?.[1] || '').replace(/\s*\|?\s*LinkedIn\s*$/, '').trim();
   if (!name || name === 'LinkedIn') return null;
 
-  // Profile photo
-  const photoMatch = html.match(/(https:\/\/media\.licdn\.com\/dms\/image\/[^"]+?profile-displayphoto[^"]+)/);
+  // Profile photo — use 200x200+ (the profile owner's photo, not nav thumbnails which are 100x100)
+  const photoMatch = html.match(/(https:\/\/media\.licdn\.com\/dms\/image\/[^"]+?profile-displayphoto-shrink_(?:200_200|400_400|800_800)[^"]+)/)
+    || html.match(/(https:\/\/media\.licdn\.com\/dms\/image\/[^"]+?profile-displayphoto-shrink_(?!100_100)[^"]+)/);
   const photo = photoMatch?.[1]?.replace(/&amp;/g, '&') || '';
 
   // Company logo
