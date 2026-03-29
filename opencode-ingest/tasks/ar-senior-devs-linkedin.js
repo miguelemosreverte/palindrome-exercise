@@ -106,6 +106,14 @@ export default class LinkedInArDevsScraper extends Scraper {
 
       console.log(`[${this.taskName}] Found ${profileUrls.length} profile URLs on search page`);
 
+      // Save search page HTML
+      const { writeFileSync: wf, mkdirSync: md } = await import('fs');
+      const { join: pjoin } = await import('path');
+      const htmlDir = pjoin(this.dataDir, 'html');
+      md(htmlDir, { recursive: true });
+      const searchHtml = await page.content();
+      wf(pjoin(htmlDir, `${String(pageNum).padStart(3, '0')}-search.html`), searchHtml);
+
       // Visit each profile with human-like behavior and session limits
       const records = [];
       for (const profileUrl of profileUrls) {
@@ -120,6 +128,11 @@ export default class LinkedInArDevsScraper extends Scraper {
 
           // Read the profile page like a human (scroll, pause, read)
           await humanReadPage(page, { minTime: 2000, maxTime: 6000 });
+
+          // SAVE PROFILE HTML — the treasure
+          const profileHtml = await page.content();
+          const slug = profileUrl.split('/in/')[1]?.replace(/\//g, '') || 'unknown';
+          wf(pjoin(htmlDir, `${String(pageNum).padStart(3, '0')}-profile-${slug}.html`), profileHtml);
 
           // Extract name from page title
           const pageTitle = await page.title();
