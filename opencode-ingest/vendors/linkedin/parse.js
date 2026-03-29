@@ -1,14 +1,23 @@
 /**
  * LinkedIn — HTML parser
- * Extracts profile data from saved LinkedIn profile HTML pages.
- * LinkedIn uses SDUI (no stable DOM classes), so we parse from page text.
+ * Extracts profile data + photos + company logos from saved HTML pages.
+ * Runs OFFLINE on saved HTML — no network needed.
  */
 
-export function parseProfile(html, url) {
+export function parseProfile(html, filename) {
   const titleMatch = html.match(/<title>([^<]+)<\/title>/);
   const name = (titleMatch?.[1] || '').replace(/\s*\|?\s*LinkedIn\s*$/, '').trim();
   if (!name || name === 'LinkedIn') return null;
 
+  // Profile photo
+  const photoMatch = html.match(/(https:\/\/media\.licdn\.com\/dms\/image\/[^"]+?profile-displayphoto[^"]+)/);
+  const photo = photoMatch?.[1]?.replace(/&amp;/g, '&') || '';
+
+  // Company logo
+  const companyLogoMatch = html.match(/(https:\/\/media\.licdn\.com\/dms\/image\/[^"]+?(?:company-logo|C4[DE]0[A-Z]+)[^"]+)/);
+  const companyLogo = companyLogoMatch?.[1]?.replace(/&amp;/g, '&') || '';
+
+  // Strip to text
   const text = html.replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, '\n')
@@ -48,6 +57,9 @@ export function parseProfile(html, url) {
     }
   }
 
+  const connMatch = text.match(/(\d+)\+?\s*(?:contactos|connections)/i);
+  const connections = connMatch ? parseInt(connMatch[1]) : 0;
+
   let seniority = 'senior';
   const t = (title + ' ' + headline).toLowerCase();
   if (t.includes('staff')) seniority = 'staff';
@@ -57,32 +69,24 @@ export function parseProfile(html, url) {
   if (t.includes('director') || t.includes('vp') || t.includes('cto')) seniority = 'executive';
   if (t.includes('manager') || t.includes('head of')) seniority = 'manager';
 
-  const slug = url.match(/\/in\/([^/]+)/)?.[1] || url.match(/profile-([^.]+)/)?.[1] || '';
+  const slug = filename.match(/profile-([^.]+)/)?.[1] || '';
 
   return {
-    name,
-    title,
-    company,
-    location,
+    name, title, company, location,
     skills: skills.join(', '),
     profileUrl: slug ? `https://www.linkedin.com/in/${slug}` : '',
-    seniority,
-    headline,
+    photo, companyLogo, connections, seniority, headline,
     source: 'linkedin',
   };
 }
 
-/** Parse all HTML files for a LinkedIn task. Profile files contain "profile" in name. */
+/** Parse all HTML files for a LinkedIn task */
 export function parseAll(htmlFiles, readFile) {
   const records = [];
-  const profileFiles = htmlFiles.filter(f => f.includes('profile'));
-
-  for (const { name, content } of profileFiles.map(f => ({ name: f, content: readFile(f) }))) {
-    const record = parseProfile(content, name);
+  for (const f of htmlFiles.filter(f => f.includes('profile'))) {
+    const record = parseProfile(readFile(f), f);
     if (record && record.name) records.push(record);
   }
-
-  // Deduplicate by profileUrl
   const seen = new Set();
   return records.filter(r => {
     if (!r.profileUrl || seen.has(r.profileUrl)) return false;

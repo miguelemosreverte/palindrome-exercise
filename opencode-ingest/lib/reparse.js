@@ -9,7 +9,7 @@ async function loadParser(taskName) {
   const vendor = vendorForTask(taskName);
   if (!vendor) return null;
   try {
-    return await import(`../vendors/${vendor}/parser.js`);
+    return await import(`../vendors/${vendor}/parse.js`);
   } catch {
     return null;
   }
