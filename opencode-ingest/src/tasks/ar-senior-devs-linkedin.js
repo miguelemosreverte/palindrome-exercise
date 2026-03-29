@@ -2,12 +2,15 @@ import { Scraper } from '../scraper.js';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { getChromeCookes } from '../chrome-cookies.js';
+import { humanMove, humanClick, humanScroll, humanReadPage, humanNavigate, Session, sleep, betaRange, uniform } from '../human.js';
 
 /**
  * Argentine Senior Software Developers — LinkedIn
  *
  * Uses cookies from the user's real Chrome profile (no login needed, Chrome stays open).
- * Scrapes LinkedIn People search for senior/staff/lead engineers in Argentina.
+ * Employs full human behavior emulation: Bezier mouse paths, Fitts's Law,
+ * typing with typos, scroll momentum, session rhythm with breaks.
+ *
  * Max 100 pages (~10 results per page = ~1000 profiles).
  */
 export default class LinkedInArDevsScraper extends Scraper {
@@ -17,7 +20,6 @@ export default class LinkedInArDevsScraper extends Scraper {
   }
 
   sources() {
-    // Multiple search queries to get broader coverage — cycle through them
     const queries = [
       'senior%20software%20engineer',
       'staff%20engineer',
@@ -42,7 +44,6 @@ export default class LinkedInArDevsScraper extends Scraper {
   async next() {
     const { chromium } = await import('playwright');
 
-    // Extract LinkedIn cookies from Chrome (while Chrome stays open)
     const cookies = await getChromeCookes('.linkedin.com');
     if (cookies.length === 0) {
       throw new Error('No LinkedIn cookies found — are you logged in to LinkedIn in Chrome?');
@@ -55,7 +56,6 @@ export default class LinkedInArDevsScraper extends Scraper {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });
 
-    // Inject real Chrome cookies — clean up for Playwright compatibility
     const cleanCookies = cookies
       .filter(c => c.name && c.value && c.domain)
       .map(c => {
@@ -63,7 +63,6 @@ export default class LinkedInArDevsScraper extends Scraper {
         if (c.secure) clean.secure = true;
         if (c.httpOnly) clean.httpOnly = true;
         if (c.expires && c.expires > 0) clean.expires = c.expires;
-        // Playwright only accepts 'Strict', 'Lax', 'None'
         if (c.sameSite === 'None' && c.secure) clean.sameSite = 'None';
         else if (c.sameSite === 'Strict') clean.sameSite = 'Strict';
         else clean.sameSite = 'Lax';
@@ -72,15 +71,17 @@ export default class LinkedInArDevsScraper extends Scraper {
     await context.addCookies(cleanCookies);
     const page = await context.newPage();
 
+    // Session manager: daily limits, breaks, warm-up
+    const session = new Session({ maxProfiles: Math.floor(uniform(28, 36)) });
+
     try {
-      // Navigate to search results
+      // Navigate to search results — human-like
       const baseUrl = this.sources()[0].url;
       const pageNum = this.meta.iteration + 1;
       const url = this.meta.cursor || (pageNum > 1 ? `${baseUrl}&page=${pageNum}` : baseUrl);
 
       console.log(`[${this.taskName}] Iteration ${pageNum} → ${url}`);
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(3000);
+      await humanNavigate(page, url);
 
       // Check if we're actually logged in
       const isLoggedIn = await page.evaluate(() => {
@@ -90,17 +91,10 @@ export default class LinkedInArDevsScraper extends Scraper {
         throw new Error('Not logged in to LinkedIn — cookies may have expired');
       }
 
-      // Scroll to load all results
-      await page.evaluate(async () => {
-        for (let i = 0; i < 8; i++) {
-          window.scrollBy(0, 600);
-          await new Promise(r => setTimeout(r, 500));
-        }
-        window.scrollTo(0, 0);
-      });
-      await page.waitForTimeout(2000);
+      // Scroll through search results like a human reading them
+      await humanReadPage(page, { minTime: 3000, maxTime: 8000 });
 
-      // Step 1: Collect profile URLs from search results
+      // Collect profile URLs
       const profileUrls = await page.evaluate(() => {
         const urls = new Set();
         document.querySelectorAll('a[href*="/in/"]').forEach(a => {
@@ -112,32 +106,36 @@ export default class LinkedInArDevsScraper extends Scraper {
 
       console.log(`[${this.taskName}] Found ${profileUrls.length} profile URLs on search page`);
 
-      // Step 2: Visit each profile and extract structured data
+      // Visit each profile with human-like behavior and session limits
       const records = [];
       for (const profileUrl of profileUrls) {
-        try {
-          await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-          await page.waitForTimeout(1500 + Math.random() * 2000);
+        if (!session.canContinue) {
+          console.log(`[${this.taskName}] Session limit reached, stopping gracefully`);
+          break;
+        }
 
-          // Extract name from page title (reliable — LinkedIn SDUI doesn't use h1)
+        try {
+          // Human-like navigation to profile
+          await humanNavigate(page, profileUrl);
+
+          // Read the profile page like a human (scroll, pause, read)
+          await humanReadPage(page, { minTime: 2000, maxTime: 6000 });
+
+          // Extract name from page title
           const pageTitle = await page.title();
           const nameFromTitle = pageTitle.replace(/\s*\|?\s*LinkedIn\s*$/, '').trim();
 
           const record = await page.evaluate(({url, name}) => {
-            // Get the full visible text of the page
             const bodyText = document.body.innerText;
             const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-            // Find the line with the name, headline is usually right after
             const nameIdx = lines.findIndex(l => l === name);
             const headline = (nameIdx >= 0 && nameIdx < lines.length - 1) ? lines[nameIdx + 1] : '';
 
-            // Location — look for Argentina-related text
             const location = lines.find(l =>
               /argentina|buenos aires|córdoba|rosario|mendoza/i.test(l) && l.length < 80
             ) || 'Argentina';
 
-            // Parse headline for title + company
             let title = headline;
             let company = '';
             const patterns = [
@@ -149,16 +147,13 @@ export default class LinkedInArDevsScraper extends Scraper {
               if (m) { title = m[1].trim(); company = m[2].trim(); break; }
             }
 
-            // Experience: find "Experiencia" or "Experience" section in text
             const expIdx = lines.findIndex(l => /^experiencia$|^experience$/i.test(l));
             if (expIdx > 0) {
-              // Lines after "Experience" header are role entries
               const expLines = lines.slice(expIdx + 1, expIdx + 10).filter(l => l.length > 3 && l.length < 120);
               if (expLines[0] && !title) title = expLines[0];
               if (expLines[1] && !company) company = expLines[1];
             }
 
-            // Skills: find "Aptitudes" or "Skills" section
             const skillIdx = lines.findIndex(l => /^aptitudes$|^skills$|^competencias$/i.test(l));
             const skills = [];
             if (skillIdx > 0) {
@@ -169,7 +164,6 @@ export default class LinkedInArDevsScraper extends Scraper {
               }
             }
 
-            // Seniority
             let seniority = 'senior';
             const t = (title + ' ' + headline).toLowerCase();
             if (t.includes('staff')) seniority = 'staff';
@@ -197,14 +191,13 @@ export default class LinkedInArDevsScraper extends Scraper {
           if (record.name && record.name.length > 2) {
             records.push(record);
             console.log(`  ✓ ${record.name} — ${record.title} @ ${record.company}`);
-          } else {
-            const pageTitle = await page.title();
-            const h1s = await page.evaluate(() => [...document.querySelectorAll('h1')].map(h => h.textContent.trim()));
-            console.log(`  ? Empty name for ${profileUrl} — page title: "${pageTitle}", h1s: ${JSON.stringify(h1s)}`);
           }
         } catch (err) {
           console.log(`  ✗ ${profileUrl} — ${err.message.substring(0, 60)}`);
         }
+
+        // Wait between profiles — human rhythm with session management
+        await session.waitBetweenProfiles();
       }
 
       // Save screenshot
@@ -218,15 +211,14 @@ export default class LinkedInArDevsScraper extends Scraper {
       const rawFile = join(this.rawDir, `${String(this.meta.iteration).padStart(3, '0')}.jsonl`);
       writeFileSync(rawFile, records.map(r => JSON.stringify(r)).join('\n') + '\n');
 
-      // Next page — if 0 results, move to next query; otherwise next page of same query
+      // Next page
       const pageWithinQuery = (this.meta.iteration % 10) + 1;
       let hasNext = this.meta.iteration < this.maxPages;
       let nextUrl;
 
       if (records.length === 0 || pageWithinQuery >= 10) {
-        // Switch to next query, page 1
-        this.meta.iteration = Math.ceil(this.meta.iteration / 10) * 10; // snap to next query boundary
-        nextUrl = this.sources()[0].url; // sources() uses meta.iteration to pick query
+        this.meta.iteration = Math.ceil(this.meta.iteration / 10) * 10;
+        nextUrl = this.sources()[0].url;
       } else {
         nextUrl = `${this.sources()[0].url}&page=${pageWithinQuery + 1}`;
       }
@@ -247,7 +239,6 @@ export default class LinkedInArDevsScraper extends Scraper {
     }
   }
 
-  // Not used — next() handles everything
   async extract(page) { return []; }
   async nextPage(page) { return false; }
 }
