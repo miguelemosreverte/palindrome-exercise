@@ -291,119 +291,195 @@ function buildGraph(records, columns) {
 function buildDataScript(layout, data) {
   if (layout !== 'graph' || !data?.records?.length) return '';
 
-  // D3.js force graph: people → companies
   const records = data.records;
   const companyCol = data.columns?.find(c => /company|org/i.test(c));
   const nameCol = data.columns?.find(c => /^name$/i.test(c)) || data.columns?.[0];
+  const titleCol = data.columns?.find(c => /^title$/i.test(c));
+  const skillsCol = data.columns?.find(c => /skills/i.test(c));
+  const urlCol = data.columns?.find(c => /url|profileUrl/i.test(c));
+  const seniorityCol = data.columns?.find(c => /seniority/i.test(c));
   if (!companyCol) return '';
 
-  // Build nodes with sizing: companies sized by employee count
+  // Build graph data — include ALL people, even solo companies
   const nodes = [];
   const links = [];
-  const nodeSet = new Set();
+  const nodeMap = {};
   const companyCounts = {};
 
-  // First pass: count employees per company
   records.forEach(r => {
-    const company = r[companyCol];
-    if (company && company.length > 1) companyCounts[company] = (companyCounts[company] || 0) + 1;
+    const co = r[companyCol];
+    if (co && co.length > 1) companyCounts[co] = (companyCounts[co] || 0) + 1;
   });
-
-  // Only include companies with 2+ people (meaningful clusters)
-  const significantCompanies = new Set(Object.entries(companyCounts).filter(([, c]) => c >= 2).map(([k]) => k));
 
   records.forEach(r => {
     const name = r[nameCol];
     const company = r[companyCol];
+    const title = r[titleCol] || '';
+    const skills = r[skillsCol] || '';
+    const url = r[urlCol] || '';
+    const seniority = r[seniorityCol] || '';
     if (!name || name.length < 3) return;
-    if (!company || !significantCompanies.has(company)) return;
-    if (!nodeSet.has(name)) { nodeSet.add(name); nodes.push({ id: name, type: 'person', count: 1 }); }
-    if (!nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company', count: companyCounts[company] }); }
-    links.push({ source: name, target: company });
-  });
 
-  const maxCount = Math.max(...Object.values(companyCounts), 1);
+    if (!nodeMap[name]) {
+      const n = { id: name, type: 'person', title, skills, url, seniority, count: 1 };
+      nodeMap[name] = n;
+      nodes.push(n);
+    }
+    if (company && company.length > 1) {
+      if (!nodeMap[company]) {
+        const n = { id: company, type: 'company', count: companyCounts[company] };
+        nodeMap[company] = n;
+        nodes.push(n);
+      }
+      links.push({ source: name, target: company });
+    }
+  });
 
   return `
 (function() {
   const container = document.getElementById('network-graph');
   if (!container || typeof d3 === 'undefined') return;
   const width = container.offsetWidth || 900;
-  const height = 600;
+  const height = 650;
   const nodes = ${JSON.stringify(nodes)};
   const links = ${JSON.stringify(links)};
-  const maxCount = ${maxCount};
+
+  // Detail panel
+  const detail = document.createElement('div');
+  detail.className = 'graph-detail';
+  detail.innerHTML = '<p style="color:#999;font-style:italic">Click a node to see details</p>';
+  container.parentNode.insertBefore(detail, container.nextSibling);
 
   const svg = d3.select(container).append('svg')
     .attr('width', width).attr('height', height)
     .attr('class', 'graph-svg');
 
-  // Zoom + pan
   const g = svg.append('g');
-  svg.call(d3.zoom()
-    .scaleExtent([0.2, 5])
-    .on('zoom', (event) => g.attr('transform', event.transform))
-  );
 
-  // Tooltip
-  const tooltip = d3.select(container).append('div')
-    .style('position','absolute').style('background','#fff').style('border','1px solid #ccc')
-    .style('padding','6px 10px').style('border-radius','4px').style('font-size','0.8rem')
-    .style('pointer-events','none').style('opacity','0').style('box-shadow','0 2px 8px rgba(0,0,0,0.1)');
+  // Zoom + pan
+  const zoom = d3.zoom().scaleExtent([0.15, 6])
+    .on('zoom', (event) => g.attr('transform', event.transform));
+  svg.call(zoom);
 
   const simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 60 + (d.target?.count || 1) * 8))
-    .force('charge', d3.forceManyBody().strength(d => d.type === 'company' ? -300 - d.count * 30 : -50))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(50).strength(0.7))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'company' ? -200 - (d.count || 1) * 40 : -30))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(d => d.type === 'company' ? 8 + d.count * 4 : 6))
-    .force('x', d3.forceX(width / 2).strength(0.03))
-    .force('y', d3.forceY(height / 2).strength(0.03));
+    .force('collision', d3.forceCollide().radius(d => d.type === 'company' ? 10 + (d.count || 1) * 5 : 8))
+    .force('x', d3.forceX(width / 2).strength(0.05))
+    .force('y', d3.forceY(height / 2).strength(0.05));
 
   const link = g.append('g').selectAll('line').data(links).join('line')
-    .attr('stroke', '#d4cdc4').attr('stroke-width', 0.8);
+    .attr('stroke', '#d4cdc4').attr('stroke-width', 1).attr('class', 'graph-link');
 
-  const node = g.append('g').selectAll('circle').data(nodes).join('circle')
-    .attr('r', d => d.type === 'company' ? 6 + d.count * 3 : 4)
-    .attr('fill', d => d.type === 'company' ? '#c0392b' : '#5a7d9a')
-    .attr('stroke', d => d.type === 'company' ? '#8b2020' : 'none')
-    .attr('stroke-width', d => d.type === 'company' ? 1.5 : 0)
+  const nodeG = g.append('g').selectAll('g').data(nodes).join('g')
+    .attr('class', d => 'graph-node graph-node--' + d.type)
     .style('cursor', 'pointer')
-    .on('mouseover', (event, d) => {
-      tooltip.style('opacity', 1)
-        .html(d.type === 'company'
-          ? '<strong>' + d.id + '</strong><br>' + d.count + ' people'
-          : '<strong>' + d.id + '</strong>')
-        .style('left', (event.offsetX + 12) + 'px')
-        .style('top', (event.offsetY - 10) + 'px');
-      d3.select(event.target).attr('r', d.type === 'company' ? 8 + d.count * 3 : 6);
-    })
-    .on('mouseout', (event, d) => {
-      tooltip.style('opacity', 0);
-      d3.select(event.target).attr('r', d.type === 'company' ? 6 + d.count * 3 : 4);
-    })
-    .call(d3.drag().on('start', dragstart).on('drag', dragged).on('end', dragend));
+    .call(d3.drag().on('start', ds).on('drag', dd).on('end', de));
 
-  // Labels only on companies with 2+ people
-  const label = g.append('g').selectAll('text')
-    .data(nodes.filter(d => d.type === 'company'))
-    .join('text')
-    .text(d => d.id.length > 25 ? d.id.substring(0, 25) + '…' : d.id)
-    .attr('font-size', d => 8 + Math.min(d.count, 5))
-    .attr('font-weight', d => d.count >= 3 ? '600' : '400')
-    .attr('fill', '#333')
-    .attr('dx', d => 10 + d.count * 2)
-    .attr('dy', 3)
+  nodeG.append('circle')
+    .attr('r', d => d.type === 'company' ? 8 + (d.count || 1) * 4 : 5)
+    .attr('fill', d => d.type === 'company' ? '#c0392b' : '#5a7d9a')
+    .attr('stroke', d => d.type === 'company' ? '#fff' : 'none')
+    .attr('stroke-width', d => d.type === 'company' ? 2 : 0);
+
+  // Company labels always visible
+  nodeG.filter(d => d.type === 'company').append('text')
+    .text(d => d.id.length > 22 ? d.id.substring(0, 22) + '…' : d.id)
+    .attr('dy', d => -(12 + (d.count || 1) * 3))
+    .attr('text-anchor', 'middle')
+    .attr('font-size', d => 9 + Math.min((d.count || 1), 6))
+    .attr('font-weight', '600')
+    .attr('fill', '#2c3e50')
     .style('pointer-events', 'none');
+
+  // Person labels (smaller, shown on hover)
+  nodeG.filter(d => d.type === 'person').append('text')
+    .text(d => d.id.split(' ')[0])
+    .attr('dy', -10).attr('text-anchor', 'middle')
+    .attr('font-size', 8).attr('fill', '#888')
+    .style('pointer-events', 'none').style('opacity', 0).attr('class', 'person-label');
+
+  // Click: highlight connections + show detail
+  let selected = null;
+  nodeG.on('click', (event, d) => {
+    event.stopPropagation();
+    selected = d.id;
+
+    // Reset all
+    nodeG.select('circle').attr('opacity', 0.2);
+    link.attr('opacity', 0.05).attr('stroke-width', 1);
+    nodeG.selectAll('.person-label').style('opacity', 0);
+
+    // Highlight connected
+    const connected = new Set();
+    connected.add(d.id);
+    links.forEach(l => {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      if (s === d.id) connected.add(t);
+      if (t === d.id) connected.add(s);
+    });
+
+    nodeG.select('circle').attr('opacity', nd => connected.has(nd.id) ? 1 : 0.1);
+    nodeG.selectAll('.person-label').style('opacity', nd => connected.has(nd.id) ? 1 : 0);
+    link.attr('opacity', l => {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 1 : 0.03;
+    }).attr('stroke-width', l => {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 2.5 : 1;
+    });
+
+    // Detail panel
+    if (d.type === 'company') {
+      const people = nodes.filter(n => n.type === 'person' && connected.has(n.id));
+      detail.innerHTML = '<h3>' + d.id + '</h3><p>' + (d.count||0) + ' people</p>' +
+        '<div class="detail-people">' + people.map(p =>
+          '<a href="' + (p.url||'#') + '" target="_blank" class="detail-person">' +
+          '<strong>' + p.id + '</strong>' +
+          (p.title ? '<br><span>' + p.title + '</span>' : '') +
+          (p.seniority ? '<br><small>' + p.seniority + '</small>' : '') +
+          '</a>'
+        ).join('') + '</div>';
+    } else {
+      detail.innerHTML =
+        '<h3>' + d.id + '</h3>' +
+        (d.title ? '<p>' + d.title + '</p>' : '') +
+        (d.seniority ? '<p><strong>Seniority:</strong> ' + d.seniority + '</p>' : '') +
+        (d.skills ? '<p><strong>Skills:</strong> ' + d.skills + '</p>' : '') +
+        (d.url ? '<a href="' + d.url + '" target="_blank">View Profile →</a>' : '');
+    }
+  });
+
+  // Click background to reset
+  svg.on('click', () => {
+    selected = null;
+    nodeG.select('circle').attr('opacity', 1);
+    link.attr('opacity', 0.6).attr('stroke-width', 1);
+    nodeG.selectAll('.person-label').style('opacity', 0);
+    detail.innerHTML = '<p style="color:#999;font-style:italic">Click a node to see details</p>';
+  });
 
   simulation.on('tick', () => {
     link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    node.attr('cx', d => d.x).attr('cy', d => d.y);
-    label.attr('x', d => d.x).attr('y', d => d.y);
+    nodeG.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
   });
 
-  function dragstart(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
-  function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-  function dragend(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+  // Fit to content after simulation settles
+  simulation.on('end', () => {
+    const bounds = g.node().getBBox();
+    const scale = Math.min(width / (bounds.width + 60), height / (bounds.height + 60), 1.5);
+    const tx = (width - bounds.width * scale) / 2 - bounds.x * scale;
+    const ty = (height - bounds.height * scale) / 2 - bounds.y * scale;
+    svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+  });
+
+  function ds(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+  function dd(event, d) { d.fx = event.x; d.fy = event.y; }
+  function de(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
 })();`;
 }
 
@@ -546,8 +622,18 @@ const CSS_LAYOUTS = `
   .seniority-row { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
   .tag-sen { background: #2c3e50; color: #fff; padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.75rem; }
 
-  #network-graph { margin: 1.5rem 0; }
-  .graph-svg { width: 100%; height: 500px; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; }
+  #network-graph { margin: 1.5rem 0; position: relative; }
+  .graph-svg { width: 100%; height: 650px; background: #faf9f7; border: 1px solid #e0d8cf; border-radius: 8px; }
+  .graph-detail { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 1rem; margin-top: 0.8rem; min-height: 60px; }
+  .graph-detail h3 { font-family: 'Playfair Display', Georgia, serif; margin-bottom: 0.3rem; color: #2c3e50; }
+  .graph-detail p { font-size: 0.85rem; margin-bottom: 0.3rem; }
+  .graph-detail a { color: #c0392b; font-size: 0.85rem; }
+  .detail-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+  .detail-person { display: block; padding: 0.5rem; border: 1px solid #e0d8cf; border-radius: 4px; text-decoration: none !important; color: inherit; font-size: 0.8rem; }
+  .detail-person:hover { background: #f0ebe4; }
+  .detail-person strong { color: #2c3e50; }
+  .detail-person span { color: #666; }
+  .detail-person small { color: #c0392b; }
 
   .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
   .profile-card { display: block; background: #fff; border: 1px solid #e0d8cf; border-radius: 6px; padding: 0.8rem; text-decoration: none !important; color: inherit; transition: box-shadow 0.15s; }
