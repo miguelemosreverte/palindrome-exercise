@@ -87,31 +87,57 @@ function buildDataRenderer(layout, data) {
 }
 
 function buildGrid(records, columns) {
-  const titleCol = columns.find(c => /title|name/i.test(c)) || columns[0];
-  const priceCol = columns.find(c => /price|precio/i.test(c));
-  const locCol = columns.find(c => /location|ubicacion/i.test(c));
-  const sellerCol = columns.find(c => /seller|vendedor/i.test(c));
-  const shippingCol = columns.find(c => /shipping|envio/i.test(c));
-  const urlCol = columns.find(c => /url|link|href/i.test(c));
-  const conditionCol = columns.find(c => /condition|condicion/i.test(c));
+  const col = (pattern) => columns.find(c => pattern.test(c));
+  const titleCol = col(/^title$/i) || columns[0];
+  const priceCol = col(/^price$/i);
+  const origPriceCol = col(/original_price/i);
+  const discountCol = col(/discount/i);
+  const urlCol = col(/^url$/i);
+  const imageCol = col(/image/i);
+  const sellerCol = col(/seller/i);
+  const brandCol = col(/brand/i);
+  const shippingCol = col(/^shipping$/i);
+  const freeShipCol = col(/free_shipping/i);
+  const installCol = col(/installment/i);
+  const ratingCol = col(/rating/i);
+  const reviewsCol = col(/reviews/i);
+  const couponCol = col(/coupon/i);
 
   const cards = records.map(r => {
     const title = r[titleCol] || '';
     const price = r[priceCol] || '';
-    const loc = r[locCol] || '';
-    const seller = r[sellerCol] || '';
-    const shipping = r[shippingCol] || '';
+    const origPrice = r[origPriceCol] || '';
+    const discount = r[discountCol] || '';
     const url = r[urlCol] || '#';
-    const cond = r[conditionCol] || '';
+    const image = r[imageCol] || '';
+    const seller = r[sellerCol] || '';
+    const brand = r[brandCol] || '';
+    const shipping = r[shippingCol] || '';
+    const freeShip = r[freeShipCol];
+    const installments = r[installCol] || '';
+    const rating = parseFloat(r[ratingCol]) || 0;
+    const reviews = parseInt(r[reviewsCol]) || 0;
+    const coupon = r[couponCol] || '';
+
+    const stars = rating > 0 ? `<span class="card-stars">${'★'.repeat(Math.round(rating))}${'☆'.repeat(5 - Math.round(rating))} <small>${rating}</small></span>` : '';
+
     return `<a href="${escHtml(url)}" class="card" target="_blank">
-      <div class="card-price">${escHtml(price)}</div>
-      <h3 class="card-title">${escHtml(title.substring(0, 80))}</h3>
-      <div class="card-meta">
-        ${loc ? `<span class="tag">${escHtml(loc)}</span>` : ''}
-        ${shipping ? `<span class="tag tag-ship">${escHtml(shipping)}</span>` : ''}
-        ${cond ? `<span class="tag tag-cond">${escHtml(cond)}</span>` : ''}
+      ${image ? `<div class="card-img"><img src="${escHtml(image)}" alt="" loading="lazy"></div>` : ''}
+      <div class="card-body">
+        <div class="card-price-row">
+          <span class="card-price">${escHtml(price)}</span>
+          ${discount ? `<span class="card-discount">${escHtml(discount)}</span>` : ''}
+        </div>
+        ${origPrice && discount ? `<span class="card-orig-price">${escHtml(origPrice)}</span>` : ''}
+        ${installments ? `<div class="card-installments">${escHtml(installments)}</div>` : ''}
+        <h3 class="card-title">${escHtml(title.substring(0, 90))}</h3>
+        ${stars}
+        <div class="card-meta">
+          ${freeShip ? `<span class="tag tag-ship">Envío gratis</span>` : (shipping ? `<span class="tag">${escHtml(shipping)}</span>` : '')}
+          ${coupon ? `<span class="tag tag-coupon">${escHtml(coupon)}</span>` : ''}
+        </div>
+        ${seller || brand ? `<div class="card-seller">${escHtml(brand || seller)}</div>` : ''}
       </div>
-      ${seller ? `<div class="card-seller">${escHtml(seller)}</div>` : ''}
     </a>`;
   }).join('\n');
 
@@ -119,30 +145,46 @@ function buildGrid(records, columns) {
 }
 
 function buildFeed(records, columns) {
-  const titleCol = columns.find(c => /title|name/i.test(c)) || columns[0];
-  const channelCol = columns.find(c => /channel|author|creator/i.test(c));
-  const viewsCol = columns.find(c => /views|vistas/i.test(c));
-  const pubCol = columns.find(c => /published|date|time|ago/i.test(c));
-  const durCol = columns.find(c => /duration|duracion|length/i.test(c));
-  const urlCol = columns.find(c => /url|link|href/i.test(c));
-  const descCol = columns.find(c => /description|desc|snippet/i.test(c));
+  const col = (pattern) => columns.find(c => pattern.test(c));
+  const titleCol = col(/^title$/i) || columns[0];
+  const channelCol = col(/^channel$/i);
+  const channelAvatarCol = col(/channelAvatar/i);
+  const viewsCol = col(/^views$/i);
+  const shortViewsCol = col(/shortViews/i);
+  const pubCol = col(/published/i);
+  const durCol = col(/^duration$/i);
+  const urlCol = col(/^url$/i);
+  const descCol = col(/description/i);
+  const thumbCol = col(/^thumbnail$/i);
+  const badgesCol = col(/badges/i);
 
   const items = records.map(r => {
     const title = r[titleCol] || '';
     const channel = r[channelCol] || '';
-    const views = r[viewsCol] || '';
+    const channelAvatar = r[channelAvatarCol] || '';
+    const views = r[shortViewsCol] || r[viewsCol] || '';
     const pub = r[pubCol] || '';
     const dur = r[durCol] || '';
     const url = r[urlCol] || '#';
     const desc = r[descCol] || '';
-    const meta = [channel, views, pub].filter(Boolean).join(' · ');
+    const thumb = r[thumbCol] || '';
+    const badges = r[badgesCol] || '';
+
+    const badgeHtml = badges ? badges.split(',').map(b => `<span class="feed-badge">${escHtml(b.trim())}</span>`).join('') : '';
 
     return `<a href="${escHtml(url)}" class="feed-item" target="_blank">
-      <div class="feed-thumb">${dur ? `<span class="feed-dur">${escHtml(dur)}</span>` : '<span class="feed-play">▶</span>'}</div>
+      <div class="feed-thumb"${thumb ? ` style="background-image:url('${escHtml(thumb)}');background-size:cover;background-position:center"` : ''}>
+        ${dur ? `<span class="feed-dur">${escHtml(dur)}</span>` : '<span class="feed-play">▶</span>'}
+        ${badgeHtml ? `<div class="feed-badges">${badgeHtml}</div>` : ''}
+      </div>
       <div class="feed-body">
         <h3 class="feed-title">${escHtml(title)}</h3>
-        <div class="feed-meta">${escHtml(meta)}</div>
-        ${desc ? `<p class="feed-desc">${escHtml(desc.substring(0, 150))}</p>` : ''}
+        <div class="feed-channel">
+          ${channelAvatar ? `<img class="feed-avatar" src="${escHtml(channelAvatar)}" alt="">` : ''}
+          <span>${escHtml(channel)}</span>
+        </div>
+        <div class="feed-meta">${escHtml([views, pub].filter(Boolean).join(' · '))}</div>
+        ${desc ? `<p class="feed-desc">${escHtml(desc.substring(0, 180))}</p>` : ''}
       </div>
     </a>`;
   }).join('\n');
@@ -361,46 +403,63 @@ const CSS_BASE = `
 
 const CSS_LAYOUTS = `
   /* ─── Grid (MercadoLibre-style) ─── */
-  .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin: 1rem 0; }
-  .card { display: block; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 1rem; transition: box-shadow 0.2s, transform 0.15s; text-decoration: none !important; color: inherit; }
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
+  .card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.15s; text-decoration: none !important; color: inherit; }
   .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); transform: translateY(-2px); }
-  .card-price { font-family: 'Playfair Display', Georgia, serif; font-size: 1.4rem; font-weight: 700; color: #2c3e50; margin-bottom: 0.3rem; }
-  .card-title { font-size: 0.85rem; font-weight: 500; color: #333; line-height: 1.35; margin-bottom: 0.5rem; min-height: 2.4rem; }
-  .card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
-  .tag { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; background: #f0ebe4; color: #666; }
-  .tag-ship { background: #d4edda; color: #155724; }
-  .tag-cond { background: #fff3cd; color: #856404; }
-  .card-seller { font-size: 0.75rem; color: #999; }
+  .card-img { width: 100%; aspect-ratio: 1; overflow: hidden; background: #f0ebe4; display: flex; align-items: center; justify-content: center; }
+  .card-img img { width: 100%; height: 100%; object-fit: contain; }
+  .card-body { padding: 0.8rem; flex: 1; display: flex; flex-direction: column; }
+  .card-price-row { display: flex; align-items: baseline; gap: 0.4rem; }
+  .card-price { font-size: 1.3rem; font-weight: 600; color: #1a1a1a; }
+  .card-discount { font-size: 0.8rem; font-weight: 600; color: #00a650; }
+  .card-orig-price { font-size: 0.8rem; color: #999; text-decoration: line-through; display: block; margin-top: -0.1rem; }
+  .card-installments { font-size: 0.75rem; color: #00a650; margin-top: 0.2rem; }
+  .card-title { font-size: 0.82rem; font-weight: 400; color: #333; line-height: 1.35; margin: 0.4rem 0; flex: 1; }
+  .card-stars { font-size: 0.75rem; color: #ff9900; margin-bottom: 0.3rem; display: block; }
+  .card-stars small { color: #666; font-size: 0.7rem; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: auto; }
+  .tag { font-size: 0.68rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: #f0ebe4; color: #666; }
+  .tag-ship { background: #d4edda; color: #00a650; font-weight: 500; }
+  .tag-coupon { background: #fff3cd; color: #856404; }
+  .card-seller { font-size: 0.72rem; color: #999; margin-top: 0.3rem; }
 
   @media (max-width: 640px) {
     .grid-cards { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .card { padding: 0.7rem; }
-    .card-price { font-size: 1.1rem; }
-    .card-title { font-size: 0.78rem; min-height: auto; }
+    .card-body { padding: 0.5rem; }
+    .card-price { font-size: 1rem; }
+    .card-title { font-size: 0.75rem; }
   }
   @media (max-width: 380px) {
     .grid-cards { grid-template-columns: 1fr; }
+    .card { flex-direction: row; }
+    .card-img { width: 120px; aspect-ratio: 1; flex-shrink: 0; }
   }
 
   /* ─── Feed (YouTube-style) ─── */
-  .feed { max-width: 720px; margin: 0 auto; }
+  .feed { max-width: 800px; margin: 0 auto; }
   .feed-item { display: flex; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid #e0d8cf; text-decoration: none !important; color: inherit; transition: background 0.15s; }
   .feed-item:hover { background: #f0ebe4; border-radius: 6px; padding-left: 0.5rem; margin-left: -0.5rem; padding-right: 0.5rem; margin-right: -0.5rem; }
-  .feed-thumb { flex-shrink: 0; width: 160px; height: 90px; background: #1a1a1a; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; position: relative; }
-  .feed-dur { font-size: 0.75rem; background: rgba(0,0,0,0.8); padding: 0.15rem 0.4rem; border-radius: 3px; position: absolute; bottom: 4px; right: 4px; }
-  .feed-play { font-size: 1.5rem; opacity: 0.7; }
-  .feed-body { flex: 1; min-width: 0; }
-  .feed-title { font-size: 0.95rem; font-weight: 600; line-height: 1.3; margin-bottom: 0.3rem; }
-  .feed-meta { font-size: 0.8rem; color: #666; }
-  .feed-desc { font-size: 0.8rem; color: #888; margin-top: 0.3rem; }
+  .feed-thumb { flex-shrink: 0; width: 320px; height: 180px; background: #0f0f0f; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; position: relative; overflow: hidden; }
+  .feed-dur { font-size: 0.75rem; background: rgba(0,0,0,0.85); padding: 0.15rem 0.4rem; border-radius: 3px; position: absolute; bottom: 6px; right: 6px; color: #fff; font-weight: 500; }
+  .feed-badges { position: absolute; top: 6px; left: 6px; display: flex; gap: 3px; }
+  .feed-badge { font-size: 0.65rem; background: rgba(0,0,0,0.7); padding: 0.1rem 0.35rem; border-radius: 2px; color: #fff; }
+  .feed-play { font-size: 2rem; opacity: 0.7; }
+  .feed-body { flex: 1; min-width: 0; padding-top: 0.1rem; }
+  .feed-title { font-size: 1rem; font-weight: 600; line-height: 1.3; margin-bottom: 0.4rem; color: #1a1a1a; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .feed-channel { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; font-size: 0.85rem; color: #555; }
+  .feed-avatar { width: 24px; height: 24px; border-radius: 50%; }
+  .feed-meta { font-size: 0.8rem; color: #888; }
+  .feed-desc { font-size: 0.8rem; color: #888; margin-top: 0.3rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   @media (max-width: 640px) {
-    .feed-thumb { width: 120px; height: 68px; }
-    .feed-title { font-size: 0.85rem; }
+    .feed-thumb { width: 168px; height: 94px; border-radius: 8px; }
+    .feed-title { font-size: 0.88rem; }
+    .feed-channel { font-size: 0.78rem; }
+    .feed-desc { display: none; }
   }
-  @media (max-width: 380px) {
-    .feed-item { flex-direction: column; }
-    .feed-thumb { width: 100%; height: 180px; }
+  @media (max-width: 480px) {
+    .feed-item { flex-direction: column; gap: 0.5rem; }
+    .feed-thumb { width: 100%; height: 0; padding-bottom: 56.25%; }
   }
 
   /* ─── Graph (LinkedIn-style) ─── */
