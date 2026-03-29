@@ -49,7 +49,6 @@ export function md2html(inputPath, outputPath) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  ${layout === 'graph' ? '<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>' : ''}
   <style>${CSS_BASE}${CSS_LAYOUTS}</style>
 </head>
 <body>
@@ -88,7 +87,7 @@ function buildDataRenderer(layout, data) {
 
   if (layout === 'grid') return buildGrid(records, columns);
   if (layout === 'feed') return buildFeed(records, columns);
-  if (layout === 'graph') return buildGraph(records, columns);
+  if (layout === 'graph') return buildGraph(records, columns, data.showcaseResults);
   return ''; // table is already in markdown
 }
 
@@ -198,15 +197,13 @@ function buildFeed(records, columns) {
   return `<section class="layout-section"><h2 class="section-title">Feed</h2><div class="feed">${items}</div></section>`;
 }
 
-function buildGraph(records, columns) {
+function buildGraph(records, columns, showcaseResults) {
   const nameCol = columns.find(c => /^name$/i.test(c)) || columns[0];
   const companyCol = columns.find(c => /company|org/i.test(c));
-  const titleCol = columns.find(c => /title|role|headline/i.test(c));
   const seniorityCol = columns.find(c => /seniority|level/i.test(c));
   const skillsCol = columns.find(c => /skills|tech/i.test(c));
-  const urlCol = columns.find(c => /url|profileUrl|link/i.test(c));
 
-  // Build stats — only count real companies
+  // Stats
   const companies = {};
   const seniorities = {};
   const allSkills = {};
@@ -220,83 +217,196 @@ function buildGraph(records, columns) {
     });
   });
 
-  const topCompanies = Object.entries(companies).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  const topSkills = Object.entries(allSkills).sort((a, b) => b[1] - a[1]).slice(0, 20);
-
-  // Stat cards HTML
   const statCards = `<div class="stat-cards">
-    <div class="stat-card">
-      <div class="stat-number">${records.length}</div>
-      <div class="stat-label">Professionals</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-number">${Object.keys(companies).length}</div>
-      <div class="stat-label">Companies</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-number">${Object.keys(allSkills).length}</div>
-      <div class="stat-label">Unique Skills</div>
-    </div>
+    <div class="stat-card"><div class="stat-number">${records.length}</div><div class="stat-label">Professionals</div></div>
+    <div class="stat-card"><div class="stat-number">${Object.keys(companies).length}</div><div class="stat-label">Companies</div></div>
+    <div class="stat-card"><div class="stat-number">${Object.keys(allSkills).length}</div><div class="stat-label">Unique Skills</div></div>
   </div>`;
 
-  // Top companies list
-  const companyList = topCompanies.map(([name, count]) =>
-    `<div class="rank-item"><span class="rank-name">${escHtml(name)}</span><span class="rank-bar" style="width:${Math.round(count / topCompanies[0][1] * 100)}%"></span><span class="rank-count">${count}</span></div>`
-  ).join('');
-
-  // Skills cloud
-  const maxSkill = topSkills[0]?.[1] || 1;
-  const skillCloud = topSkills.map(([name, count]) => {
-    const size = 0.7 + (count / maxSkill) * 1.0;
-    const opacity = 0.5 + (count / maxSkill) * 0.5;
-    return `<span class="skill-tag" style="font-size:${size}rem;opacity:${opacity}">${escHtml(name)}</span>`;
-  }).join(' ');
-
-  // Seniority breakdown
-  const senBreakdown = Object.entries(seniorities).sort((a, b) => b[1] - a[1])
+  // Seniority pills
+  const senPills = Object.entries(seniorities).sort((a, b) => b[1] - a[1])
     .map(([name, count]) => `<span class="tag tag-sen">${escHtml(name)} (${count})</span>`).join(' ');
 
-  // Profile cards — with photos
-  const photoCol = columns.find(c => /photo|avatar|image/i.test(c));
-  const profileCards = records.slice(0, 50).map(r => {
-    const name = r[nameCol] || '';
-    const title = r[titleCol] || '';
-    const company = r[companyCol] || '';
-    const url = r[urlCol] || '#';
-    const photo = r[photoCol] || '';
-    const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-    return `<a href="${escHtml(url)}" class="profile-card" target="_blank">
-      ${photo
-        ? `<img class="profile-photo" src="${escHtml(photo)}" alt="" loading="lazy">`
-        : `<div class="profile-photo profile-initials">${initials}</div>`}
-      <div class="profile-info">
-        <div class="profile-name">${escHtml(name)}</div>
-        <div class="profile-title">${escHtml(title.substring(0, 60))}</div>
-        ${company ? `<div class="profile-company">${escHtml(company.substring(0, 40))}</div>` : ''}
-      </div>
-    </a>`;
-  }).join('\n');
+  // Showcase query dropdown options
+  const showcaseOptions = (showcaseResults || [])
+    .map(q => `<option value="${escHtml(q.id)}">${escHtml(q.label)} (${q.rows?.length || 0})</option>`)
+    .join('');
+
+  // Embed ALL data + showcase results as JSON for the client-side table engine
+  const tableData = JSON.stringify({
+    allRecords: records,
+    columns,
+    showcase: (showcaseResults || []).map(q => ({ id: q.id, label: q.label, sql: q.sql, columns: q.columns, rows: q.rows })),
+  });
 
   return `<section class="layout-section">
     ${statCards}
-    <div class="graph-panels">
-      <div class="panel">
-        <h3 class="panel-title">Top Companies</h3>
-        <div class="rank-list">${companyList}</div>
+    <div class="seniority-row"><strong>Seniority:</strong> ${senPills}</div>
+
+    <div class="query-section">
+      <div class="query-bar">
+        <div class="query-input-row">
+          <select id="query-showcase" class="query-select">
+            <option value="">Select a query...</option>
+            ${showcaseOptions}
+            <option value="__all">Show all records</option>
+          </select>
+          <input id="query-input" class="query-input" placeholder="Or type a question about the data..." disabled title="Live queries require the server">
+          <button id="query-export" class="query-btn-export" title="Export CSV">CSV</button>
+        </div>
+        <div id="query-sql" class="query-sql"></div>
       </div>
-      <div class="panel">
-        <h3 class="panel-title">Skills</h3>
-        <div class="skill-cloud">${skillCloud}</div>
-      </div>
+
+      <div id="query-table" class="query-table"></div>
+      <div id="query-pagination" class="query-pagination"></div>
     </div>
-    <div class="seniority-row"><strong>Seniority:</strong> ${senBreakdown}</div>
-    <div id="network-graph"></div>
-    <h2 class="section-title">Profiles</h2>
-    <div class="profile-grid">${profileCards}</div>
-  </section>`;
+  </section>
+  <script id="table-data" type="application/json">${tableData}</script>`;
 }
 
 function buildDataScript(layout, data) {
+  if (layout !== 'graph') return '';
+  // Client-side table engine with sort, paginate, query showcase
+  return TABLE_ENGINE_JS;
+}
+
+const TABLE_ENGINE_JS = `
+(function() {
+  const dataEl = document.getElementById('table-data');
+  if (!dataEl) return;
+  const DATA = JSON.parse(dataEl.textContent);
+  const tableEl = document.getElementById('query-table');
+  const paginationEl = document.getElementById('query-pagination');
+  const sqlEl = document.getElementById('query-sql');
+  const selectEl = document.getElementById('query-showcase');
+  const exportBtn = document.getElementById('query-export');
+
+  let currentRows = DATA.allRecords;
+  let currentCols = DATA.columns.filter(c => !c.startsWith('_') && c !== 'source');
+  let sortCol = null, sortDir = 1;
+  let page = 0, perPage = 25;
+  let currentLabel = 'All records';
+
+  // Column display config
+  const imgCols = new Set(['photo', 'companyLogo', 'image', 'thumbnail', 'channelAvatar', 'richThumbnail']);
+  const urlCols = new Set(['url', 'profileUrl', 'channelUrl']);
+  const tagCols = new Set(['skills', 'badges']);
+  const hideCols = new Set(['headline', 'description', 'companyLogo', 'richThumbnail']);
+
+  function visibleCols() { return currentCols.filter(c => !hideCols.has(c)); }
+
+  function renderCell(val, col) {
+    if (!val) return '<span class="cell-empty">—</span>';
+    const s = String(val);
+    if (imgCols.has(col) && s.startsWith('http')) return '<img class="cell-img" src="' + s + '" loading="lazy">';
+    if (urlCols.has(col) && s.startsWith('http')) return '<a href="' + s + '" target="_blank" class="cell-link">View →</a>';
+    if (tagCols.has(col)) return s.split(',').map(t => '<span class="cell-tag">' + t.trim() + '</span>').join(' ');
+    if (s.length > 80) return '<span title="' + s.replace(/"/g, '&quot;') + '">' + s.substring(0, 80) + '…</span>';
+    return s;
+  }
+
+  function render() {
+    const cols = visibleCols();
+    const sorted = [...currentRows];
+    if (sortCol !== null) {
+      sorted.sort((a, b) => {
+        const va = a[sortCol] || '', vb = b[sortCol] || '';
+        const na = parseFloat(va), nb = parseFloat(vb);
+        if (!isNaN(na) && !isNaN(nb)) return (na - nb) * sortDir;
+        return String(va).localeCompare(String(vb)) * sortDir;
+      });
+    }
+
+    const start = page * perPage;
+    const pageRows = sorted.slice(start, start + perPage);
+    const totalPages = Math.ceil(sorted.length / perPage);
+
+    let html = '<table class="qt"><thead><tr>';
+    for (const col of cols) {
+      const arrow = sortCol === col ? (sortDir === 1 ? ' ↑' : ' ↓') : ' ↕';
+      html += '<th data-col="' + col + '">' + col + '<span class="sort-arrow">' + arrow + '</span></th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    for (const row of pageRows) {
+      html += '<tr>';
+      for (const col of cols) {
+        html += '<td data-label="' + col + '">' + renderCell(row[col], col) + '</td>';
+      }
+      html += '</tr>';
+    }
+    if (pageRows.length === 0) html += '<tr><td colspan="' + cols.length + '" class="cell-empty" style="text-align:center;padding:2rem">No results</td></tr>';
+    html += '</tbody></table>';
+
+    tableEl.innerHTML = html;
+
+    // Pagination
+    paginationEl.innerHTML = '<div class="pag-info">' + currentLabel + ' — ' +
+      sorted.length + ' results, page ' + (page + 1) + '/' + Math.max(totalPages, 1) + '</div>' +
+      '<div class="pag-controls">' +
+      '<button class="pag-btn" id="pag-prev"' + (page === 0 ? ' disabled' : '') + '>← Prev</button>' +
+      '<select id="pag-size">' + [25,50,100,500].map(n => '<option' + (n===perPage?' selected':'') + '>' + n + '</option>').join('') + '</select>' +
+      '<button class="pag-btn" id="pag-next"' + (page >= totalPages - 1 ? ' disabled' : '') + '>Next →</button>' +
+      '</div>';
+
+    // Sort click handlers
+    tableEl.querySelectorAll('th').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = () => {
+        const col = th.dataset.col;
+        if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+        render();
+      };
+    });
+
+    // Pagination handlers
+    document.getElementById('pag-prev')?.addEventListener('click', () => { page = Math.max(0, page - 1); render(); });
+    document.getElementById('pag-next')?.addEventListener('click', () => { page = Math.min(totalPages - 1, page + 1); render(); });
+    document.getElementById('pag-size')?.addEventListener('change', (e) => { perPage = parseInt(e.target.value); page = 0; render(); });
+  }
+
+  // Showcase query handler
+  selectEl?.addEventListener('change', (e) => {
+    const id = e.target.value;
+    if (id === '__all' || !id) {
+      currentRows = DATA.allRecords;
+      currentCols = DATA.columns.filter(c => !c.startsWith('_') && c !== 'source');
+      currentLabel = 'All records';
+      sqlEl.textContent = '';
+      page = 0; sortCol = null;
+      render();
+      return;
+    }
+    const q = DATA.showcase?.find(s => s.id === id);
+    if (!q) return;
+    currentLabel = q.label;
+    sqlEl.textContent = q.sql;
+    if (q.columns?.length && q.rows?.length) {
+      currentCols = q.columns;
+      currentRows = q.rows.map(row => Object.fromEntries(q.columns.map((c, i) => [c, row[i]])));
+    } else {
+      currentRows = [];
+      currentCols = DATA.columns.filter(c => !c.startsWith('_') && c !== 'source');
+    }
+    page = 0; sortCol = null;
+    render();
+  });
+
+  // CSV export
+  exportBtn?.addEventListener('click', () => {
+    const cols = visibleCols();
+    const csv = [cols.join(','), ...currentRows.map(r => cols.map(c => '"' + String(r[c] || '').replace(/"/g, '""') + '"').join(','))].join('\\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();
+  });
+
+  // Initial render — show all
+  render();
+})();
+`;
+
+// Dead code — kept signature for compatibility
+function _oldBuildDataScript(layout, data) {
   if (layout !== 'graph' || !data?.records?.length) return '';
 
   const records = data.records;
@@ -630,18 +740,62 @@ const CSS_LAYOUTS = `
   .seniority-row { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
   .tag-sen { background: #2c3e50; color: #fff; padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.75rem; }
 
-  #network-graph { margin: 1.5rem 0; position: relative; }
-  .graph-svg { width: 100%; height: 650px; background: #faf9f7; border: 1px solid #e0d8cf; border-radius: 8px; }
-  .graph-detail { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 1rem; margin-top: 0.8rem; min-height: 60px; }
-  .graph-detail h3 { font-family: 'Playfair Display', Georgia, serif; margin-bottom: 0.3rem; color: #2c3e50; }
-  .graph-detail p { font-size: 0.85rem; margin-bottom: 0.3rem; }
-  .graph-detail a { color: #c0392b; font-size: 0.85rem; }
-  .detail-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
-  .detail-person { display: block; padding: 0.5rem; border: 1px solid #e0d8cf; border-radius: 4px; text-decoration: none !important; color: inherit; font-size: 0.8rem; }
-  .detail-person:hover { background: #f0ebe4; }
-  .detail-person strong { color: #2c3e50; }
-  .detail-person span { color: #666; }
-  .detail-person small { color: #c0392b; }
+  /* ─── Queryable Table ─── */
+  .query-section { margin: 1.5rem 0; }
+  .query-bar { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.8rem; }
+  .query-input-row { display: flex; gap: 0.5rem; align-items: center; }
+  .query-select { flex: 1; padding: 0.55rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.85rem; background: #fff; min-width: 0; }
+  .query-input { flex: 1; padding: 0.55rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.85rem; }
+  .query-input:disabled { background: #f4f4f5; color: #a1a1aa; }
+  .query-btn-export { padding: 0.55rem 0.8rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+  .query-btn-export:hover { background: #f0ebe4; }
+  .query-sql { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem; color: #666; margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: #f8f5f0; border-radius: 4px; display: none; }
+  .query-sql:not(:empty) { display: block; }
+
+  .qt { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; }
+  .qt thead { position: sticky; top: 0; z-index: 2; }
+  .qt th { background: #2c3e50; color: #fff; text-align: left; padding: 0.55rem 0.7rem; font-weight: 500; font-size: 0.78rem; white-space: nowrap; user-select: none; }
+  .qt th:hover { background: #34495e; }
+  .sort-arrow { font-size: 0.65rem; margin-left: 3px; opacity: 0.6; }
+  .qt td { padding: 0.45rem 0.7rem; border-bottom: 1px solid #f0ebe4; vertical-align: middle; }
+  .qt tr:hover { background: #faf9f7; }
+  .qt tr:nth-child(even) { background: #fcfbf9; }
+  .qt tr:nth-child(even):hover { background: #f5f0ea; }
+
+  .cell-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
+  .cell-link { color: #c0392b; text-decoration: none; font-weight: 500; font-size: 0.78rem; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-tag { display: inline-block; background: #f0ebe4; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.72rem; margin: 1px; color: #555; }
+  .cell-empty { color: #ccc; }
+
+  .query-pagination { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; font-size: 0.8rem; color: #666; }
+  .pag-info { font-weight: 500; }
+  .pag-controls { display: flex; gap: 0.4rem; align-items: center; }
+  .pag-btn { padding: 0.35rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.78rem; }
+  .pag-btn:hover:not(:disabled) { background: #f0ebe4; }
+  .pag-btn:disabled { opacity: 0.4; cursor: default; }
+  .pag-controls select { padding: 0.3rem 0.4rem; border: 1px solid #d4cdc4; border-radius: 4px; font-size: 0.78rem; }
+
+  .query-table { overflow-x: auto; border-radius: 8px; max-height: 70vh; overflow-y: auto; }
+
+  @media (max-width: 768px) {
+    .query-input-row { flex-wrap: wrap; }
+    .query-select { width: 100%; }
+    .query-input { width: 100%; }
+    .qt { font-size: 0.75rem; }
+    .qt th, .qt td { padding: 0.35rem 0.5rem; }
+    .cell-img { width: 24px; height: 24px; }
+    .query-pagination { flex-direction: column; gap: 0.4rem; }
+  }
+
+  @media (max-width: 480px) {
+    /* Card layout on phone */
+    .qt thead { display: none; }
+    .qt, .qt tbody, .qt tr, .qt td { display: block; }
+    .qt tr { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.6rem; margin-bottom: 0.5rem; }
+    .qt td { padding: 0.2rem 0; border: none; }
+    .qt td::before { content: attr(data-label); font-weight: 600; color: #2c3e50; display: block; font-size: 0.7rem; margin-bottom: 0.1rem; }
+  }
 
   .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
   .profile-card { display: flex; align-items: center; gap: 0.7rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.7rem; text-decoration: none !important; color: inherit; transition: box-shadow 0.15s; }

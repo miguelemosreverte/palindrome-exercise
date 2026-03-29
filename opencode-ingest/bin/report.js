@@ -129,9 +129,19 @@ export async function generateReport(taskName) {
   }, null, 2);
   md += '\n```\n\n';
 
+  // Pre-compute showcase queries for queryable layouts
+  let showcaseResults = null;
+  if (layout === 'graph') {
+    try {
+      const { runShowcaseQueries } = await import('./query.js');
+      showcaseResults = await runShowcaseQueries(taskName);
+      console.log(`[${taskName}] Pre-computed ${showcaseResults.length} showcase queries`);
+    } catch {}
+  }
+
   // Data — emit as JSON block for custom rendering, plus markdown table as fallback
   md += `## Data\n\n`;
-  md += `<!-- data:json\n${JSON.stringify({ columns, records: records.slice(0, 200), layout })}\n-->\n\n`;
+  md += `<!-- data:json\n${JSON.stringify({ columns, records: records.slice(0, 500), layout, showcaseResults })}\n-->\n\n`;
 
   // Markdown table fallback
   md += `| ${columns.join(' | ')} |\n`;
