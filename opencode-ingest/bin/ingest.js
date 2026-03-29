@@ -171,7 +171,7 @@ const commands = {
       await reparseTask(t);
 
       // 2. Clean the new JSONL
-      cleanTask(t);
+      await cleanTask(t);
 
       // 3. Delete old SQLite, re-normalize
       const dbPath = join(dataDir, 'db.sqlite');
@@ -205,7 +205,7 @@ const commands = {
       if (!existsSync(rawDir)) { console.log(`[${t}] No raw data — skipping`); continue; }
 
       // 1. Clean raw JSONL in-place
-      cleanTask(t);
+      await cleanTask(t);
 
       // 2. Delete old SQLite so normalize rebuilds from cleaned data
       const dbPath = join(dataDir, 'db.sqlite');
