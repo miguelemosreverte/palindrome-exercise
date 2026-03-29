@@ -60,12 +60,16 @@ export function md2html(inputPath, outputPath) {
       <div class="masthead-rule"></div>
     </div>
     <article class="content">
-      ${dataBlock && layout !== 'table'
-        ? html.replace(/<table>/g, '<div class="table-wrap" style="display:none"><table>').replace(/<\/table>/g, '</table></div>')
-        : html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>')}
+      ${(() => {
+        let h = dataBlock && layout !== 'table'
+          ? html.replace(/<table>/g, '<div class="table-wrap" style="display:none"><table>').replace(/<\/table>/g, '</table></div>')
+          : html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
+        // Inject custom layout where #data-root placeholder is
+        if (dataRenderer) h = h.replace('<div id="data-root"></div>', dataRenderer);
+        return h;
+      })()}
     </article>
   </div>
-  ${dataRenderer}
   <script>
     ${chartScripts}
     ${dataScript}
@@ -293,47 +297,103 @@ function buildDataScript(layout, data) {
   const nameCol = data.columns?.find(c => /^name$/i.test(c)) || data.columns?.[0];
   if (!companyCol) return '';
 
+  // Build nodes with sizing: companies sized by employee count
   const nodes = [];
   const links = [];
   const nodeSet = new Set();
+  const companyCounts = {};
+
+  // First pass: count employees per company
+  records.forEach(r => {
+    const company = r[companyCol];
+    if (company && company.length > 1) companyCounts[company] = (companyCounts[company] || 0) + 1;
+  });
+
+  // Only include companies with 2+ people (meaningful clusters)
+  const significantCompanies = new Set(Object.entries(companyCounts).filter(([, c]) => c >= 2).map(([k]) => k));
+
   records.forEach(r => {
     const name = r[nameCol];
     const company = r[companyCol];
     if (!name || name.length < 3) return;
-    if (!company || company.length < 2) return; // skip disconnected nodes
-    if (!nodeSet.has(name)) { nodeSet.add(name); nodes.push({ id: name, type: 'person' }); }
-    if (!nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company' }); }
+    if (!company || !significantCompanies.has(company)) return;
+    if (!nodeSet.has(name)) { nodeSet.add(name); nodes.push({ id: name, type: 'person', count: 1 }); }
+    if (!nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company', count: companyCounts[company] }); }
     links.push({ source: name, target: company });
   });
+
+  const maxCount = Math.max(...Object.values(companyCounts), 1);
 
   return `
 (function() {
   const container = document.getElementById('network-graph');
   if (!container || typeof d3 === 'undefined') return;
-  const width = container.offsetWidth || 800;
-  const height = 500;
+  const width = container.offsetWidth || 900;
+  const height = 600;
   const nodes = ${JSON.stringify(nodes)};
   const links = ${JSON.stringify(links)};
+  const maxCount = ${maxCount};
 
-  const svg = d3.select(container).append('svg').attr('viewBox', [0, 0, width, height]).attr('class', 'graph-svg');
+  const svg = d3.select(container).append('svg')
+    .attr('width', width).attr('height', height)
+    .attr('class', 'graph-svg');
+
+  // Zoom + pan
+  const g = svg.append('g');
+  svg.call(d3.zoom()
+    .scaleExtent([0.2, 5])
+    .on('zoom', (event) => g.attr('transform', event.transform))
+  );
+
+  // Tooltip
+  const tooltip = d3.select(container).append('div')
+    .style('position','absolute').style('background','#fff').style('border','1px solid #ccc')
+    .style('padding','6px 10px').style('border-radius','4px').style('font-size','0.8rem')
+    .style('pointer-events','none').style('opacity','0').style('box-shadow','0 2px 8px rgba(0,0,0,0.1)');
+
   const simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(80))
-    .force('charge', d3.forceManyBody().strength(-120))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 60 + (d.target?.count || 1) * 8))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'company' ? -300 - d.count * 30 : -50))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(20));
+    .force('collision', d3.forceCollide().radius(d => d.type === 'company' ? 8 + d.count * 4 : 6))
+    .force('x', d3.forceX(width / 2).strength(0.03))
+    .force('y', d3.forceY(height / 2).strength(0.03));
 
-  const link = svg.append('g').selectAll('line').data(links).join('line')
-    .attr('stroke', '#ccc').attr('stroke-width', 1);
+  const link = g.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', '#d4cdc4').attr('stroke-width', 0.8);
 
-  const node = svg.append('g').selectAll('circle').data(nodes).join('circle')
-    .attr('r', d => d.type === 'company' ? 10 : 5)
-    .attr('fill', d => d.type === 'company' ? '#c0392b' : '#2c3e50')
+  const node = g.append('g').selectAll('circle').data(nodes).join('circle')
+    .attr('r', d => d.type === 'company' ? 6 + d.count * 3 : 4)
+    .attr('fill', d => d.type === 'company' ? '#c0392b' : '#5a7d9a')
+    .attr('stroke', d => d.type === 'company' ? '#8b2020' : 'none')
+    .attr('stroke-width', d => d.type === 'company' ? 1.5 : 0)
+    .style('cursor', 'pointer')
+    .on('mouseover', (event, d) => {
+      tooltip.style('opacity', 1)
+        .html(d.type === 'company'
+          ? '<strong>' + d.id + '</strong><br>' + d.count + ' people'
+          : '<strong>' + d.id + '</strong>')
+        .style('left', (event.offsetX + 12) + 'px')
+        .style('top', (event.offsetY - 10) + 'px');
+      d3.select(event.target).attr('r', d.type === 'company' ? 8 + d.count * 3 : 6);
+    })
+    .on('mouseout', (event, d) => {
+      tooltip.style('opacity', 0);
+      d3.select(event.target).attr('r', d.type === 'company' ? 6 + d.count * 3 : 4);
+    })
     .call(d3.drag().on('start', dragstart).on('drag', dragged).on('end', dragend));
 
-  node.append('title').text(d => d.id);
-
-  const label = svg.append('g').selectAll('text').data(nodes.filter(d => d.type === 'company')).join('text')
-    .text(d => d.id.substring(0, 20)).attr('font-size', 9).attr('fill', '#666').attr('dx', 14);
+  // Labels only on companies with 2+ people
+  const label = g.append('g').selectAll('text')
+    .data(nodes.filter(d => d.type === 'company'))
+    .join('text')
+    .text(d => d.id.length > 25 ? d.id.substring(0, 25) + '…' : d.id)
+    .attr('font-size', d => 8 + Math.min(d.count, 5))
+    .attr('font-weight', d => d.count >= 3 ? '600' : '400')
+    .attr('fill', '#333')
+    .attr('dx', d => 10 + d.count * 2)
+    .attr('dy', 3)
+    .style('pointer-events', 'none');
 
   simulation.on('tick', () => {
     link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
