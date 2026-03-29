@@ -65,10 +65,12 @@ export function md2html(inputPath, outputPath) {
   console.log(`HTML written to ${outputPath}`);
 }
 
-// CLI: node src/md2html.js input.md output.html
-const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
-if (args.length >= 2) {
-  md2html(args[0], args[1]);
-} else if (args.length === 1) {
-  md2html(args[0], args[0].replace('.md', '.html'));
+// CLI: node lib/md2html.js input.md output.html
+if (process.argv[1]?.endsWith('md2html.js')) {
+  const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
+  if (args.length >= 2) {
+    md2html(args[0], args[1]);
+  } else if (args.length === 1) {
+    md2html(args[0], args[0].replace('.md', '.html'));
+  }
 }

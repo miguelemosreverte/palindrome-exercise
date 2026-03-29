@@ -1,4 +1,4 @@
-import { Scraper } from '../scraper.js';
+import { Scraper } from '../lib/scraper.js';
 
 /**
  * Argentine Senior Software Developers — Ingestion Task

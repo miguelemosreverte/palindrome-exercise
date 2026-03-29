@@ -115,13 +115,15 @@ export async function generateReport(taskName) {
   return mdPath;
 }
 
-// CLI
-const task = process.argv.find(a => a.startsWith('--task='))?.split('=')[1];
-if (task) {
-  const htmlPath = await generateReport(task);
-  if (htmlPath) {
-    const { md2html } = await import('./md2html.js');
-    const outDir = join(ROOT, 'output', task);
-    md2html(join(outDir, 'report.md'), join(outDir, 'index.html'));
+// CLI (when run directly)
+if (process.argv[1]?.endsWith('report.js')) {
+  const task = process.argv.find(a => a.startsWith('--task='))?.split('=')[1];
+  if (task) {
+    const htmlPath = await generateReport(task);
+    if (htmlPath) {
+      const { md2html } = await import('./md2html.js');
+      const outDir = join(ROOT, 'output', task);
+      md2html(join(outDir, 'report.md'), join(outDir, 'index.html'));
+    }
   }
 }

@@ -1,8 +1,8 @@
-import { Scraper } from '../scraper.js';
+import { Scraper } from '../lib/scraper.js';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { getChromeCookes } from '../chrome-cookies.js';
-import { humanMove, humanClick, humanScroll, humanReadPage, humanNavigate, Session, sleep, betaRange, uniform } from '../human.js';
+import { getChromeCookes } from '../lib/chrome-cookies.js';
+import { humanMove, humanClick, humanScroll, humanReadPage, humanNavigate, Session, sleep, betaRange, uniform } from '../lib/human.js';
 
 /**
  * Argentine Senior Software Developers — LinkedIn

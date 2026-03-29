@@ -1,96 +1,137 @@
-# OpenCode Ingest — Agent-Driven Data Ingestion Framework
+# OpenCode Ingest — Browser-Based Data Ingestion CLI
 
-## Philosophy
+Your Chrome session is the universal API. This tool leverages it for authenticated
+scraping, normalization, and live report generation across any domain.
 
-This project is **built by the agent, for the agent**. The agent evolves the scraper scripts
-over time, adding domain knowledge, pagination logic, and normalization rules incrementally.
+## Quick Start
 
-Each "task" is a domain (real-estate, hr, linkedin, etc.) with its own:
-- Puppeteer scraper (iterator pattern with `.next()`)
-- Raw data store (JSON lines in `data/{task}/raw/`)
-- SQLite normalized database (`data/{task}/db.sqlite`)
-- Living Markdown report → HTML (`output/{task}/index.html`)
+```bash
+npm install
+node bin/ingest.js list                    # See available tasks
+node bin/ingest.js run example             # Run one iteration
+node bin/ingest.js run example --iterations=5
+node bin/ingest.js status example          # Check progress
+```
+
+## CLI Commands
+
+```bash
+# Core pipeline
+ingest run <task> [--iterations=N]         # Scrape → normalize → report → HTML
+ingest feed <task> [--file=data.json]      # Feed external JSON into pipeline
+ingest report <task>                       # Regenerate report from existing data
+ingest render <file.md> [output.html]      # Convert any markdown to themed HTML
+
+# Browser session (uses your real Chrome cookies)
+ingest browse <url> [--domain=.site.com]   # Open URL authenticated
+ingest cookies <domain>                    # Inspect extracted cookies
+
+# Task management
+ingest list                                # List tasks + record counts
+ingest new <name>                          # Scaffold a new task
+ingest status <task>                       # Show iterations, records, cursor
+```
 
 ## Architecture
 
 ```
-src/
-├── ingest.js          ← Main entry: picks task, runs scraper.next(), stores raw, normalizes, reports
-├── scraper.js         ← Base scraper class with .next() iterator pattern
-├── normalize.js       ← Raw JSON → SQLite normalization
-├── report.js          ← SQLite → Markdown with ```chartjs``` blocks + insights
-├── md2html.js         ← Universal Markdown → HTML converter (Chart.js, tables, timeline)
-└── tasks/             ← One file per domain (the agent creates these over time)
-    └── example.js     ← Template task
-
-data/{task}/
-├── raw/               ← JSON lines files, one per iteration (001.jsonl, 002.jsonl, ...)
-├── db.sqlite          ← Normalized relational data
-└── meta.json          ← Task metadata: source URLs, page cursor, iteration count
-
-output/{task}/
-├── report.md          ← Generated Markdown report
-└── index.html         ← Rendered HTML (always viewable)
+bin/ingest.js          ← Single CLI entry point
+lib/
+├── browser.js         ← Playwright + Chrome cookie injection (the primitive)
+├── human.js           ← Human behavior emulation (Bezier, Fitts's Law, session rhythm)
+├── scraper.js         ← Base Scraper class with .next() iterator pattern
+├── normalize.js       ← Raw JSONL → SQLite
+├── report.js          ← SQLite → Markdown with ```chartjs``` blocks
+├── md2html.js         ← Universal Markdown → themed HTML with Chart.js
+├── graph.js           ← Neo4j relationship layer (optional)
+└── chrome-cookies.js  ← macOS Chrome cookie decryption
+tasks/                 ← Domain scrapers (agent creates these over time)
+├── example.js         ← Template (Hacker News)
+├── ar-senior-devs.js  ← GetOnBoard jobs
+└── ar-senior-devs-linkedin.js  ← LinkedIn with human emulation
 ```
 
-## Iteration Cycle
-
-Each invocation of `npm run ingest -- --task=<name>` does ONE iteration:
-
-1. **Discover** — If no task file exists, agent researches known sites for the domain
-2. **Scrape** — Call `scraper.next()` → fetches next page(s), returns raw records
-3. **Store** — Append raw JSON lines to `data/{task}/raw/{iteration}.jsonl`
-4. **Normalize** — Parse raw → insert/update SQLite tables
-5. **Report** — Query SQLite → generate Markdown with Chart.js charts
-6. **Render** — Convert Markdown → HTML via `md2html.js`
-
-The agent can invoke this repeatedly. Each run picks up where the last left off (cursor in meta.json).
-
-## Report Structure (every task follows this)
-
-```markdown
-# {Task Name} — Ingestion Report
-
-## Timeline
-- **Iteration 1** (2024-01-15): Scraped 50 records from site-a.com/page/1
-- **Iteration 2** (2024-01-15): Scraped 50 records from site-a.com/page/2
-...
-
-## Overview
-{Agent-written insights and conclusions about the data}
-
-## Charts
-```chartjs
-{ "type": "line", "data": { ... } }
-```
-
-## Data
-| Column A | Column B | ... |
-|----------|----------|-----|
-| ...      | ...      | ... |
-```
-
-## Commands
+## Creating a New Task
 
 ```bash
-# Run one iteration for a task
-npm run ingest -- --task=real-estate
-
-# Regenerate report without scraping
-npm run report -- --task=real-estate
-
-# Convert any markdown to HTML
-npm run md2html -- input.md output.html
-
-# Serve output folder
-npm run serve
+ingest new my-domain
+# Edit tasks/my-domain.js:
 ```
 
-## Agent Guidelines
+```js
+import { Scraper } from '../lib/scraper.js';
 
-- **Create task files incrementally** — don't try to build the perfect scraper upfront
-- **Store raw data first** — normalize later; raw is the source of truth
-- **Pagination via cursor** — meta.json tracks where we left off
-- **Max 100 pages per task** unless explicitly told otherwise
-- **Reports are append-friendly** — each iteration adds to the timeline
-- **Insights should be specific** — not generic summaries, actual patterns found in data
+export default class MyDomainScraper extends Scraper {
+  // Inject Chrome cookies for authenticated sites:
+  get cookieDomain() { return '.example.com'; }
+
+  sources() {
+    return [{ name: 'Source', url: 'https://example.com/data' }];
+  }
+
+  async extract(page) {
+    return page.evaluate(() => {
+      // Return array of record objects
+      return [...document.querySelectorAll('.item')].map(el => ({
+        title: el.querySelector('h2')?.textContent,
+        url: el.querySelector('a')?.href,
+      }));
+    });
+  }
+
+  async nextPage(page) {
+    if (this.meta.iteration >= 100) return false;
+    const next = await page.$('a[rel="next"]');
+    if (!next) return false;
+    await next.click();
+    await page.waitForLoadState('networkidle');
+    return true;
+  }
+}
+```
+
+## Composability
+
+The core primitives are independent and composable:
+
+- **`lib/browser.js`** — `createBrowser({domain})` → authenticated Playwright session
+- **`lib/human.js`** — `humanClick()`, `humanScroll()`, `humanType()`, `Session` class
+- **`lib/chrome-cookies.js`** — `getChromeCookes(domain)` → cookie array
+- **`lib/normalize.js`** — `normalize(task, dir)` → JSONL to SQLite
+- **`lib/report.js`** — `generateReport(task)` → Markdown with charts
+- **`lib/md2html.js`** — `md2html(input, output)` → themed HTML
+
+Tasks compose these. The LinkedIn scraper uses browser + human + cookies.
+A YouTube task would use browser + cookies. A public site just uses browser.
+
+## Data Flow
+
+Each `ingest run` iteration:
+1. **Scrape** — `scraper.next()` launches Playwright, calls task's `extract(page)`
+2. **Store** — Raw JSONL in `data/{task}/raw/{iteration}.jsonl`
+3. **Normalize** — Parse → SQLite `data/{task}/db.sqlite`
+4. **Report** — Query → Markdown with Chart.js + data table
+5. **Render** — Markdown → `output/{task}/index.html`
+
+Cursor in `meta.json` tracks position. Each run resumes where it left off.
+
+## Report Structure (every task)
+
+```
+# {Task} — Ingestion Report
+## Timeline        ← iteration log
+## Overview        ← agent insights (filled over time)
+## Dataset Growth  ← Chart.js line chart
+## Records/Iter    ← Chart.js bar chart
+## Data            ← scrollable table
+```
+
+## Human Behavior Emulation
+
+For sites that detect automation (LinkedIn, etc.), `lib/human.js` provides:
+- Mouse: Bezier curves, Fitts's Law velocity, 25% overshoot-and-correct
+- Clicks: variable hold (60-180ms), pre-click dwell
+- Typing: burst patterns, 3% typo rate, word-boundary pauses
+- Scrolling: momentum deceleration, direction changes
+- Timing: beta distribution (not uniform random)
+- Sessions: warm-up, periodic breaks, daily limits (28-35)

@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { createBrowser } from './browser.js';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -27,15 +27,14 @@ export class Scraper {
   async nextPage(page) { return false; }
 
   /** One iteration: launch browser, scrape next page(s), save raw, update meta */
+  /** Cookie domain for authenticated scraping — override in task if needed */
+  get cookieDomain() { return undefined; }
+
   async next() {
-    const headless = process.env.HEADLESS !== 'false';
-    const browser = await chromium.launch({ headless });
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1440, height: 900 },
+    const { browser, page, close } = await createBrowser({
+      domain: this.cookieDomain,
       locale: 'es-AR',
     });
-    const page = await context.newPage();
 
     try {
       const url = this.meta.cursor || this.sources()[0]?.url;
@@ -71,7 +70,7 @@ export class Scraper {
       this.saveMeta();
       return { records, iteration: this.meta.iteration, hasNext };
     } finally {
-      await browser.close();
+      await close();
     }
   }
 
