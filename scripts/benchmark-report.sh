@@ -19,7 +19,9 @@ echo "=== Benchmark Report: $BENCH_NAME ==="
 
 # Step 1: Extract ALL data for this benchmark from SQLite into a single JSON
 echo "Reading data from SQLite..."
-ALL_DATA=$(node -e "
+TMPDATA=$(mktemp)
+export TMPDATA
+node -e "
 const db = require('./lib/db');
 
 // Get benchmark-specific data
@@ -55,9 +57,21 @@ let totalStoredRows = 0;
 let uniqueUrls = new Set();
 for (const r of allData) {
   try {
-    const d = JSON.parse(r.data);
+    // Data might be JSON object or raw text string
+    let d;
+    try { d = JSON.parse(r.data); } catch(e) { d = { text: r.data }; }
+    const text = typeof d === 'string' ? d : (d.text || r.data || '');
     totalStoredRows += (d.rows || []).length;
     (d.sources || []).forEach(u => uniqueUrls.add(u));
+    // Also count CSV rows in raw text
+    const csvMatch = text.match(/```csv\s*\n([\s\S]*?)```/);
+    if (csvMatch) {
+      const lines = csvMatch[1].trim().split('\n').filter(l => l.trim());
+      totalStoredRows += Math.max(0, lines.length - 1); // minus header
+    }
+    // Extract URLs from text
+    const urlMatches = text.match(/https?:\/\/[^\s"',]+/g);
+    if (urlMatches) urlMatches.forEach(u => uniqueUrls.add(u));
   } catch(e) {}
 }
 
@@ -85,7 +99,22 @@ for (const r of records) {
   // Direct structured data (from benchmark-hr-real.js)
   if (d.headers && d.rows && d.rows.length > 0) {
     output.tables.push({ name, headers: d.headers, rows: d.rows, sources: d.sources || [] });
-    continue; // skip markdown parsing — we have the structured data already
+    continue;
+  }
+
+  // Raw text — might contain CSV blocks
+  const csvMatch = text.match(/\x60\x60\x60csv\\s*\\n([\\s\\S]*?)\x60\x60\x60/);
+  if (csvMatch) {
+    const lines = csvMatch[1].trim().split('\\n').filter(l => l.trim());
+    if (lines.length > 1) {
+      const headers = lines[0].split(',').map(h => h.trim());
+      const rows = lines.slice(1).map(l => {
+        const cells = []; let cur = '', inQ = false;
+        for (const ch of l) { if (ch==='\"'){inQ=!inQ;continue;} if(ch===','&&!inQ){cells.push(cur.trim());cur='';continue;} cur+=ch; }
+        cells.push(cur.trim()); return cells;
+      });
+      output.tables.push({ name, headers, rows });
+    }
   }
 
   // Extract chartjs blocks
@@ -144,62 +173,48 @@ for (const r of records) {
   }
 }
 
-console.log(JSON.stringify(output));
-" 2>/dev/null)
+const fs = require('fs');
+fs.writeFileSync(process.env.TMPDATA || '/tmp/bench-data.json', JSON.stringify(output));
+console.log('Data extracted: ' + output.tables.length + ' tables, ' + output.charts.length + ' charts, ' + output.history.length + ' runs');
+" 2>/dev/null
 
 echo "Data extracted. Generating analysis..."
 
-# Step 2: Ask Claude to analyze the ACTUAL data
-ANALYSIS=$(echo "$ALL_DATA" | node -e "
-let d = '';
-process.stdin.on('data', c => d += c);
-process.stdin.on('end', () => {
-  const data = JSON.parse(d);
-  let prompt = 'You are a senior analyst. Write a concise research brief based ONLY on this data. No speculation.\\n\\n';
+# Step 2: Build analysis prompt from temp file data
+ANALYSIS_PROMPT=$(node -e "
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.env.TMPDATA || '/tmp/bench-data.json', 'utf8'));
+let p = 'You are a senior analyst. Write a concise research brief based ONLY on this data.\\n\\n';
+for (const t of data.tables) {
+  p += 'TABLE ' + t.name + ':\\n' + t.headers.join(' | ') + '\\n';
+  for (const r of t.rows) p += r.join(' | ') + '\\n';
+  p += '\\n';
+}
+for (const c of data.charts) {
+  if (c.dataTable) { p += 'CHART ' + c.name + ':\\n' + c.dataTable.headers.join(' | ') + '\\n';
+    for (const r of c.dataTable.rows) p += r.join(' | ') + '\\n'; p += '\\n'; }
+}
+for (const r of data.rawTexts) { p += 'DATA ' + r.name + ': ' + r.text.substring(0,500) + '\\n'; }
+p += '\\nWrite: 1. Key Findings 2. Market Insights 3. Data Quality. Be concise. Use markdown.';
+console.log(p);
+" 2>/dev/null)
 
-  // Feed tables
-  for (const t of data.tables) {
-    prompt += 'TABLE: ' + t.name + '\\n';
-    prompt += t.headers.join(' | ') + '\\n';
-    for (const r of t.rows) prompt += r.join(' | ') + '\\n';
-    prompt += '\\n';
-  }
-
-  // Feed chart data as tables
-  for (const c of data.charts) {
-    prompt += 'CHART DATA (' + c.name + '):\\n';
-    prompt += c.dataTable.headers.join(' | ') + '\\n';
-    for (const r of c.dataTable.rows) prompt += r.join(' | ') + '\\n';
-    prompt += '\\n';
-  }
-
-  // Feed cards
-  for (const c of data.cards) {
-    prompt += 'METRICS (' + c.name + '): ';
-    prompt += c.items.map(i => i.label + '=' + i.value).join(', ') + '\\n';
-  }
-
-  // Feed raw texts
-  for (const r of data.rawTexts) {
-    prompt += 'RAW (' + r.name + '): ' + r.text.substring(0, 500) + '\\n';
-  }
-
-  prompt += '\\nWrite: 1) Key Findings (specific numbers only) 2) Market Insights 3) Data Quality Assessment. Be concise. Use markdown.';
-  console.log(prompt);
-});
+ANALYSIS=$(echo "$ANALYSIS_PROMPT"
 " | claude --model haiku --output-format text --dangerously-skip-permissions --tools "" -p - 2>/dev/null)
 
+echo "$ANALYSIS" > /tmp/bench-analysis.txt
 echo "Analysis complete. Building HTML..."
 
 # Step 3: Build the HTML report
-export ALL_DATA
-export ANALYSIS
 export REPORT_HTML
 
 node << 'NODEOF'
 const fs = require('fs');
-const data = JSON.parse(process.env.ALL_DATA);
-const analysis = process.env.ANALYSIS || '';
+const data = JSON.parse(fs.readFileSync(process.env.TMPDATA || '/tmp/bench-data.json', 'utf8'));
+let analysis = '';
+try { analysis = fs.readFileSync('/tmp/bench-analysis.txt', 'utf8'); } catch(e) {
+  analysis = process.env.ANALYSIS || '';
+}
 const outPath = process.env.REPORT_HTML;
 
 // Convert analysis markdown to simple HTML

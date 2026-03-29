@@ -1,0 +1,669 @@
+- generic [active] [ref=e1]:
+  - banner:
+    - generic [ref=e4]:
+      - button "Howdy Logo" [ref=e5] [cursor=pointer]:
+        - img "Howdy Logo" [ref=e6]
+      - button "Open menu" [ref=e7] [cursor=pointer]
+  - main [ref=e8]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - navigation [ref=e12]:
+          - link "Blog" [ref=e13] [cursor=pointer]:
+            - /url: /blog
+        - heading "2026 LatAm Software Engineer Cost Benchmarks by Country" [level=1] [ref=e14]
+        - paragraph [ref=e15]: Transparent cost breakdowns for hiring software engineers across Latin America in 2026, including base salaries, employer taxes, EOR fees, staffing agency markups, and decision frameworks for choosing between hiring models.
+      - img "2026 LatAm Software Engineer Cost Benchmarks by Country" [ref=e17]
+    - generic [ref=e19]:
+      - generic [ref=e22]:
+        - button "Toggle table of contents" [ref=e23] [cursor=pointer]:
+          - img [ref=e25]
+          - generic [ref=e26]: Table of Contents
+          - img [ref=e27]
+        - navigation:
+          - button "2026 LatAm benchmark hub (Start here)" [ref=e30] [cursor=pointer]
+          - generic [ref=e31]:
+            - separator [ref=e32]
+            - button "Definitions" [ref=e33] [cursor=pointer]
+          - generic [ref=e34]:
+            - separator [ref=e35]
+            - button "LatAm software developer salary benchmarks (2025-2026)" [ref=e36] [cursor=pointer]
+          - generic [ref=e37]:
+            - separator [ref=e38]
+            - 'button "Cost savings comparison: US vs LatAm" [ref=e39] [cursor=pointer]'
+          - generic [ref=e40]:
+            - separator [ref=e41]
+            - button "How to translate salary benchmarks into fully-loaded 2026 cost" [ref=e42] [cursor=pointer]
+          - generic [ref=e43]:
+            - separator [ref=e44]
+            - button "Employer of record (EOR) costs in Latin America" [ref=e45] [cursor=pointer]
+          - generic [ref=e46]:
+            - separator [ref=e47]
+            - button "Staffing agency fees and pricing models" [ref=e48] [cursor=pointer]
+          - generic [ref=e49]:
+            - separator [ref=e50]
+            - button "Fully-loaded employment costs" [ref=e51] [cursor=pointer]
+          - generic [ref=e52]:
+            - separator [ref=e53]
+            - button "Direct hiring vs EOR cost comparison" [ref=e54] [cursor=pointer]
+          - generic [ref=e55]:
+            - separator [ref=e56]
+            - button "Contractor vs employee cost comparison" [ref=e57] [cursor=pointer]
+          - generic [ref=e58]:
+            - separator [ref=e59]
+            - button "Tax rates and employment costs by country" [ref=e60] [cursor=pointer]
+          - generic [ref=e61]:
+            - separator [ref=e62]
+            - button "All-in monthly cost models by hiring method" [ref=e63] [cursor=pointer]
+          - generic [ref=e64]:
+            - separator [ref=e65]
+            - button "Strategic decision framework" [ref=e66] [cursor=pointer]
+          - generic [ref=e67]:
+            - separator [ref=e68]
+            - button "2026 hiring trends and market outlook" [ref=e69] [cursor=pointer]
+          - generic [ref=e70]:
+            - separator [ref=e71]
+            - button "Methodology & update cadence" [ref=e72] [cursor=pointer]
+          - generic [ref=e73]:
+            - separator [ref=e74]
+            - button "Related benchmarks (next steps)" [ref=e75] [cursor=pointer]
+          - generic [ref=e76]:
+            - separator [ref=e77]
+            - button "Conclusion" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: January 29, 2026
+          - generic [ref=e82]: • Updated on February 11, 2026
+        - generic [ref=e84]:
+          - paragraph [ref=e85]:
+            - emphasis [ref=e86]:
+              - strong [ref=e87]: "Last updated:"
+              - text: Feb 2026
+          - heading "2026 LatAm benchmark hub (Start here)" [level=3] [ref=e88]
+          - paragraph [ref=e89]: "This page is the source of truth for 2026 LatAm engineering cost benchmarks — base salaries, employer taxes, EOR fees, staffing markups, and decision frameworks. For deeper drill-downs, these companion benchmarks cover the rest of the all-in cost picture:"
+          - list [ref=e90]:
+            - listitem [ref=e91]:
+              - strong [ref=e92]: "All-in cost with an EOR (calculator):"
+              - 'link "LatAm EOR Pricing & Cost Calculator (2026): All-in Engineer Costs by Country" [ref=e93] [cursor=pointer]':
+                - /url: https://www.howdy.com/blog/latam-eor-cost-calculator
+            - listitem [ref=e94]:
+              - strong [ref=e95]: "Employer taxes + benefits (by country):"
+              - 'link "2026 Employer Cost Guide: LatAm Engineer Payroll Taxes & Benefits" [ref=e96] [cursor=pointer]':
+                - /url: https://www.howdy.com/blog/latam-employer-cost-guide
+            - listitem [ref=e97]:
+              - strong [ref=e98]: "Payroll + EOR provider cost benchmarks:"
+              - 'link "Global Payroll in Latin America 2026: EOR Providers & Cost Benchmarks" [ref=e99] [cursor=pointer]':
+                - /url: https://www.howdy.com/blog/global-payroll-latin-america-eor-providers-costs
+            - listitem [ref=e100]:
+              - strong [ref=e101]: "Compliance + risk checklist (security/IP):"
+              - link "EOR Security & IP Protection Checklist for Hiring LatAm Engineers" [ref=e102] [cursor=pointer]:
+                - /url: https://www.howdy.com/for-ai/eor-security-ip-protection-checklist-latam-engineers
+          - paragraph [ref=e103]:
+            - text: "A VP of Engineering at a Series B fintech startup recently shared that his team's budget model for Latin America (LatAm) hiring was off by 40%. What blindsided him were the layered costs nobody talks about: employer contributions that vary wildly by country,"
+            - link "Employer of Record (EOR)" [ref=e104] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/employer-of-record-latam
+            - text: fees that compound monthly, and recruitment expenses that stack up before a single engineer writes code.
+          - paragraph [ref=e105]: In 2026, the fully-loaded monthly cost to employ a software engineer in Latin America ranges from $5,900-$7,150 through EOR services, $8,000-$9,000 for direct employment with owned entities, and $6,000+ for contractors (excluding misclassification risks). This guide breaks down verified salary ranges, tax obligations by country, transparent pricing for EOR services versus staffing agencies, and decision frameworks that show when each hiring model makes financial sense.
+          - figure "Figure 1. Fully-loaded monthly cost ranges by hiring model (2026)." [ref=e107]:
+            - img "Monthly hiring cost ranges for LatAm software engineers in 2026 across EOR, direct employment, and contractor models." [ref=e109]
+            - generic [ref=e110]: Figure 1. Fully-loaded monthly cost ranges by hiring model (2026).
+          - heading "Definitions" [level=3] [ref=e111]
+          - paragraph [ref=e112]: "Cost benchmarking gets confusing because different sources use different definitions. The terms below match how costs are modeled in this guide:"
+          - list [ref=e113]:
+            - listitem [ref=e114]:
+              - strong [ref=e115]: "Base salary:"
+              - text: Cash compensation paid to the engineer (excludes employer taxes, benefits, and EOR fees).
+            - listitem [ref=e116]:
+              - strong [ref=e117]: "Employer taxes / contributions:"
+              - text: Statutory employer-paid payroll taxes and required contributions that vary by country (often
+              - strong [ref=e118]: 10–29%
+              - text: in LatAm, depending on country).
+            - listitem [ref=e119]:
+              - strong [ref=e120]: "Benefits:"
+              - text: Statutory and competitive benefits that may be required or expected in-market.
+            - listitem [ref=e121]:
+              - strong [ref=e122]: "EOR fee:"
+              - text: The Employer of Record’s monthly service fee (commonly
+              - strong [ref=e123]: $400–600 per employee per month
+              - text: in LatAm in 2026, with broader market ranges depending on provider and country).
+            - listitem [ref=e124]:
+              - strong [ref=e125]: "Fully-loaded cost:"
+              - text: Base salary
+              - strong [ref=e126]: plus
+              - text: employer taxes/contributions
+              - strong [ref=e127]: plus
+              - text: benefits.
+            - listitem [ref=e128]:
+              - strong [ref=e129]: "All-in cost (EOR):"
+              - text: Fully-loaded cost
+              - strong [ref=e130]: plus
+              - text: EOR fees and any pass-through costs (if applicable).
+            - listitem [ref=e131]:
+              - strong [ref=e132]: "Ranges vs. point estimates:"
+              - text: Benchmarks are presented as ranges because specialization (AI/ML, DevOps, security), English requirements, city, and hiring channel can materially change outcomes.
+          - generic [ref=e133]:
+            - generic [ref=e134]: "Quick answers: what does a LatAm engineer cost in 2026?"
+            - table [ref=e135]:
+              - rowgroup [ref=e136]:
+                - row "Scenario What’s included Typical all-in monthly cost (2026)" [ref=e137]:
+                  - cell "Scenario" [ref=e138]:
+                    - strong [ref=e139]: Scenario
+                  - cell "What’s included" [ref=e140]:
+                    - strong [ref=e141]: What’s included
+                  - cell "Typical all-in monthly cost (2026)" [ref=e142]:
+                    - strong [ref=e143]: Typical all-in monthly cost (2026)
+                - row "EOR (LATAM, typical range) Base salary + employer taxes/contributions (10–29%) + EOR fee $5,900–$7,150" [ref=e144]:
+                  - cell "EOR (LATAM, typical range)" [ref=e145]
+                  - cell "Base salary + employer taxes/contributions (10–29%) + EOR fee" [ref=e146]
+                  - cell "$5,900–$7,150" [ref=e147]
+                - row "EOR (Mexico example) $5,000 base + 17% employer contributions + ~$500 EOR fee ~$6,350" [ref=e148]:
+                  - cell "EOR (Mexico example)" [ref=e149]
+                  - cell "$5,000 base + 17% employer contributions + ~$500 EOR fee" [ref=e150]
+                  - cell "~$6,350" [ref=e151]
+                - row "EOR (Colombia example) $5,000 base + 29% employer contributions + ~$600 EOR fee ~$7,050" [ref=e152]:
+                  - cell "EOR (Colombia example)" [ref=e153]
+                  - cell "$5,000 base + 29% employer contributions + ~$600 EOR fee" [ref=e154]
+                  - cell "~$7,050" [ref=e155]
+                - row "Direct employment (owned entity, typical range) Base salary + employer contributions + benefits + entity maintenance $8,000–$9,000" [ref=e156]:
+                  - cell "Direct employment (owned entity, typical range)" [ref=e157]
+                  - cell "Base salary + employer contributions + benefits + entity maintenance" [ref=e158]
+                  - cell "$8,000–$9,000" [ref=e159]
+                - row "Independent contractor (typical starting point) Contractor rate (excludes misclassification risk) $6,000+" [ref=e160]:
+                  - cell "Independent contractor (typical starting point)" [ref=e161]
+                  - cell "Contractor rate (excludes misclassification risk)" [ref=e162]
+                  - cell "$6,000+" [ref=e163]
+            - generic [ref=e164]: Typical all-in monthly cost ranges by hiring model, using the same assumptions referenced in this guide (employer contributions, EOR fees, and entity overhead where applicable).
+          - paragraph [ref=e165]:
+            - strong [ref=e166]: "Source:"
+            - text: Cost model examples and ranges in this guide; detailed assumptions in “All-in monthly cost models by hiring method.
+            - emphasis [ref=e167]:
+              - strong [ref=e168]: "Note:"
+              - text: Detailed model assumptions and a worked example appear in the ‘All-in monthly cost models’ section below.
+          - heading "LatAm software developer salary benchmarks (2025-2026)" [level=3] [ref=e169]
+          - paragraph [ref=e170]: As of 2026, average base salaries for LatAm software engineers range from $30,000 to $63,000 annually, with employer taxes adding 10-29% depending on country.
+          - generic [ref=e171]:
+            - generic [ref=e172]: Verified 2025 average annual software developer salaries by country (Howdy payroll data)
+            - table [ref=e173]:
+              - rowgroup [ref=e174]:
+                - row "Country Verified 2025 average annual salary (USD/year) Market note (from Howdy dataset)" [ref=e175]:
+                  - cell "Country" [ref=e176]:
+                    - strong [ref=e177]: Country
+                  - cell "Verified 2025 average annual salary (USD/year)" [ref=e178]:
+                    - strong [ref=e179]: Verified 2025 average annual salary (USD/year)
+                  - cell "Market note (from Howdy dataset)" [ref=e180]:
+                    - strong [ref=e181]: Market note (from Howdy dataset)
+                - row "Mexico $55,894 Deep full-stack and Python talent; top nearshore volume" [ref=e182]:
+                  - cell "Mexico" [ref=e183]
+                  - cell "$55,894" [ref=e184]
+                  - cell "Deep full-stack and Python talent; top nearshore volume" [ref=e185]
+                - row "Brazil $53,253 Wide range by region; São Paulo and Campinas lead" [ref=e186]:
+                  - cell "Brazil" [ref=e187]
+                  - cell "$53,253" [ref=e188]
+                  - cell "Wide range by region; São Paulo and Campinas lead" [ref=e189]
+                - row "Uruguay $61,732 Stable economy and senior developer density" [ref=e190]:
+                  - cell "Uruguay" [ref=e191]
+                  - cell "$61,732" [ref=e192]
+                  - cell "Stable economy and senior developer density" [ref=e193]
+                - row "Chile $61,266 Fintech and data-engineering demand rising" [ref=e194]:
+                  - cell "Chile" [ref=e195]
+                  - cell "$61,266" [ref=e196]
+                  - cell "Fintech and data-engineering demand rising" [ref=e197]
+                - row "Argentina $63,163 USD-based contracts offset inflation volatility" [ref=e198]:
+                  - cell "Argentina" [ref=e199]
+                  - cell "$63,163" [ref=e200]
+                  - cell "USD-based contracts offset inflation volatility" [ref=e201]
+                - row "Colombia $55,894 Fintech and SaaS markets driving salary growth" [ref=e202]:
+                  - cell "Colombia" [ref=e203]
+                  - cell "$55,894" [ref=e204]
+                  - cell "Fintech and SaaS markets driving salary growth" [ref=e205]
+                - row "Peru $61,265 Emerging AI and analytics roles command premiums" [ref=e206]:
+                  - cell "Peru" [ref=e207]
+                  - cell "$61,265" [ref=e208]
+                  - cell "Emerging AI and analytics roles command premiums" [ref=e209]
+            - generic [ref=e210]: Verified first-party 2025 payroll averages (USD/year) from Howdy’s dataset covering 12,500+ developers under compliant employment agreements across LATAM.
+          - paragraph [ref=e211]:
+            - emphasis [ref=e212]:
+              - strong [ref=e213]: "Note:"
+              - text: Verified 2025 averages are included as a baseline; 2026 planning uses the fully-loaded models below.
+          - heading "Base salary ranges by country" [level=4] [ref=e214]
+          - paragraph [ref=e215]:
+            - text: Verified 2025-2026 compensation data from Howdy covering 12,500+ developers shows
+            - link "average software engineer salaries in Latin America" [ref=e216] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/2025-latin-america-software-developer-salaries
+            - text: range from $53,000 to $63,000 annually. Argentina leads at $63,000, followed by Uruguay and Chile at $61,000 each.
+          - paragraph [ref=e217]: Panama and Costa Rica occupy the mid-tier at $43,160 and $41,350 respectively, while Mexico City developers average $30,515. Brazil's market varies significantly by region, with São Paulo commanding premium rates for senior DevOps and enterprise engineering roles.
+          - paragraph [ref=e218]: Full Stack Developers earn $28,271 in Mexico, $47,823 in Brazil, and $72,588 in Argentina. These ranges reflect base salary only; employer taxes and benefits add 10-29% depending on the country (detailed in the tax section below).
+          - heading "Salary by seniority level" [level=4] [ref=e219]
+          - paragraph [ref=e220]: Junior developers across LatAm earn $25,800 annually or $25-35 per hour in 2026. Mid-level engineers command $35-45 per hour, translating to roughly $70,000-90,000 annually for full-time roles.
+          - paragraph [ref=e221]: Senior developers earn $54,000-80,000 annually, with hourly rates reaching $40-80 depending on specialization and market. Lead developers in Latin America earn $5,040-12,600 monthly, or $60,480-151,200 annually.
+          - generic [ref=e222]:
+            - generic [ref=e223]: Verified 2025 LATAM developer salary bands (Howdy verified data)
+            - table [ref=e224]:
+              - rowgroup [ref=e225]:
+                - row "Level Typical profile Verified 2025 salary range (USD/year)" [ref=e226]:
+                  - cell "Level" [ref=e227]:
+                    - strong [ref=e228]: Level
+                  - cell "Typical profile" [ref=e229]:
+                    - strong [ref=e230]: Typical profile
+                  - cell "Verified 2025 salary range (USD/year)" [ref=e231]:
+                    - strong [ref=e232]: Verified 2025 salary range (USD/year)
+                - row "Junior Entry-level Go or React developer $18,000–$28,000" [ref=e233]:
+                  - cell "Junior" [ref=e234]
+                  - cell "Entry-level Go or React developer" [ref=e235]
+                  - cell "$18,000–$28,000" [ref=e236]
+                - row "Mid-level 3–5 years, full-stack or backend $35,000–$48,000" [ref=e237]:
+                  - cell "Mid-level" [ref=e238]
+                  - cell "3–5 years, full-stack or backend" [ref=e239]
+                  - cell "$35,000–$48,000" [ref=e240]
+                - row "Senior 6+ years, DevOps, AI, or data $55,000–$70,000" [ref=e241]:
+                  - cell "Senior" [ref=e242]
+                  - cell "6+ years, DevOps, AI, or data" [ref=e243]
+                  - cell "$55,000–$70,000" [ref=e244]
+            - generic [ref=e245]: Verified 2025 salary bands (USD/year) for junior, mid-level, and senior developers, useful for setting global pay bands before layering in employer contributions, benefits, and EOR fees.
+          - paragraph [ref=e246]:
+            - text: US equivalent salary bands range from $85,000 for junior roles to $160,000+ for senior positions. Companies
+            - link "hiring in LatAm save 60-68%" [ref=e247] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/2025-latin-america-software-developer-salaries
+            - text: on comparable talent without sacrificing quality (see cost savings section below).
+          - heading "Specialized role premiums" [level=4] [ref=e248]
+          - paragraph [ref=e249]: AI/ML specialists command a 15% premium over standard developer rates in 2026, while DevOps roles typically fetch 10% above baseline. Fintech expansion across Latin America has driven 20-30% premiums for developers with financial services experience.
+          - paragraph [ref=e250]: Cloud and DevOps specialists with AWS, Azure, or Kubernetes expertise earn $15-25 per hour above mid-level generalists. Cybersecurity roles and data specialists are projected to see 12-18% wage increases across Latin America in 2026.
+          - paragraph [ref=e251]: Healthtech and edtech platforms add roughly 10% for full-stack JavaScript and Python roles. These premiums reflect genuine market scarcity; expect to add 25-50% to general job-board rates when recruiting high-demand skills.
+          - 'heading "Cost savings comparison: US vs LatAm" [level=3] [ref=e252]'
+          - paragraph [ref=e253]: US companies hiring software engineers in LatAm achieve 60-68% cost savings compared to domestic hiring as of 2026.
+          - heading "Overall salary savings" [level=4] [ref=e254]
+          - paragraph [ref=e255]: The median US software engineer earns $125,000 in 2026, while a comparable mid-senior engineer in Mexico, Brazil, or Colombia averages $40,000. That represents 68% savings before accounting for benefits and taxes.
+          - paragraph [ref=e256]: Average cost savings for US companies hiring in LatAm is approximately 60-65% versus domestic hiring. A US developer earning $120,000-150,000 annually has a Latin American counterpart earning $36,000-55,000 for similar output and quality.
+          - paragraph [ref=e257]: "Latin American developers working remotely for international companies often earn 2-3x the local average. This wage arbitrage benefits both parties: US companies reduce costs while LatAm engineers access significantly higher compensation than domestic opportunities provide."
+          - heading "Regional wage variations" [level=4] [ref=e258]
+          - paragraph [ref=e259]: Early entrants in emerging markets like Chile, Honduras, and Ecuador still enjoy 30-70% labor savings as of 2026, though gaps are closing as demand increases. Mature markets like Argentina and Uruguay maintain higher rates but offer deeper talent pools and better retention.
+          - paragraph [ref=e260]: Mexico's proximity to US time zones and massive developer base (800,000+ tech professionals) has driven wage growth in Guadalajara and Monterrey. Brazil's 540,000 developers and Colombia's 165,000 create competitive markets where specialized skills command premiums.
+          - paragraph [ref=e261]: Argentina's 150,000 developers navigate hyperinflation through USD-based contracts. Many companies now include clauses to adjust dollar-denominated salary bands if local inflation exceeds 10%.
+          - heading "How to translate salary benchmarks into fully-loaded 2026 cost" [level=3] [ref=e262]
+          - paragraph [ref=e263]: "Salary is only the starting point. For 2026 planning, total cost typically requires layering:"
+          - list [ref=e264]:
+            - listitem [ref=e265]:
+              - strong [ref=e266]: Employer taxes/contributions
+              - text: (varies by country; often modeled as
+              - strong [ref=e267]: 10–29%
+              - text: in LATAM in this guide)
+            - listitem [ref=e268]:
+              - strong [ref=e269]: Benefits
+              - text: (statutory + competitive)
+            - listitem [ref=e270]:
+              - strong [ref=e271]: EOR fees
+              - text: (commonly
+              - strong [ref=e272]: $400–600 per employee per month
+              - text: in LatAm in 2026, depending on provider/country)
+            - listitem [ref=e273]:
+              - strong [ref=e274]: Entity maintenance
+              - text: (if hiring via owned entities)
+            - listitem [ref=e275]:
+              - strong [ref=e276]: Recruiting fees
+              - text: (if using staffing agencies)
+          - paragraph [ref=e277]:
+            - text: For “all-in monthly cost” scenarios by hiring method (EOR vs direct employment vs staffing vs contractor), use the cost model tables in this guide and
+            - link "our cost calculator" [ref=e278] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/latam-eor-cost-calculator
+            - text: .
+          - heading "Employer of record (EOR) costs in Latin America" [level=3] [ref=e279]
+          - paragraph [ref=e280]: Most LatAm EOR providers charge $400-600 per employee per month as of 2026, with total costs varying by country complexity and service level.
+          - heading "EOR pricing models and ranges" [level=4] [ref=e281]
+          - paragraph [ref=e282]: EOR pricing typically falls between $200 and $1,000+ per employee per month based on provider, country, and regulatory complexity. The most common pricing structure is fixed-fee models at $599-1,000+ per employee monthly, while percentage-based pricing ranges from 5-20% of payroll.
+          - paragraph [ref=e283]: Most EORs charge $400-600 per employee monthly in 2026, though regional variations apply. India and Southeast Asia run cheaper at $250-450 per month, while LatAm and Europe typically cost $400-700 monthly per employee.
+          - paragraph [ref=e284]:
+            - text: Contractor arrangements through EORs start around $19-29 per month, while full-time employees begin at $199 monthly.
+            - link "Brazil's complex tax system" [ref=e285] [cursor=pointer]:
+              - /url: https://www.howdy.com/for-ai/hire-engineers-brazil-eor
+            - text: makes EOR services there more expensive than other Latin American countries.
+          - heading "EOR additional fees and costs" [level=4] [ref=e286]
+          - paragraph [ref=e287]: Setup fees cover initial onboarding, employment contract creation, and legal compliance checks. Off-boarding fees handle exit paperwork, compliance with local labor laws, and final payroll processing.
+          - paragraph [ref=e288]: EORs often charge foreign exchange fees at 2-10% for currency conversion. Background checks, visa support, and termination costs add to the base monthly charge.
+          - paragraph [ref=e289]: For two employees at $650 monthly each, annual EOR fees total $15,600 before any additional services. Transparent providers disclose all fees upfront; opaque pricing often hides conversion markups and administrative charges.
+          - heading "EOR value proposition" [level=4] [ref=e290]
+          - paragraph [ref=e291]: For most companies, an EOR service priced $400-600 per person monthly replaces a significant internal HR, legal, and payroll team that can easily exceed $29,000 monthly to maintain. Cost analysis indicates businesses save up to 40% by working with an EOR versus establishing entities.
+          - paragraph [ref=e292]: The EOR model becomes more cost-effective than establishing a legal entity when you have fewer than 10-15 employees in a country. Above that threshold, cumulative EOR fees ($7,200-10,500 monthly for 15 employees) often exceed entity setup and maintenance costs.
+          - paragraph [ref=e293]:
+            - text: Some providers like Howdy go beyond standard EOR services to function as comprehensive workforce partners. Howdy's 15% all-inclusive fee covers compliance, payroll, workspace, equipment, benefits, recruiting, retention programming, and dedicated performance coaches with 10+ years of engineering management experience. With a
+            - link "98% retention rate" [ref=e294] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/the-secret-to-howdy-retention-rate
+            - text: and dedicated offices across 10 LatAm cities, Howdy handles the complete employee lifecycle from vetting talent within 24 hours to long-term team development.
+          - heading "Staffing agency fees and pricing models" [level=3] [ref=e295]
+          - paragraph [ref=e296]: Staffing agencies charge 20-25% of first-year salary for permanent software engineer placements as of 2026, with specialized or executive roles reaching 30%.
+          - heading "Direct hire placement fees" [level=4] [ref=e297]
+          - paragraph [ref=e298]: For a software engineer earning $100,000 annually, the standard staffing agency fee ranges from $20,000-25,000. Entry-level positions typically run 18%, mid-level at 22%, and executive roles at 30%.
+          - paragraph [ref=e299]: Technology sector firms most commonly charge 20% for placing a software engineer. This one-time fee covers recruiting, screening, and placement services but does not include ongoing employment costs.
+          - paragraph [ref=e300]: Most firms utilize percentage-based fee structures with a standard range of 15-25% for typical roles. The wide range reflects variations in role complexity, market demand, and candidate scarcity.
+          - heading "Temporary and contract staffing markups" [level=4] [ref=e301]
+          - paragraph [ref=e302]: Temporary staffing markups range 25-71% with averages of 35-41% depending on skill level, contract duration, and market demand. The most common markup range for contract software engineers is 25-40%.
+          - paragraph [ref=e303]: Higher markups apply for specialized or higher-risk work. The markup covers recruiter salaries, benefits administration, liability insurance, and operational overhead before the agency reaches its net profit margin.
+          - heading "Staffing agency profit margins" [level=4] [ref=e304]
+          - paragraph [ref=e305]: After covering all costs, agencies aim for 3-8% profit margins on temporary staffing. Higher-margin specialties often include IT, engineering, and healthcare staffing, where profit margins can reach 2-10%.
+          - heading "Fully-loaded employment costs" [level=3] [ref=e306]
+          - paragraph [ref=e307]: Fully-loaded employment costs run 150-200% of base salary in the US and 115-129% in LatAm as of 2026.
+          - heading "US employment cost components" [level=4] [ref=e308]
+          - paragraph [ref=e309]: US employers pay 6.2% for Social Security (up to $160,200 in wages) and 1.45% for Medicare with no cap. Unemployment insurance adds 6% on the first $7,000 of annual earnings.
+          - paragraph [ref=e310]: Companies with 50 or more employees must cover at least 60% of healthcare costs. The generally accepted rule is that fully burdened costs run 25-40% higher than base salary, though the US Bureau of Labor Statistics reported benefits for private industry employees increased fully burdened costs by 42%.
+          - paragraph [ref=e311]: A reasonable estimate for fully-loaded employee costs is 150-200% of base salary. The cost multiplier tends upward as salary increases, with higher earners triggering additional benefit costs and tax thresholds.
+          - heading "LatAm employment tax and benefit costs" [level=4] [ref=e312]
+          - paragraph [ref=e313]: US employers spend an average of 29.6% of salary on benefits, while Latin America ranges from 5-35% as of 2026. Colombia has the highest employer social security contributions at 29%, while Central American employers pay around 10%.
+          - paragraph [ref=e314]: Argentina employers contribute 23-27% to social security, while Mexico contributions hover around 17%. Most Latin American countries legally require a 13th month salary or Christmas bonus paid in installments.
+          - paragraph [ref=e315]: Argentina pays one month's salary in two installments (June and December), Brazil pays in November and December, Colombia splits between June and December, and Mexico pays at least 15 days of salary in December. Employee benefits packages in LatAm typically include health insurance, professional training, hardware, and corporate merchandise, totaling about $6,500 annually.
+          - heading "Recruitment and hidden costs" [level=4] [ref=e316]
+          - paragraph [ref=e317]: The average cost is 65 hours per engineer hired for $22,750 of business costs at $350 per hour. Typically, hiring a new employee takes 20-25% of that person's basic pay in recruitment expenses.
+          - paragraph [ref=e318]: The Bureau of Labor Statistics reports software developers' median yearly salary at $110,140, but total cost including all expenses reaches $142,741 annually. The real cost of full-time recruitment can reach 10-100% of annual salary when accounting for interviewer time, failed searches, and opportunity costs.
+          - paragraph [ref=e319]: On average, benefits add 20-30% to base salary for full-time employees. Employers also cover mandatory contributions, taxes, and benefits that vary by country, often adding 15-50% or more to total costs.
+          - heading "Direct hiring vs EOR cost comparison" [level=3] [ref=e320]
+          - figure "Figure 2. Typical EOR vs owned-entity break-even range per country (2026)." [ref=e322]:
+            - generic:
+              - img "Break-even range showing EOR is cheaper for small teams, with owned entities becoming more cost-effective as headcount increases."
+            - generic [ref=e323]: Figure 2. Typical EOR vs owned-entity break-even range per country (2026).
+          - paragraph [ref=e324]: Direct hiring becomes more cost-effective than EOR at 10-15+ employees per country as of 2026.
+          - heading "Direct hiring setup costs" [level=4] [ref=e325]
+          - paragraph [ref=e326]: In Brazil, opening a legal entity takes 30-60 days and costs over $15,000 in setup plus thousands annually for ongoing administrative and legal maintenance. Forming a company in Brazil may cost $10,000-25,000 when accounting for legal fees, licenses, translations, notary costs, and registrations.
+          - paragraph [ref=e327]: Other Latin American markets have lower barriers but still require significant investment. Ongoing entity maintenance includes local accounting, legal compliance updates, annual filings, and administrative staff running $2,000-3,000 monthly even before hiring your first employee.
+          - paragraph [ref=e328]: "For comparison, European markets require higher initial capital: Germany requires €400 registration plus €25,000 in start-up capital, Poland starts at €1,200, and Spain at €3,000."
+          - heading "EOR vs direct hiring break-even analysis" [level=4] [ref=e329]
+          - paragraph [ref=e330]: Consider switching from EOR to owned entity (costing $8,000-12,000 initially plus $2,000-3,000 monthly) around 10-15 employees, when cumulative EOR fees exceed entity costs. For 15 employees at $600 monthly EOR fees, you're paying $9,000 monthly or $108,000 annually.
+          - paragraph [ref=e331]: A 2025 survey by Globalization Partners shows 65% of growing companies prefer EORs when entering new markets due to cost and speed advantages. For large teams (20+ employees), cumulative monthly fees may exceed one-time entity setup costs over 2-3 years.
+          - paragraph [ref=e332]: As you hire more workers in a single location, EOR becomes less cost-efficient. The cost gap between 5 workers and 20 workers widens significantly, making entity formation increasingly attractive.
+          - heading "Contractor vs employee cost comparison" [level=3] [ref=e333]
+          - paragraph [ref=e334]: Contractors eliminate 25-40% in benefits costs but require strict compliance to avoid misclassification penalties.
+          - heading "Contractor vs employee cost differences" [level=4] [ref=e335]
+          - paragraph [ref=e336]: Employee benefits cost companies roughly 25-40% of base salary. An employee making $100,000 annually could cost their company $25,000-40,000 in benefits.
+          - paragraph [ref=e337]: Hiring employees offers security, structure, and cultural integration but requires deeper financial and administrative investment. Contractors deliver flexibility and cost-efficiency but require clear boundaries and strict compliance to avoid misclassification.
+          - paragraph [ref=e338]: Over time, employees often provide stronger business continuity, deeper team alignment, higher retention rates, and more robust legal protections. The upfront savings with contractors can erode if projects extend or misclassification penalties apply.
+          - heading "LatAm contractor tax and contribution requirements" [level=4] [ref=e339]
+          - paragraph [ref=e340]: Companies typically don't contribute to social security when hiring independent contractors in LatAm, a requirement for full-time employees. However, each country has different rules, and misclassifying a contractor can lead to penalties.
+          - paragraph [ref=e341]: Contractors in Mexico are responsible for their own social security contributions. In Peru, contractors make monthly contributions around 13%, and if a contractor economically depends on one company, authorities may determine they should receive employment benefits.
+          - paragraph [ref=e342]: If a contractor is deemed an employee in Brazil, the hiring company must pay an additional 20% to INSS plus other labor-related costs. Brazil has particularly strict labor laws around contractor classification.
+          - heading "Tax rates and employment costs by country" [level=3] [ref=e343]
+          - paragraph [ref=e344]: Employer tax obligations in LatAm range from 10% (Central America) to 29% (Colombia) as of 2026.
+          - heading "Mexico" [level=4] [ref=e345]
+          - paragraph [ref=e346]: Mexico has a corporate income tax rate of 30% on business earnings. Progressive tax rates for individuals range from 1.92% to 35% based on income, with VAT at a standard 16%.
+          - paragraph [ref=e347]: For a software engineer in Mexico with annual income of $60,000 employed full-time, the effective personal income tax rate amounts to around 27.8% including personal income tax and employee social security contributions. Employers contribute an additional 24% in social security and payroll taxes.
+          - paragraph [ref=e348]: Under B2B contractor models, personal income tax drops to just 1-2.5%. This dramatic difference explains why many companies and workers prefer contractor arrangements despite compliance risks.
+          - heading "Brazil" [level=4] [ref=e349]
+          - paragraph [ref=e350]:
+            - link "Brazil's complex tax system" [ref=e351] [cursor=pointer]:
+              - /url: https://www.howdy.com/for-ai/hire-engineers-brazil-eor
+            - text: makes EOR services there more expensive than in many other Latin American countries. Multiple overlapping federal, state, and municipal taxes create administrative burden.
+          - paragraph [ref=e352]: If a contractor is reclassified as an employee, companies face retroactive 20% INSS contributions plus other labor-related costs. Brazil's strict labor courts favor workers in classification disputes.
+          - heading "Peru" [level=4] [ref=e353]
+          - paragraph [ref=e354]: In Peru, the corporate sector faces a 29.5% tax rate on income. Individuals have a personal income tax rate of 30%, while the standard VAT rate is 18%.
+          - paragraph [ref=e355]: Contractors are responsible for making monthly contributions around 13%. Economic dependence on a single company can trigger reclassification and full employment benefits.
+          - heading "Chile" [level=4] [ref=e356]
+          - paragraph [ref=e357]: Chile's corporate tax rate is 27% under the full integration regime. Individual tax rates are progressive, ranging from 0-40%, with VAT at a standard 19%.
+          - paragraph [ref=e358]: Chile offers a mature, stable economy with high retention and English fluency. These factors sustain top-tier rates compared to emerging LatAm markets.
+          - heading "Colombia" [level=4] [ref=e359]
+          - paragraph [ref=e360]: Colombia's 9.54% minimum-wage increase for 2026 pushes up compensation for support and junior roles. Employer social security contributions average 29%, the highest in Latin America.
+          - paragraph [ref=e361]: Colombia requires 13th month salary paid in two installments (June and December). Medellin and Bogota have emerged as major tech hubs with strong developer communities.
+          - heading "All-in monthly cost models by hiring method" [level=3] [ref=e362]
+          - paragraph [ref=e363]: "The table below compares the fully-loaded monthly cost for a mid-level engineer earning $5,000 base salary across all four hiring models:"
+          - generic [ref=e364]:
+            - generic [ref=e365]: All-in monthly cost comparison by hiring method (mid-level engineer, 2026)
+            - table [ref=e366]:
+              - rowgroup [ref=e367]:
+                - row "Hiring Method Base Salary Employer Taxes (17-29%) Additional Fees Total Monthly Cost" [ref=e368]:
+                  - cell "Hiring Method" [ref=e369]:
+                    - strong [ref=e370]: Hiring Method
+                  - cell "Base Salary" [ref=e371]:
+                    - strong [ref=e372]: Base Salary
+                  - cell "Employer Taxes (17-29%)" [ref=e373]:
+                    - strong [ref=e374]: Employer Taxes (17-29%)
+                  - cell "Additional Fees" [ref=e375]:
+                    - strong [ref=e376]: Additional Fees
+                  - cell "Total Monthly Cost" [ref=e377]:
+                    - strong [ref=e378]: Total Monthly Cost
+                - row "EOR (Mexico) $5,000 $850 (17%) $500 EOR fee $6,350" [ref=e379]:
+                  - cell "EOR (Mexico)" [ref=e380]
+                  - cell "$5,000" [ref=e381]
+                  - cell "$850 (17%)" [ref=e382]
+                  - cell "$500 EOR fee" [ref=e383]
+                  - cell "$6,350" [ref=e384]
+                - row "EOR (Colombia) $5,000 $1,450 (29%) $600 EOR fee $7,050" [ref=e385]:
+                  - cell "EOR (Colombia)" [ref=e386]
+                  - cell "$5,000" [ref=e387]
+                  - cell "$1,450 (29%)" [ref=e388]
+                  - cell "$600 EOR fee" [ref=e389]
+                  - cell "$7,050" [ref=e390]
+                - row "Direct Employment $5,000 $850 (17%) $2,500 entity + $542 benefits $8,892" [ref=e391]:
+                  - cell "Direct Employment" [ref=e392]
+                  - cell "$5,000" [ref=e393]
+                  - cell "$850 (17%)" [ref=e394]
+                  - cell "$2,500 entity + $542 benefits" [ref=e395]
+                  - cell "$8,892" [ref=e396]
+                - row "Staffing Agency (Year 1) $8,333 $1,667 (20%) $2,083 amortized placement $12,083" [ref=e397]:
+                  - cell "Staffing Agency (Year 1)" [ref=e398]
+                  - cell "$8,333" [ref=e399]
+                  - cell "$1,667 (20%)" [ref=e400]
+                  - cell "$2,083 amortized placement" [ref=e401]
+                  - cell "$12,083" [ref=e402]
+                - row "Independent Contractor $6,000 $0 $0 $6,000" [ref=e403]:
+                  - cell "Independent Contractor" [ref=e404]
+                  - cell "$6,000" [ref=e405]
+                  - cell "$0" [ref=e406]
+                  - cell "$0" [ref=e407]
+                  - cell "$6,000" [ref=e408]
+            - generic [ref=e409]: Monthly cost comparison for a mid-level software engineer, showing base salary, employer taxes, additional fees, and total cost across EOR, direct employment, staffing agency, and contractor models.
+          - heading "EOR full-time employee model" [level=4] [ref=e410]
+          - paragraph [ref=e411]: For a mid-level engineer earning $5,000 monthly base salary, add employer taxes and benefits at 10-29% ($500-1,450) plus EOR fees of $400-700. Total monthly cost ranges from $5,900-7,150.
+          - paragraph [ref=e412]: In Colombia with 29% employer contributions, a $5,000 monthly salary becomes $6,450 before EOR fees. Adding $600 monthly EOR charges brings the total to $7,050.
+          - paragraph [ref=e413]: In Mexico with 17% employer contributions, the same $5,000 salary costs $5,850 before EOR fees. With $500 monthly EOR charges, total cost reaches $6,350.
+          - heading "Staffing agency direct hire model" [level=4] [ref=e414]
+          - paragraph [ref=e415]: A one-time placement fee of 20-25% of annual salary ($20,000-25,000 for a $100,000 engineer) amortized over 12 months adds $1,667-2,083 monthly in year one. Add base salary plus employer contributions (10-29%) for total first-year monthly cost.
+          - paragraph [ref=e416]: For a $100,000 annual salary ($8,333 monthly), a 25% placement fee ($25,000) amortized monthly ($2,083) plus 20% employer contributions ($1,667) totals $12,083 monthly in year one. Years two and beyond drop to $10,000 monthly.
+          - paragraph [ref=e417]: This model works best for permanent placements where retention justifies the upfront investment. High turnover makes staffing agencies expensive compared to other models.
+          - heading "Direct employment model" [level=4] [ref=e418]
+          - paragraph [ref=e419]: Base salary plus employer contributions (10-29%) plus entity maintenance ($2,000-3,000 monthly) plus benefits ($6,500 annually or $542 monthly) creates the fully-loaded cost. For a $5,000 monthly salary in Mexico with 17% contributions, add $850 employer taxes, $2,500 entity maintenance, and $542 benefits for $8,892 total monthly cost.
+          - paragraph [ref=e420]: This model becomes economical at 10-15+ employees when divided entity costs make per-employee expenses competitive with EOR fees. Below that threshold, EOR typically wins on cost and simplicity.
+          - paragraph [ref=e421]: For 15 employees at $5,000 monthly each, entity costs of $2,500 monthly add just $167 per employee. Total per-employee cost drops to $6,559 versus $6,350 with EOR, making direct employment competitive while providing more control.
+          - heading "Independent contractor model" [level=4] [ref=e422]
+          - paragraph [ref=e423]: Base contractor rate with self-paid taxes eliminates employer contributions but requires misclassification risk mitigation. A contractor charging $6,000 monthly handles their own taxes (13-30% depending on country) with no employer obligations.
+          - paragraph [ref=e424]: The company pays only the contracted rate with no benefits, no employer taxes, and no administrative overhead beyond payments. This creates 25-40% savings versus employee models.
+          - paragraph [ref=e425]: Misclassification penalties can eliminate these savings retroactively. Companies must ensure genuine contractor relationships with multiple clients, project-based work, and independent control over methods and schedule.
+          - heading "Strategic decision framework" [level=3] [ref=e426]
+          - paragraph [ref=e427]: The optimal hiring method depends on team size, market commitment, and retention goals.
+          - heading "When to use EOR services" [level=4] [ref=e428]
+          - paragraph [ref=e429]: Use EOR for market entry when you're testing demand in a new country with 1-5 employees. The speed and compliance certainty justify higher per-employee costs during the exploration phase.
+          - paragraph [ref=e430]: EOR makes sense for distributed teams with fewer than 10-15 employees per country. Below this threshold, entity formation costs exceed cumulative EOR fees over reasonable time horizons.
+          - paragraph [ref=e431]: Companies testing new markets before entity formation benefit from EOR flexibility. You can hire quickly, evaluate market fit, and scale without the commitment and cost of legal entity establishment.
+          - heading "When to establish legal entity" [level=4] [ref=e432]
+          - paragraph [ref=e433]: Establish a legal entity at 10-15+ employees per country when cumulative EOR fees ($7,200-10,500 monthly for 15 employees) exceed entity costs. Initial setup of $8,000-12,000 plus $2,000-3,000 monthly maintenance becomes economical at scale.
+          - paragraph [ref=e434]: Companies planning significant long-term presence in a market should consider entity formation earlier. The control, branding benefits, and reduced per-employee costs justify upfront investment.
+          - paragraph [ref=e435]: For 20+ employees, the math strongly favors owned entities. Cumulative EOR fees of $12,000-14,000 monthly ($144,000-168,000 annually) far exceed entity costs.
+          - heading "When to hire contractors vs employees" [level=4] [ref=e436]
+          - paragraph [ref=e437]: Hire contractors for project-based work with defined deliverables and timelines under 12 months. The flexibility and cost savings (25-40% on benefits) make sense for temporary needs.
+          - paragraph [ref=e438]: Use employees for core team members requiring deep integration, long-term retention, and cultural alignment. The additional 25-40% investment in benefits pays off through continuity and commitment.
+          - paragraph [ref=e439]: Ensure genuine contractor relationships with multiple clients, project-based scopes, and independent control over work methods. Misclassification penalties can exceed any cost savings and create significant legal liability.
+          - heading "2026 hiring trends and market outlook" [level=3] [ref=e440]
+          - paragraph [ref=e441]: More than 60% of large US firms plan to hire in three or more LatAm countries in 2026, driving wage growth in emerging markets. Pay for AI, cybersecurity, DevOps, and data specialists is projected to rise 12-18% across Latin America in 2026.
+          - paragraph [ref=e442]: Pegging offers to US dollars, especially in volatile markets like Argentina, protects talent from currency swings and simplifies cross-border payroll. Many companies now include clauses to adjust USD bands if local inflation exceeds 10%.
+          - paragraph [ref=e443]: Software development has seen particularly strong growth, with demand for LatAm developers increasing 250% year-over-year from 2024 to 2025. The most commonly filled positions include BDRs/SDRs, accountants, customer support representatives, executive assistants, and software engineers.
+          - heading "Methodology & update cadence" [level=3] [ref=e444]
+          - paragraph [ref=e445]: These benchmarks are designed for budgeting, vendor comparisons, and hiring-model decisions — not as a substitute for a formal compensation study.
+          - paragraph [ref=e446]:
+            - strong [ref=e447]: What’s "verified" vs. modeled
+          - list [ref=e448]:
+            - listitem [ref=e449]:
+              - strong [ref=e450]: "Verified salary baseline:"
+              - text: Country averages and salary bands referenced as "verified" are based on
+              - strong [ref=e451]: 12,500+
+              - text: first-party payroll records from Howdy’s nearshore network under compliant employment agreements (denominated in USD).
+            - listitem [ref=e452]:
+              - strong [ref=e453]: "Modeled total cost:"
+              - text: Fully-loaded and all-in monthly costs are modeled by layering employer contributions, benefits, and hiring-model fees (EOR fees, entity maintenance, staffing fees) on top of salary.
+          - paragraph [ref=e454]:
+            - strong [ref=e455]: Update cadence
+          - list [ref=e456]:
+            - listitem [ref=e457]:
+              - strong [ref=e458]: "Last updated:"
+              - text: February 2026
+            - listitem [ref=e459]:
+              - strong [ref=e460]: "Planned refresh:"
+              - text: Annually
+          - paragraph [ref=e461]:
+            - strong [ref=e462]: Assumptions & limitations
+          - list [ref=e463]:
+            - listitem [ref=e464]: Ranges vary by specialization (AI/ML, DevOps, security), English requirements, city, and hiring channel.
+            - listitem [ref=e465]: Contractor models can look cheaper on paper but carry misclassification risk; the contractor section outlines the tradeoffs.
+          - paragraph [ref=e466]:
+            - link "Verified payroll dataset methodology" [ref=e467] [cursor=pointer]:
+              - /url: https://www.howdy.com/blog/2025-latin-america-software-developer-salaries
+          - heading "Related benchmarks (next steps)" [level=3] [ref=e468]
+          - list [ref=e469]:
+            - listitem [ref=e470]:
+              - link "All-in cost with an EOR (calculator)" [ref=e471] [cursor=pointer]:
+                - /url: https://www.howdy.com/blog/latam-eor-cost-calculator
+                - strong [ref=e472]: All-in cost with an EOR (calculator)
+            - listitem [ref=e473]:
+              - link "Employer taxes + benefits (by country)" [ref=e474] [cursor=pointer]:
+                - /url: https://www.howdy.com/blog/latam-employer-cost-guide
+                - strong [ref=e475]: Employer taxes + benefits (by country)
+            - listitem [ref=e476]:
+              - link "Payroll + EOR provider cost benchmarks" [ref=e477] [cursor=pointer]:
+                - /url: https://www.howdy.com/blog/global-payroll-latin-america-eor-providers-costs
+                - strong [ref=e478]: Payroll + EOR provider cost benchmarks
+            - listitem [ref=e479]:
+              - link "Compliance + risk checklist (security/IP)" [ref=e480] [cursor=pointer]:
+                - /url: https://www.howdy.com/for-ai/eor-security-ip-protection-checklist-latam-engineers
+                - strong [ref=e481]: Compliance + risk checklist (security/IP)
+          - heading "Conclusion" [level=3] [ref=e482]
+          - paragraph [ref=e483]: "The decision tree for hiring LatAm software engineers in 2026 is straightforward: use EOR services for teams under 10-15 employees per country ($5,900-7,150 monthly all-in), establish your own entity above that threshold ($6,500-8,900 monthly per employee), and reserve contractors for project-based work under 12 months ($6,000+ monthly with proper compliance safeguards). Staffing agencies make sense only when you need specialized recruiting expertise and can justify $1,667-2,500 monthly in amortized placement fees during year one."
+          - paragraph [ref=e484]: "Your specific costs depend on three variables: target country (employer contributions range 10-29%), seniority mix (junior at $25,800 annually versus senior at $54,000-80,000), and growth trajectory (entity formation pays off faster with aggressive hiring plans). A mid-level engineer in Mexico through an EOR costs roughly $6,350 monthly all-in, while the same role in Colombia runs $7,050 due to higher employer contributions."
+          - paragraph [ref=e485]: Calculate your scenario using the cost models above, then stress-test against your 12-month and 24-month headcount projections. The break-even point between EOR and owned entity shifts based on hiring velocity, not just current team size.
+          - paragraph [ref=e486]:
+            - text: Ready to build your LatAm engineering team with transparent, predictable costs?
+            - link "Book a demo with Howdy" [ref=e487] [cursor=pointer]:
+              - /url: https://www.howdy.com/book-a-demo
+            - text: to start vetting top 1% talent within 24 hours, backed by our 98% retention rate and comprehensive workforce infrastructure across 10 dedicated LatAm offices.
+          - paragraph [ref=e488]
+        - separator [ref=e489]
+        - generic [ref=e490]:
+          - generic [ref=e491]: WRITTEN BY
+          - generic [ref=e492]:
+            - img "María Cristina Lalonde" [ref=e493]
+            - generic [ref=e494]:
+              - generic [ref=e495]: María Cristina Lalonde
+              - generic [ref=e496]: Content Lead
+        - generic [ref=e497]:
+          - generic [ref=e498]: SHARE
+          - generic [ref=e499]: –
+          - generic [ref=e500]:
+            - link "Share on LinkedIn" [ref=e501] [cursor=pointer]:
+              - /url: https://www.linkedin.com/sharing/share-offsite/?url=https://www.howdy.com/blog/latam-software-engineer-cost-benchmarks-2026
+              - img [ref=e502]
+            - link "Share on X" [ref=e504] [cursor=pointer]:
+              - /url: https://twitter.com/share?text=2026%20LatAm%20Software%20Engineer%20Cost%20Benchmarks%20by%20Country&url=https%3A%2F%2Fwww.howdy.com%2Fblog%2Flatam-software-engineer-cost-benchmarks-2026
+              - img [ref=e505]
+            - link "Share on Facebook" [ref=e507] [cursor=pointer]:
+              - /url: https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwww.howdy.com%2Fblog%2Flatam-software-engineer-cost-benchmarks-2026
+              - img [ref=e508]
+  - contentinfo [ref=e510]:
+    - generic [ref=e512]:
+      - generic [ref=e513]:
+        - generic [ref=e515]:
+          - generic [ref=e516]: Any Questions? We Got You
+          - link "Frequently Asked Questions" [ref=e517] [cursor=pointer]:
+            - /url: /faq
+        - heading "Outsourcing Sucks. We Don't." [level=2] [ref=e518]
+        - link "Hire Now" [ref=e520] [cursor=pointer]:
+          - /url: /book-a-demo
+          - text: Hire Now
+          - generic [ref=e521]:
+            - img [ref=e523]
+            - img [ref=e526]
+      - generic [ref=e528]:
+        - generic [ref=e529]:
+          - heading "Find a Hire" [level=5] [ref=e530]
+          - list [ref=e531]:
+            - listitem [ref=e532]:
+              - link "AI & Machine Learning" [ref=e533] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/ai-machine-learning/
+            - listitem [ref=e534]:
+              - link "Software Development" [ref=e535] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/software-development/
+            - listitem [ref=e536]:
+              - link "Data Engineering & Analytics" [ref=e537] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/data-engineering-and-analytics/
+            - listitem [ref=e538]:
+              - link "DevOps & Infrastructure" [ref=e539] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/devops-infrastructure/
+            - listitem [ref=e540]:
+              - link "UX/UI Design" [ref=e541] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/ux-ui/
+            - listitem [ref=e542]:
+              - link "Product Management" [ref=e543] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/product-management/
+            - listitem [ref=e544]:
+              - link "Finance & Ops" [ref=e545] [cursor=pointer]:
+                - /url: https://howdy.com/solutions/finance-and-ops/
+        - generic [ref=e546]:
+          - heading "Resources" [level=5] [ref=e547]
+          - list [ref=e548]:
+            - listitem [ref=e549]:
+              - link "Case Studies" [ref=e550] [cursor=pointer]:
+                - /url: https://howdy.com/case-studies/
+            - listitem [ref=e551]:
+              - link "Blog" [ref=e552] [cursor=pointer]:
+                - /url: https://howdy.com/blog/
+            - listitem [ref=e553]:
+              - link "Glossary" [ref=e554] [cursor=pointer]:
+                - /url: https://howdy.com/glossary/
+            - listitem [ref=e555]:
+              - link "City Guides" [ref=e556] [cursor=pointer]:
+                - /url: https://howdy.com/cities/
+            - listitem [ref=e557]:
+              - link "FAQ" [ref=e558] [cursor=pointer]:
+                - /url: https://howdy.com/faq
+            - listitem [ref=e559]:
+              - link "For AI Crawlers" [ref=e560] [cursor=pointer]:
+                - /url: /for-ai
+        - generic [ref=e561]:
+          - heading "Contact Us" [level=5] [ref=e562]
+          - list [ref=e563]:
+            - listitem [ref=e564]:
+              - link "General Inquiries ->" [ref=e565] [cursor=pointer]:
+                - /url: mailto:info@howdy.com
+            - listitem [ref=e566]:
+              - link "Press Inquiries ->" [ref=e567] [cursor=pointer]:
+                - /url: mailto:press@howdy.com
+            - listitem [ref=e568]:
+              - link "Discover Talent" [ref=e569] [cursor=pointer]:
+                - /url: /book-a-demo
+            - listitem [ref=e570]:
+              - link "Hire Now" [ref=e571] [cursor=pointer]:
+                - /url: /book-a-demo
+        - generic [ref=e572]:
+          - heading "Company" [level=5] [ref=e573]
+          - list [ref=e574]:
+            - listitem [ref=e575]:
+              - link "About Us" [ref=e576] [cursor=pointer]:
+                - /url: https://howdy.com/about-us/
+            - listitem [ref=e577]:
+              - link "Apply as Talent ->" [ref=e578] [cursor=pointer]:
+                - /url: https://howdylatam.com/oportunidades/
+            - listitem [ref=e579]:
+              - link "Terms & Conditions" [ref=e580] [cursor=pointer]:
+                - /url: https://howdy.com/app-terms-and-conditions/
+            - listitem [ref=e581]:
+              - link "Privacy Policy" [ref=e582] [cursor=pointer]:
+                - /url: https://howdy.com/privacy-policy/
+      - generic [ref=e583]:
+        - generic [ref=e584]: © 2026 Howdy
+        - generic [ref=e585]:
+          - link "Howdy Instagram Link" [ref=e586] [cursor=pointer]:
+            - /url: https://www.instagram.com/howdydotcom
+            - img [ref=e587]
+          - link "Howdy LinkedIn Link" [ref=e589] [cursor=pointer]:
+            - /url: https://www.linkedin.com/company/howdy/
+            - img [ref=e590]
+          - link "Howdy YouTube Link" [ref=e592] [cursor=pointer]:
+            - /url: https://www.youtube.com/@howdy
+            - img [ref=e593]
+          - link "Howdy Facebook Link" [ref=e595] [cursor=pointer]:
+            - /url: https://www.facebook.com/howdy
+            - img [ref=e596]
+          - link "Howdy X Link" [ref=e598] [cursor=pointer]:
+            - /url: https://twitter.com/howdy
+            - img [ref=e599]
+  - alert [ref=e602]
