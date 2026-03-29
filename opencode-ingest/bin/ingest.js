@@ -149,6 +149,45 @@ const commands = {
     }
   },
 
+  async clean() {
+    const taskName = positional[0];
+    if (!taskName && taskName !== 'all') return usage('clean <task|all>  — clean raw data offline');
+
+    const { cleanTask } = await import('../lib/clean.js');
+    const { normalize } = await import('../lib/normalize.js');
+    const { generateReport } = await import('../lib/report.js');
+    const { md2html } = await import('../lib/md2html.js');
+
+    const tasks = taskName === 'all'
+      ? readdirSync(TASKS_DIR).filter(f => f.endsWith('.js')).map(f => f.replace('.js', ''))
+      : [taskName];
+
+    for (const t of tasks) {
+      const dataDir = join(DATA_DIR, t);
+      const rawDir = join(dataDir, 'raw');
+      if (!existsSync(rawDir)) { console.log(`[${t}] No raw data — skipping`); continue; }
+
+      // 1. Clean raw JSONL in-place
+      cleanTask(t);
+
+      // 2. Delete old SQLite so normalize rebuilds from cleaned data
+      const dbPath = join(dataDir, 'db.sqlite');
+      if (existsSync(dbPath)) {
+        const { unlinkSync } = await import('fs');
+        unlinkSync(dbPath);
+      }
+
+      // 3. Re-normalize from cleaned raw
+      await normalize(t, dataDir);
+
+      // 4. Regenerate report + HTML
+      const outputDir = join(OUTPUT_DIR, t);
+      mkdirSync(outputDir, { recursive: true });
+      const mdPath = await generateReport(t);
+      if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
+    }
+  },
+
   async render() {
     const input = positional[0];
     const output = positional[1] || input?.replace('.md', '.html');
@@ -281,6 +320,7 @@ function usage(example) {
     run <task> [--iterations=N]           Run scraper iterations
     feed <task> [--file=... | stdin]      Feed external JSON records
     report <task>                         Regenerate report
+    clean <task|all>                      Clean raw data + rebuild DB + report
     render <file.md> [output.html]        Convert markdown to HTML
 
     browse <url> [--domain=...]           Open URL with Chrome session
