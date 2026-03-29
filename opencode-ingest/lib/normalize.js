@@ -37,6 +37,7 @@ export async function normalize(taskName, dataDir) {
     const lines = readFileSync(join(rawDir, file), 'utf8').trim().split('\n').filter(Boolean);
     for (const line of lines) {
       const record = JSON.parse(line);
+      if (record._deleted) continue;
 
       if (!tableCreated) {
         const columns = Object.keys(record).map(k => `"${k}" TEXT`);

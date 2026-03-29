@@ -60,7 +60,9 @@ export function md2html(inputPath, outputPath) {
       <div class="masthead-rule"></div>
     </div>
     <article class="content">
-      ${html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>')}
+      ${dataBlock && layout !== 'table'
+        ? html.replace(/<table>/g, '<div class="table-wrap" style="display:none"><table>').replace(/<\/table>/g, '</table></div>')
+        : html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>')}
     </article>
   </div>
   ${dataRenderer}
@@ -200,13 +202,20 @@ function buildGraph(records, columns) {
   const skillsCol = columns.find(c => /skills|tech/i.test(c));
   const urlCol = columns.find(c => /url|profileUrl|link/i.test(c));
 
-  // Build stats
+  // Filter out junk records
+  const junkNames = new Set(['registrarse', 'regístrate', 'sign up', 'linkedin', 'conectar', '']);
+  records = records.filter(r => {
+    const name = (r[nameCol] || '').toLowerCase();
+    return name && !junkNames.has(name) && name.length > 2;
+  });
+
+  // Build stats — only count real companies
   const companies = {};
   const seniorities = {};
   const allSkills = {};
   records.forEach(r => {
-    const co = r[companyCol] || 'Unknown';
-    companies[co] = (companies[co] || 0) + 1;
+    const co = r[companyCol] || '';
+    if (co && co.length > 1) companies[co] = (companies[co] || 0) + 1;
     const sen = r[seniorityCol] || 'senior';
     seniorities[sen] = (seniorities[sen] || 0) + 1;
     (r[skillsCol] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
@@ -294,14 +303,16 @@ function buildDataScript(layout, data) {
   const nodes = [];
   const links = [];
   const nodeSet = new Set();
+  const junkNames = new Set(['registrarse', 'regístrate', 'sign up', 'linkedin', 'conectar', '']);
 
   records.forEach(r => {
     const name = r[nameCol];
     const company = r[companyCol];
-    if (!name) return;
+    if (!name || junkNames.has(name.toLowerCase()) || name.length < 3) return;
+    if (!company || company.length < 2) return; // skip disconnected nodes
     if (!nodeSet.has(name)) { nodeSet.add(name); nodes.push({ id: name, type: 'person' }); }
-    if (company && !nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company' }); }
-    if (company) links.push({ source: name, target: company });
+    if (!nodeSet.has(company)) { nodeSet.add(company); nodes.push({ id: company, type: 'company' }); }
+    links.push({ source: name, target: company });
   });
 
   return `
@@ -407,7 +418,7 @@ const CSS_LAYOUTS = `
   .card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.15s; text-decoration: none !important; color: inherit; }
   .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); transform: translateY(-2px); }
   .card-img { width: 100%; aspect-ratio: 1; overflow: hidden; background: #f0ebe4; display: flex; align-items: center; justify-content: center; }
-  .card-img img { width: 100%; height: 100%; object-fit: contain; }
+  .card-img img { width: 100%; height: 100%; object-fit: cover; }
   .card-body { padding: 0.8rem; flex: 1; display: flex; flex-direction: column; }
   .card-price-row { display: flex; align-items: baseline; gap: 0.4rem; }
   .card-price { font-size: 1.3rem; font-weight: 600; color: #1a1a1a; }

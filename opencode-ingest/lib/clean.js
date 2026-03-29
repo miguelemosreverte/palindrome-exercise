@@ -31,7 +31,18 @@ const LINKEDIN_SKILL_PATTERN_NOISE = [
   /^(senior|junior|developer|engineer|manager|director|lead|socio|fundador)\s/i,
 ];
 
+const LINKEDIN_JUNK_NAMES = new Set([
+  'registrarse', 'regístrate', 'sign up', 'sign in', 'iniciar sesión',
+  'linkedin', 'linkedin member', 'conectar', 'seguir',
+]);
+
 function cleanLinkedIn(r) {
+  // Filter out junk records (expired session → login page)
+  if (r.name && LINKEDIN_JUNK_NAMES.has(r.name.toLowerCase())) {
+    r._deleted = true;
+    return r;
+  }
+
   // Clean skills: remove UI noise, section headers, person names
   if (r.skills) {
     const cleaned = r.skills.split(',')

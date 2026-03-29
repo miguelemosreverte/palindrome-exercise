@@ -26,9 +26,10 @@ function parseMercadoLibre(html, url) {
       || chunk.match(/polycard_[^>]*title[^>]*>([^<]+)/);
     const title = titleMatch?.[1]?.trim() || '';
 
-    // URL
-    const urlMatch = chunk.match(/href="(https:\/\/[^"]*(?:mercadolibre|articulo|click1)[^"]*)"/);
-    const itemUrl = urlMatch?.[1]?.split('#')[0] || '';
+    // URL — prefer direct article link, fall back to click-tracking redirect
+    const articleUrlMatch = chunk.match(/href="(https:\/\/articulo\.mercadolibre\.com\.ar\/MLA-[^"]+)"/);
+    const clickUrlMatch = chunk.match(/href="(https:\/\/[^"]*(?:click1\.mercadolibre|www\.mercadolibre)[^"]*)"/);
+    const itemUrl = (articleUrlMatch?.[1] || clickUrlMatch?.[1] || '').split('#')[0];
 
     // Price — get ALL fractions (original + discount price), take the first (current price)
     const allFractions = [...chunk.matchAll(/andes-money-amount__fraction[^>]*>([^<]+)/g)].map(m => m[1].trim());
@@ -83,10 +84,6 @@ function parseMercadoLibre(html, url) {
     const couponMatch = chunk.match(/poly-component__coupons[\s\S]*?>([^<]{3,40})</);
     const coupon = couponMatch?.[1]?.trim() || '';
 
-    // MLA ID
-    const mlaMatch = itemUrl.match(/(MLA[\d-]+)/);
-    const mlaId = mlaMatch?.[1] || '';
-
     // Is ad/promoted
     const isAd = /poly-component__ads|>Ad<|>Publicidad</i.test(chunk);
 
@@ -97,7 +94,7 @@ function parseMercadoLibre(html, url) {
         _price_num: priceNum,
         original_price: originalPrice > 0 ? `${currency}${allFractions[1] || ''}` : '',
         discount,
-        url: mlaId ? `https://articulo.mercadolibre.com.ar/${mlaId}` : itemUrl,
+        url: itemUrl,
         image,
         seller: storeName || seller,
         brand,
