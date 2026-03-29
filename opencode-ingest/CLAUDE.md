@@ -1,137 +1,87 @@
-# OpenCode Ingest — Browser-Based Data Ingestion CLI
+# OpenCode Ingest
 
-Your Chrome session is the universal API. This tool leverages it for authenticated
-scraping, normalization, and live report generation across any domain.
+## Browser Agent Mode
 
-## Quick Start
+You have access to `chrome-devtools-mcp` which lets you control the user's Chrome browser.
+Use it to navigate any website, fill forms, click buttons, and extract data.
+
+### How to work
+
+1. **Ask the user** what site they want to explore and what they need
+2. **Navigate** to the URL using the chrome-devtools tools
+3. **Take screenshots** to understand what's on the page — you can see the page
+4. **When you need credentials** or decisions, ask the user conversationally
+5. **Save important pages** — write the HTML to `data/{task}/html/` for offline parsing later
+6. **Build the report** as you go — extract data and generate a summary
+
+### Rules
+
+- Never hardcode site-specific selectors or flows — look at the page and figure it out
+- Always ask the user before entering credentials or clicking irreversible actions
+- Save HTML of every important page to `data/` — this is the raw data
+- When you find structured data (tables, lists, forms), extract it to JSON
+- Generate a report at the end using `node bin/report.js`
+
+### Tools available via chrome-devtools-mcp
+
+The MCP gives you tools to interact with Chrome. Use them to:
+- Navigate to URLs
+- Take screenshots (you can see them)
+- Click elements
+- Type text into inputs
+- Read page content
+- Execute JavaScript in the page
+
+### The user's Chrome
+
+The user's Chrome is already running with their sessions logged in.
+You connect to it — you don't launch a new browser.
+This means if they're logged into a site, you're logged in too.
+
+### Data storage
+
+```
+data/{task-name}/
+├── html/          ← Save every important page's HTML here
+├── raw/           ← Extracted records as JSONL
+├── screenshots/   ← For your reference
+└── meta.json      ← Task metadata
+```
+
+### Example conversation
+
+User: "Log into AFIP and get me my tax info"
+You: "I'll navigate to AFIP. What's the URL?"
+User: "afip.gob.ar"
+You: *navigates, takes screenshot, sees login page*
+You: "I see a login page asking for CUIT. What's your CUIT?"
+User: "20-12345678-9"
+You: *types it, clicks next, takes screenshot*
+You: "Now it's asking for Clave Fiscal. What's your password?"
+User: "mypassword"
+You: *types it, clicks login, takes screenshot*
+You: "I'm in! I see these services: [list]. Which one do you want?"
+
+## Ingestion CLI
+
+For repeatable scraping tasks, use the CLI:
 
 ```bash
-npm install
-node bin/ingest.js list                    # See available tasks
-node bin/ingest.js run example             # Run one iteration
-node bin/ingest.js run example --iterations=5
-node bin/ingest.js status example          # Check progress
+node bin/ingest.js run <task> [--iterations=N]    # Fetch + parse + report
+node bin/ingest.js parse <task|all>               # Re-parse saved HTML
+node bin/ingest.js report <task>                   # Regenerate report
+node bin/ingest.js list                            # Available tasks
+node bin/ingest.js new <name>                      # Scaffold task
 ```
 
-## CLI Commands
-
-```bash
-# Core pipeline
-ingest run <task> [--iterations=N]         # Scrape → normalize → report → HTML
-ingest feed <task> [--file=data.json]      # Feed external JSON into pipeline
-ingest report <task>                       # Regenerate report from existing data
-ingest render <file.md> [output.html]      # Convert any markdown to themed HTML
-
-# Browser session (uses your real Chrome cookies)
-ingest browse <url> [--domain=.site.com]   # Open URL authenticated
-ingest cookies <domain>                    # Inspect extracted cookies
-
-# Task management
-ingest list                                # List tasks + record counts
-ingest new <name>                          # Scaffold a new task
-ingest status <task>                       # Show iterations, records, cursor
-```
-
-## Architecture
+### Architecture
 
 ```
-bin/ingest.js          ← Single CLI entry point
-lib/
-├── browser.js         ← Playwright + Chrome cookie injection (the primitive)
-├── human.js           ← Human behavior emulation (Bezier, Fitts's Law, session rhythm)
-├── scraper.js         ← Base Scraper class with .next() iterator pattern
-├── normalize.js       ← Raw JSONL → SQLite
-├── report.js          ← SQLite → Markdown with ```chartjs``` blocks
-├── md2html.js         ← Universal Markdown → themed HTML with Chart.js
-├── graph.js           ← Neo4j relationship layer (optional)
-└── chrome-cookies.js  ← macOS Chrome cookie decryption
-tasks/                 ← Domain scrapers (agent creates these over time)
-├── example.js         ← Template (Hacker News)
-├── ar-senior-devs.js  ← GetOnBoard jobs
-└── ar-senior-devs-linkedin.js  ← LinkedIn with human emulation
+lib/          ← Primitives imported by vendor code (browser, human, scraper)
+vendors/      ← 3 files per vendor: fetch.js, parse.js, clean.js
+tasks/        ← Thin config wrappers (vendor + query params)
+bin/          ← CLI tools (ingest.js, agent.js, md2html.js, report.js, normalize.js)
+agent/        ← Conversational agent server (web UI + SSE)
+data/         ← Raw HTML + extracted data + SQLite
+output/       ← Generated reports (HTML)
 ```
-
-## Creating a New Task
-
-```bash
-ingest new my-domain
-# Edit tasks/my-domain.js:
-```
-
-```js
-import { Scraper } from '../lib/scraper.js';
-
-export default class MyDomainScraper extends Scraper {
-  // Inject Chrome cookies for authenticated sites:
-  get cookieDomain() { return '.example.com'; }
-
-  sources() {
-    return [{ name: 'Source', url: 'https://example.com/data' }];
-  }
-
-  async extract(page) {
-    return page.evaluate(() => {
-      // Return array of record objects
-      return [...document.querySelectorAll('.item')].map(el => ({
-        title: el.querySelector('h2')?.textContent,
-        url: el.querySelector('a')?.href,
-      }));
-    });
-  }
-
-  async nextPage(page) {
-    if (this.meta.iteration >= 100) return false;
-    const next = await page.$('a[rel="next"]');
-    if (!next) return false;
-    await next.click();
-    await page.waitForLoadState('networkidle');
-    return true;
-  }
-}
-```
-
-## Composability
-
-The core primitives are independent and composable:
-
-- **`lib/browser.js`** — `createBrowser({domain})` → authenticated Playwright session
-- **`lib/human.js`** — `humanClick()`, `humanScroll()`, `humanType()`, `Session` class
-- **`lib/chrome-cookies.js`** — `getChromeCookes(domain)` → cookie array
-- **`lib/normalize.js`** — `normalize(task, dir)` → JSONL to SQLite
-- **`lib/report.js`** — `generateReport(task)` → Markdown with charts
-- **`lib/md2html.js`** — `md2html(input, output)` → themed HTML
-
-Tasks compose these. The LinkedIn scraper uses browser + human + cookies.
-A YouTube task would use browser + cookies. A public site just uses browser.
-
-## Data Flow
-
-Each `ingest run` iteration:
-1. **Scrape** — `scraper.next()` launches Playwright, calls task's `extract(page)`
-2. **Store** — Raw JSONL in `data/{task}/raw/{iteration}.jsonl`
-3. **Normalize** — Parse → SQLite `data/{task}/db.sqlite`
-4. **Report** — Query → Markdown with Chart.js + data table
-5. **Render** — Markdown → `output/{task}/index.html`
-
-Cursor in `meta.json` tracks position. Each run resumes where it left off.
-
-## Report Structure (every task)
-
-```
-# {Task} — Ingestion Report
-## Timeline        ← iteration log
-## Overview        ← agent insights (filled over time)
-## Dataset Growth  ← Chart.js line chart
-## Records/Iter    ← Chart.js bar chart
-## Data            ← scrollable table
-```
-
-## Human Behavior Emulation
-
-For sites that detect automation (LinkedIn, etc.), `lib/human.js` provides:
-- Mouse: Bezier curves, Fitts's Law velocity, 25% overshoot-and-correct
-- Clicks: variable hold (60-180ms), pre-click dwell
-- Typing: burst patterns, 3% typo rate, word-boundary pauses
-- Scrolling: momentum deceleration, direction changes
-- Timing: beta distribution (not uniform random)
-- Sessions: warm-up, periodic breaks, daily limits (28-35)
