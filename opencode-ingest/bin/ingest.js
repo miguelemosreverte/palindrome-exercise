@@ -1,27 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * ingest — CLI for browser-based data ingestion.
+ * ingest — Browser-based data ingestion CLI.
  *
- * The user's Chrome session is the universal API.
- * This tool leverages it for authenticated scraping,
- * normalization, and live report generation.
+ * `ingest run <task>` does everything:
+ *   1. Fetch — save HTML per URL (skip URLs already in DB unless --refetch)
+ *   2. Parse — HTML → structured records (vendor's parse.js)
+ *   3. Clean — normalize records (vendor's clean.js)
+ *   4. Store — records → SQLite
+ *   5. Report — SQLite → HTML report
  *
- * Usage:
- *   ingest run <task> [--iterations=N]
- *   ingest feed <task> [--file=data.json | --records='[...]' | stdin]
- *   ingest report <task>
- *   ingest render <file.md> [output.html]
- *   ingest browse <url> [--domain=.example.com]
- *   ingest cookies <domain>
- *   ingest list
- *   ingest new <name>
- *   ingest status <task>
+ * The URL is the primary key. Re-running adds new pages, skips known ones.
+ * Reports are the deliverable. SQLite/JSONL are side effects.
  */
 
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -31,320 +26,261 @@ const OUTPUT_DIR = join(ROOT, 'output');
 
 const [cmd, ...args] = process.argv.slice(2);
 const getFlag = (name) => args.find(a => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
+const hasFlag = (name) => args.some(a => a === `--${name}`);
 const positional = args.filter(a => !a.startsWith('--'));
 
-const commands = {
-  // ─── Core ──────────────────────────────────────────────────
+// ─── Vendor resolution ────────────────────────────────────────────────
 
+function vendorForTask(taskName) {
+  const n = taskName.toLowerCase();
+  if (n.includes('linkedin') || n.includes('devs')) return 'linkedin';
+  if (n.includes('mercado')) return 'mercadolibre';
+  if (n.includes('youtube') || n.includes('video')) return 'youtube';
+  if (n.includes('github')) return 'github';
+  return null;
+}
+
+async function loadVendor(taskName) {
+  const vendor = vendorForTask(taskName);
+  if (!vendor) return {};
+  const base = join(ROOT, 'vendors', vendor);
+  const mods = {};
+  try { mods.parse = await import(join(base, 'parse.js')); } catch {}
+  try { mods.clean = await import(join(base, 'clean.js')); } catch {}
+  return mods;
+}
+
+// ─── Parse pipeline (offline: HTML → clean records → JSONL) ───────────
+
+async function parseTask(taskName) {
+  const dataDir = join(DATA_DIR, taskName);
+  const htmlDir = join(dataDir, 'html');
+  const rawDir = join(dataDir, 'raw');
+  if (!existsSync(htmlDir)) return 0;
+
+  const vendor = await loadVendor(taskName);
+  if (!vendor.parse) return 0;
+
+  const htmlFiles = readdirSync(htmlDir).filter(f => f.endsWith('.html')).sort();
+  if (!htmlFiles.length) return 0;
+  mkdirSync(rawDir, { recursive: true });
+
+  const vendorName = vendorForTask(taskName);
+  const readFile = (f) => readFileSync(join(htmlDir, f), 'utf8');
+  const cleaner = vendor.clean?.clean || ((r) => r);
+
+  let allRecords;
+
+  if (vendorName === 'linkedin' && vendor.parse.parseAll) {
+    // LinkedIn: each HTML is one profile
+    allRecords = vendor.parse.parseAll(htmlFiles, readFile).map(cleaner).filter(r => !r._deleted);
+  } else if (vendor.parse.parsePage) {
+    // Page-based vendors: each HTML is one search results page
+    allRecords = [];
+    for (const f of htmlFiles) {
+      const records = vendor.parse.parsePage(readFile(f), f).map(cleaner).filter(r => !r._deleted);
+      allRecords.push(...records);
+    }
+  } else {
+    return 0;
+  }
+
+  // Deduplicate by URL
+  const seen = new Set();
+  const unique = allRecords.filter(r => {
+    const key = r.url || r.profileUrl || r.title;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Write single JSONL
+  const rawFile = join(rawDir, 'records.jsonl');
+  writeFileSync(rawFile, unique.map(r => JSON.stringify(r)).join('\n') + '\n');
+
+  // Clean up old numbered JSONL files
+  for (const f of readdirSync(rawDir).filter(f => f !== 'records.jsonl' && f.endsWith('.jsonl'))) {
+    unlinkSync(join(rawDir, f));
+  }
+
+  // Update meta
+  const metaPath = join(dataDir, 'meta.json');
+  if (existsSync(metaPath)) {
+    const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+    meta.totalRecords = unique.length;
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  }
+
+  console.log(`[${taskName}] Parsed ${unique.length} records from ${htmlFiles.length} HTML files`);
+  return unique.length;
+}
+
+// ─── Normalize (JSONL → SQLite) ───────────────────────────────────────
+
+async function normalizeTask(taskName) {
+  const { normalize } = await import('./normalize.js');
+  await normalize(taskName, join(DATA_DIR, taskName));
+}
+
+// ─── Report (SQLite → HTML) ──────────────────────────────────────────
+
+async function reportTask(taskName) {
+  const { generateReport } = await import('./report.js');
+  const { md2html } = await import('./md2html.js');
+  const outputDir = join(OUTPUT_DIR, taskName);
+  mkdirSync(outputDir, { recursive: true });
+  const mdPath = await generateReport(taskName);
+  if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────
+
+const commands = {
   async run() {
     const taskName = positional[0];
     const iterations = parseInt(getFlag('iterations') || '1', 10);
-    if (!taskName) return usage('run <task> [--iterations=N]');
+    const refetch = hasFlag('refetch');
+    if (!taskName) return usage('run <task> [--iterations=N] [--refetch]');
 
     const taskPath = join(TASKS_DIR, `${taskName}.js`);
     if (!existsSync(taskPath)) {
-      console.error(`Task not found: ${taskPath}`);
-      console.error(`Run 'ingest list' to see available tasks or 'ingest new ${taskName}' to create one.`);
+      console.error(`Task not found: ${taskPath}\nRun 'ingest list' or 'ingest new ${taskName}'`);
       process.exit(1);
     }
 
-    const { normalize } = await import('../lib/normalize.js');
-    const { generateReport } = await import('../lib/report.js');
-    const { md2html } = await import('../lib/md2html.js');
-    const { Graph } = await import('../lib/graph.js');
-
     const dataDir = join(DATA_DIR, taskName);
-    const outputDir = join(OUTPUT_DIR, taskName);
     mkdirSync(dataDir, { recursive: true });
-    mkdirSync(outputDir, { recursive: true });
 
+    // 1. Fetch — save HTML (skip known URLs unless --refetch)
     const { default: TaskScraper } = await import(taskPath);
     const scraper = new TaskScraper(taskName, dataDir);
 
-    const graph = new Graph();
-    const graphOk = await graph.connect();
-
     for (let i = 0; i < iterations; i++) {
-      if (scraper.isDone) {
-        console.log(`[${taskName}] All pages scraped.`);
-        break;
-      }
-      console.log(`\n── Iteration ${i + 1}/${iterations} ──`);
+      if (scraper.isDone && !refetch) { console.log(`[${taskName}] All pages fetched.`); break; }
+      console.log(`\n── Fetch ${i + 1}/${iterations} ──`);
       const result = await scraper.next();
       console.log(`[${taskName}] Got ${result.records.length} records. Has more: ${result.hasNext}`);
-      if (graphOk) await graph.ingestBatch(result.records);
       if (!result.hasNext) break;
     }
 
-    await graph.close();
-    await normalize(taskName, dataDir);
-    const mdPath = await generateReport(taskName);
-    if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
-    console.log(`\nDone! View report: output/${taskName}/index.html`);
+    // 2-3. Parse + Clean (offline from HTML)
+    await parseTask(taskName);
+
+    // 4. Normalize → SQLite
+    const dbPath = join(dataDir, 'db.sqlite');
+    if (existsSync(dbPath)) unlinkSync(dbPath);
+    await normalizeTask(taskName);
+
+    // 5. Report → HTML
+    await reportTask(taskName);
+
+    console.log(`\nDone! View: output/${taskName}/index.html`);
   },
 
-  async feed() {
+  async parse() {
     const taskName = positional[0];
-    if (!taskName) return usage('feed <task> [--file=data.json | --records=\'[...]\'] [--url=source-url]');
+    if (!taskName) return usage('parse <task|all>  — re-extract from saved HTML');
 
-    const filePath = getFlag('file');
-    const url = getFlag('url') || '';
-    const inlineRecords = getFlag('records');
+    const tasks = taskName === 'all'
+      ? readdirSync(TASKS_DIR).filter(f => f.endsWith('.js')).map(f => f.replace('.js', ''))
+      : [taskName];
 
-    let records;
-    if (inlineRecords) {
-      records = JSON.parse(inlineRecords);
-    } else if (filePath) {
-      records = JSON.parse(readFileSync(filePath, 'utf8'));
-    } else {
-      const chunks = [];
-      for await (const chunk of process.stdin) chunks.push(chunk);
-      records = JSON.parse(Buffer.concat(chunks).toString());
+    for (const t of tasks) {
+      await parseTask(t);
+      const dbPath = join(DATA_DIR, t, 'db.sqlite');
+      if (existsSync(dbPath)) unlinkSync(dbPath);
+      await normalizeTask(t);
+      await reportTask(t);
     }
-
-    if (!Array.isArray(records) || records.length === 0) {
-      console.error('No records provided');
-      process.exit(1);
-    }
-
-    const dataDir = join(DATA_DIR, taskName);
-    const outputDir = join(OUTPUT_DIR, taskName);
-    const rawDir = join(dataDir, 'raw');
-    mkdirSync(rawDir, { recursive: true });
-    mkdirSync(outputDir, { recursive: true });
-
-    const metaPath = join(dataDir, 'meta.json');
-    const meta = existsSync(metaPath)
-      ? JSON.parse(readFileSync(metaPath, 'utf8'))
-      : { task: taskName, iteration: 0, cursor: null, sources: [], totalRecords: 0, history: [] };
-
-    meta.iteration++;
-    const rawFile = join(rawDir, `${String(meta.iteration).padStart(3, '0')}.jsonl`);
-    writeFileSync(rawFile, records.map(r => JSON.stringify(r)).join('\n') + '\n');
-    meta.totalRecords += records.length;
-    meta.history.push({ iteration: meta.iteration, date: new Date().toISOString(), url: url || 'feed', records: records.length });
-    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-    console.log(`[${taskName}] Iteration ${meta.iteration}: saved ${records.length} records`);
-
-    const { normalize } = await import('../lib/normalize.js');
-    const { generateReport } = await import('../lib/report.js');
-    const { md2html } = await import('../lib/md2html.js');
-
-    await normalize(taskName, dataDir);
-    const mdPath = await generateReport(taskName);
-    if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
-    console.log(`Done! View report: output/${taskName}/index.html`);
   },
 
   async report() {
     const taskName = positional[0];
     if (!taskName) return usage('report <task>');
-
-    const { generateReport } = await import('../lib/report.js');
-    const { md2html } = await import('../lib/md2html.js');
-
-    const mdPath = await generateReport(taskName);
-    if (mdPath) {
-      md2html(mdPath, join(OUTPUT_DIR, taskName, 'index.html'));
-    }
-  },
-
-  async reparse() {
-    const taskName = positional[0];
-    if (!taskName) return usage('reparse <task|all>  — re-extract records from saved HTML');
-
-    const { reparseTask } = await import('../lib/reparse.js');
-    const { cleanTask } = await import('../lib/clean.js');
-    const { normalize } = await import('../lib/normalize.js');
-    const { generateReport } = await import('../lib/report.js');
-    const { md2html } = await import('../lib/md2html.js');
-
-    const tasks = taskName === 'all'
-      ? readdirSync(TASKS_DIR).filter(f => f.endsWith('.js')).map(f => f.replace('.js', ''))
-      : [taskName];
-
-    for (const t of tasks) {
-      const dataDir = join(DATA_DIR, t);
-      if (!existsSync(join(dataDir, 'html'))) { console.log(`[${t}] No HTML — skipping`); continue; }
-
-      // 1. Re-parse HTML → JSONL
-      await reparseTask(t);
-
-      // 2. Clean the new JSONL
-      await cleanTask(t);
-
-      // 3. Delete old SQLite, re-normalize
-      const dbPath = join(dataDir, 'db.sqlite');
-      if (existsSync(dbPath)) { const { unlinkSync } = await import('fs'); unlinkSync(dbPath); }
-      await normalize(t, dataDir);
-
-      // 4. Regenerate report + HTML
-      const outputDir = join(OUTPUT_DIR, t);
-      mkdirSync(outputDir, { recursive: true });
-      const mdPath = await generateReport(t);
-      if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
-    }
-  },
-
-  async clean() {
-    const taskName = positional[0];
-    if (!taskName && taskName !== 'all') return usage('clean <task|all>  — clean raw data offline');
-
-    const { cleanTask } = await import('../lib/clean.js');
-    const { normalize } = await import('../lib/normalize.js');
-    const { generateReport } = await import('../lib/report.js');
-    const { md2html } = await import('../lib/md2html.js');
-
-    const tasks = taskName === 'all'
-      ? readdirSync(TASKS_DIR).filter(f => f.endsWith('.js')).map(f => f.replace('.js', ''))
-      : [taskName];
-
-    for (const t of tasks) {
-      const dataDir = join(DATA_DIR, t);
-      const rawDir = join(dataDir, 'raw');
-      if (!existsSync(rawDir)) { console.log(`[${t}] No raw data — skipping`); continue; }
-
-      // 1. Clean raw JSONL in-place
-      await cleanTask(t);
-
-      // 2. Delete old SQLite so normalize rebuilds from cleaned data
-      const dbPath = join(dataDir, 'db.sqlite');
-      if (existsSync(dbPath)) {
-        const { unlinkSync } = await import('fs');
-        unlinkSync(dbPath);
-      }
-
-      // 3. Re-normalize from cleaned raw
-      await normalize(t, dataDir);
-
-      // 4. Regenerate report + HTML
-      const outputDir = join(OUTPUT_DIR, t);
-      mkdirSync(outputDir, { recursive: true });
-      const mdPath = await generateReport(t);
-      if (mdPath) md2html(mdPath, join(outputDir, 'index.html'));
-    }
+    await reportTask(taskName);
   },
 
   async render() {
     const input = positional[0];
     const output = positional[1] || input?.replace('.md', '.html');
     if (!input) return usage('render <file.md> [output.html]');
-
-    const { md2html } = await import('../lib/md2html.js');
+    const { md2html } = await import('./md2html.js');
     md2html(input, output);
   },
-
-  // ─── Browser session ───────────────────────────────────────
 
   async browse() {
     const url = positional[0];
     const domain = getFlag('domain');
     if (!url) return usage('browse <url> [--domain=.example.com]');
-
     const { createBrowser } = await import('../lib/browser.js');
     const { page } = await createBrowser({ domain, headless: false });
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    console.log(`Browser open at ${url}. Press Ctrl+C to close.`);
-    await new Promise(() => {}); // keep alive
+    console.log(`Browser open. Ctrl+C to close.`);
+    await new Promise(() => {});
   },
 
   async cookies() {
     const domain = positional[0];
-    if (!domain) return usage('cookies <domain>  (e.g. .linkedin.com)');
-
+    if (!domain) return usage('cookies <domain>');
     const { getChromeCookes } = await import('../lib/chrome-cookies.js');
     const cookies = await getChromeCookes(domain);
-    for (const c of cookies) {
-      console.log(`  ${c.name.padEnd(30)} = ${c.value.substring(0, 60)}${c.value.length > 60 ? '...' : ''}`);
-    }
-    console.log(`\n${cookies.length} cookies for ${domain}`);
+    for (const c of cookies) console.log(`  ${c.name.padEnd(30)} ${c.value.substring(0, 60)}`);
+    console.log(`\n${cookies.length} cookies`);
   },
-
-  // ─── Task management ───────────────────────────────────────
 
   async list() {
     const tasks = readdirSync(TASKS_DIR).filter(f => f.endsWith('.js')).map(f => f.replace('.js', ''));
-    console.log('Available tasks:\n');
+    console.log('Tasks:\n');
     for (const t of tasks) {
       const metaPath = join(DATA_DIR, t, 'meta.json');
       if (existsSync(metaPath)) {
         const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
-        console.log(`  ${t.padEnd(30)} ${meta.totalRecords} records, ${meta.iteration} iterations`);
+        const htmlDir = join(DATA_DIR, t, 'html');
+        const htmlCount = existsSync(htmlDir) ? readdirSync(htmlDir).filter(f => f.endsWith('.html')).length : 0;
+        console.log(`  ${t.padEnd(35)} ${meta.totalRecords} records, ${htmlCount} pages saved`);
       } else {
-        console.log(`  ${t.padEnd(30)} (no data yet)`);
+        console.log(`  ${t.padEnd(35)} (no data)`);
       }
     }
   },
 
-  async new() {
+  async ['new']() {
     const name = positional[0];
     if (!name) return usage('new <name>');
-
     const taskPath = join(TASKS_DIR, `${name}.js`);
-    if (existsSync(taskPath)) {
-      console.error(`Task already exists: ${taskPath}`);
-      process.exit(1);
-    }
+    if (existsSync(taskPath)) { console.error(`Already exists: ${taskPath}`); process.exit(1); }
 
-    const template = `import { Scraper } from '../lib/scraper.js';
+    writeFileSync(taskPath, `import { Scraper } from '../lib/scraper.js';
 
-/**
- * ${name} — Ingestion Task
- *
- * Created: ${new Date().toISOString().split('T')[0]}
- * Usage: ingest run ${name}
- */
-export default class ${name.replace(/-./g, m => m[1].toUpperCase()).replace(/^./, m => m.toUpperCase())}Scraper extends Scraper {
-  // Uncomment to inject Chrome cookies for authenticated sites:
-  // get cookieDomain() { return '.example.com'; }
-
-  sources() {
-    return [
-      { name: 'Source', url: 'https://example.com' },
-    ];
-  }
-
-  async extract(page) {
-    // Return an array of record objects from the current page
-    return page.evaluate(() => {
-      return []; // TODO: implement extraction
-    });
-  }
-
-  async nextPage(page) {
-    // Navigate to next page, return false if no more pages
-    if (this.meta.iteration >= 100) return false;
-    // TODO: implement pagination
-    return false;
-  }
+// ${name} — created ${new Date().toISOString().split('T')[0]}
+// Usage: ingest run ${name}
+export default class extends Scraper {
+  sources() { return [{ name: 'Source', url: 'https://example.com' }]; }
+  async extract(page) { return []; }
+  async nextPage(page) { return false; }
 }
-`;
-    writeFileSync(taskPath, template);
-    console.log(`Created: ${taskPath}`);
-    console.log(`\nNext steps:`);
-    console.log(`  1. Edit tasks/${name}.js — set sources(), extract(), nextPage()`);
-    console.log(`  2. ingest run ${name}`);
+`);
+    console.log(`Created: tasks/${name}.js`);
   },
 
   async status() {
     const taskName = positional[0];
     if (!taskName) return usage('status <task>');
-
     const metaPath = join(DATA_DIR, taskName, 'meta.json');
-    if (!existsSync(metaPath)) {
-      console.log(`No data for task "${taskName}"`);
-      return;
-    }
-
+    if (!existsSync(metaPath)) { console.log(`No data for "${taskName}"`); return; }
     const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+    const htmlDir = join(DATA_DIR, taskName, 'html');
+    const htmlCount = existsSync(htmlDir) ? readdirSync(htmlDir).filter(f => f.endsWith('.html')).length : 0;
     console.log(`Task:       ${meta.task}`);
-    console.log(`Iterations: ${meta.iteration}`);
     console.log(`Records:    ${meta.totalRecords}`);
+    console.log(`HTML pages: ${htmlCount}`);
+    console.log(`Iterations: ${meta.iteration}`);
     console.log(`Cursor:     ${meta.cursor || '(done)'}`);
-    console.log(`\nHistory:`);
-    for (const h of meta.history.slice(-10)) {
-      const date = new Date(h.date).toLocaleString();
-      console.log(`  #${h.iteration} (${date}): ${h.records} records from ${h.url?.substring(0, 60)}`);
+    if (meta.history?.length) {
+      console.log(`\nLast 5:`);
+      for (const h of meta.history.slice(-5)) {
+        console.log(`  #${h.iteration} ${new Date(h.date).toLocaleString()} — ${h.records} records`);
+      }
     }
   },
 };
@@ -354,26 +290,21 @@ function usage(example) {
   ingest — Browser-based data ingestion CLI
 
   Commands:
-    run <task> [--iterations=N]           Run scraper iterations
-    feed <task> [--file=... | stdin]      Feed external JSON records
-    report <task>                         Regenerate report
-    reparse <task|all>                    Re-extract from saved HTML + clean + rebuild
-    clean <task|all>                      Clean raw data + rebuild DB + report
-    render <file.md> [output.html]        Convert markdown to HTML
+    run <task> [--iterations=N] [--refetch]   Fetch + parse + report
+    parse <task|all>                          Re-parse saved HTML → report
+    report <task>                             Regenerate report only
+    render <file.md> [output.html]            Markdown → HTML
 
-    browse <url> [--domain=...]           Open URL with Chrome session
-    cookies <domain>                      Show extracted Chrome cookies
+    browse <url> [--domain=...]               Open URL with Chrome session
+    cookies <domain>                          Show Chrome cookies
 
-    list                                  List available tasks
-    new <name>                            Scaffold a new task
-    status <task>                         Show task metadata
+    list                                      Available tasks
+    new <name>                                Scaffold task
+    status <task>                             Show task info
   `);
   if (example) console.log(`  Usage: ingest ${example}\n`);
   process.exit(1);
 }
 
-if (!cmd || !commands[cmd]) {
-  usage();
-} else {
-  commands[cmd]().catch(err => { console.error(err.message || err); process.exit(1); });
-}
+if (!cmd || !commands[cmd]) usage();
+else commands[cmd]().catch(err => { console.error(err.message || err); process.exit(1); });
