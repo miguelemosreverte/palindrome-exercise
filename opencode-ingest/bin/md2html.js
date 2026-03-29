@@ -256,16 +256,24 @@ function buildGraph(records, columns) {
   const senBreakdown = Object.entries(seniorities).sort((a, b) => b[1] - a[1])
     .map(([name, count]) => `<span class="tag tag-sen">${escHtml(name)} (${count})</span>`).join(' ');
 
-  // Profile cards
+  // Profile cards — with photos
+  const photoCol = columns.find(c => /photo|avatar|image/i.test(c));
   const profileCards = records.slice(0, 50).map(r => {
     const name = r[nameCol] || '';
     const title = r[titleCol] || '';
     const company = r[companyCol] || '';
     const url = r[urlCol] || '#';
+    const photo = r[photoCol] || '';
+    const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     return `<a href="${escHtml(url)}" class="profile-card" target="_blank">
-      <div class="profile-name">${escHtml(name)}</div>
-      <div class="profile-title">${escHtml(title.substring(0, 60))}</div>
-      ${company ? `<div class="profile-company">${escHtml(company.substring(0, 40))}</div>` : ''}
+      ${photo
+        ? `<img class="profile-photo" src="${escHtml(photo)}" alt="" loading="lazy">`
+        : `<div class="profile-photo profile-initials">${initials}</div>`}
+      <div class="profile-info">
+        <div class="profile-name">${escHtml(name)}</div>
+        <div class="profile-title">${escHtml(title.substring(0, 60))}</div>
+        ${company ? `<div class="profile-company">${escHtml(company.substring(0, 40))}</div>` : ''}
+      </div>
     </a>`;
   }).join('\n');
 
@@ -635,12 +643,15 @@ const CSS_LAYOUTS = `
   .detail-person span { color: #666; }
   .detail-person small { color: #c0392b; }
 
-  .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
-  .profile-card { display: block; background: #fff; border: 1px solid #e0d8cf; border-radius: 6px; padding: 0.8rem; text-decoration: none !important; color: inherit; transition: box-shadow 0.15s; }
-  .profile-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .profile-name { font-weight: 600; font-size: 0.9rem; color: #2c3e50; }
-  .profile-title { font-size: 0.8rem; color: #666; margin-top: 0.15rem; }
-  .profile-company { font-size: 0.75rem; color: #c0392b; margin-top: 0.15rem; }
+  .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
+  .profile-card { display: flex; align-items: center; gap: 0.7rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.7rem; text-decoration: none !important; color: inherit; transition: box-shadow 0.15s; }
+  .profile-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  .profile-photo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .profile-initials { display: flex; align-items: center; justify-content: center; background: #2c3e50; color: #fff; font-size: 0.85rem; font-weight: 600; }
+  .profile-info { min-width: 0; }
+  .profile-name { font-weight: 600; font-size: 0.88rem; color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-title { font-size: 0.78rem; color: #666; margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-company { font-size: 0.73rem; color: #c0392b; margin-top: 0.1rem; }
 
   @media (max-width: 640px) {
     .graph-panels { grid-template-columns: 1fr; }
