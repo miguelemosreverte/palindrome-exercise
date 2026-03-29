@@ -15,82 +15,100 @@ const ROOT = new URL('..', import.meta.url).pathname;
 
 function parseMercadoLibre(html, url) {
   const records = [];
-  const re = /<li[^>]*ui-search-layout__item[^>]*>([\s\S]*?)(?=<li[^>]*ui-search-layout__item|<\/ol|<\/ul|$)/g;
-  let match;
 
-  // Split by list items
   const items = html.split(/<li[^>]*class="[^"]*ui-search-layout__item[^"]*"/);
 
   for (let i = 1; i < items.length; i++) {
-    const chunk = items[i].substring(0, 8000); // each item is ~3-5KB
+    const chunk = items[i].substring(0, 10000);
 
-    // Title — poly-component__title or polycard__title
+    // Title — poly-component__title
     const titleMatch = chunk.match(/poly-component__title[^>]*>([^<]+)/)
       || chunk.match(/polycard_[^>]*title[^>]*>([^<]+)/);
     const title = titleMatch?.[1]?.trim() || '';
 
-    // URL — first href in the item
+    // URL
     const urlMatch = chunk.match(/href="(https:\/\/[^"]*(?:mercadolibre|articulo|click1)[^"]*)"/);
     const itemUrl = urlMatch?.[1]?.split('#')[0] || '';
 
-    // Price — andes-money-amount__fraction
-    const fractionMatch = chunk.match(/andes-money-amount__fraction[^>]*>([^<]+)/);
+    // Price — get ALL fractions (original + discount price), take the first (current price)
+    const allFractions = [...chunk.matchAll(/andes-money-amount__fraction[^>]*>([^<]+)/g)].map(m => m[1].trim());
     const currencyMatch = chunk.match(/andes-money-amount__currency-symbol[^>]*>([^<]+)/);
-    const centsMatch = chunk.match(/andes-money-amount__cents[^>]*>([^<]+)/);
     const currency = currencyMatch?.[1]?.trim() || '$';
-    const fraction = fractionMatch?.[1]?.trim() || '';
-    const cents = centsMatch?.[1]?.trim() || '';
-    const priceNum = fraction ? parseFloat(fraction.replace(/\./g, '')) + (cents ? parseFloat(`0.${cents}`) : 0) : 0;
+    const fraction = allFractions[0] || '';
+    const priceNum = fraction ? parseFloat(fraction.replace(/\./g, '')) : 0;
 
-    // Image — product images from mlstatic
-    const imgMatch = chunk.match(/src="(https:\/\/http2\.mlstatic\.com\/D_[^"]+)"/);
+    // Original price (before discount) — usually the second price if discount exists
+    const discountMatch = chunk.match(/andes-money-amount__discount[^>]*>([^<]*\d+%[^<]*)/);
+    const discount = discountMatch?.[1]?.trim() || '';
+    const originalPrice = allFractions.length > 1 ? parseFloat(allFractions[1].replace(/\./g, '')) : 0;
+
+    // Image
+    const imgMatch = chunk.match(/src="(https:\/\/http2\.mlstatic\.com\/D_[^"]+)"/)
+      || chunk.match(/data-src="(https:\/\/http2\.mlstatic\.com\/D_[^"]+)"/);
     const image = imgMatch?.[1] || '';
 
-    // Seller — official store label or poly seller
-    const sellerMatch = chunk.match(/official-store[^>]*>([^<]+)/)
-      || chunk.match(/poly-component__seller[^>]*>([^<]+)/)
-      || chunk.match(/polycard_[^>]*seller[^>]*>([^<]+)/);
-    const seller = sellerMatch?.[1]?.trim() || '';
+    // Seller — look inside poly-component__seller block
+    const sellerBlock = chunk.match(/poly-component__seller[\s\S]*?(?=poly-component__|$)/)?.[0] || '';
+    const sellerTexts = [...sellerBlock.matchAll(/>([^<]{2,60})</g)].map(m => m[1].trim()).filter(t => t && !/poly-|andes-|class=/.test(t));
+    const seller = sellerTexts.join(' ').trim();
 
-    // Shipping
-    const shippingMatch = chunk.match(/poly-component__shipping[^>]*>([^<]+)/)
-      || chunk.match(/ui-pb-highlight[^>]*>([^<]+)/)
-      || chunk.match(/shipping[^>]*>([^<]*(?:gratis|Llega)[^<]*)/i);
-    const shipping = shippingMatch?.[1]?.trim() || '';
-    const freeShipping = /gratis|free|fulfillment/i.test(chunk);
+    // Shipping — full shipping text
+    const shipBlock = chunk.match(/poly-component__shipping[\s\S]*?(?=poly-component__|<\/li|$)/)?.[0] || '';
+    const shipTexts = [...shipBlock.matchAll(/>([^<]{2,80})</g)].map(m => m[1].trim()).filter(t => t && !/poly-|andes-|class=/.test(t));
+    const shipping = shipTexts[0] || '';
+    const freeShipping = /gratis|free/i.test(shipBlock);
 
-    // Location
-    const locMatch = chunk.match(/poly-component__location[^>]*>([^<]+)/)
-      || chunk.match(/ui-search-item__location[^>]*>([^<]+)/);
-    const location = locMatch?.[1]?.trim() || '';
-
-    // Installments
-    const installMatch = chunk.match(/(\d+x)\s*[\$]?\s*([\d.,]+)/);
-    const installments = installMatch ? `${installMatch[1]} $${installMatch[2]}` : '';
-
-    // Reviews
-    const reviewMatch = chunk.match(/reviews__amount[^>]*>\(?(\d+)\)?/);
-    const reviews = reviewMatch ? parseInt(reviewMatch[1]) : 0;
-    const ratingMatch = chunk.match(/reviews__rating-number[^>]*>([\d.]+)/);
+    // Rating + review count
+    const reviewBlock = chunk.match(/poly-component__review[\s\S]*?(?=poly-component__|$)/)?.[0] || '';
+    const ratingMatch = chunk.match(/>(\d\.\d)</) || reviewBlock.match(/>(\d\.\d)</);
     const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
+    const reviewCountMatch = reviewBlock.match(/>\(?\s*(\d+)\s*\)?</);
+    const reviews = reviewCountMatch ? parseInt(reviewCountMatch[1]) : 0;
 
-    // MLA ID from URL
+    // Installments — look for "N cuotas de $X"
+    const installBlock = chunk.match(/poly-(?:price__installments|component__installments)[\s\S]*?(?=poly-component__|<\/li|$)/)?.[0] || '';
+    const installTexts = [...installBlock.matchAll(/>([^<]{2,60})</g)].map(m => m[1].trim()).filter(t => /\d/.test(t));
+    const installments = installTexts.join(' ').replace(/\s+/g, ' ').trim();
+
+    // Variations (colors, sizes)
+    const variationsMatch = chunk.match(/Disponible en (\d+) colores?/i);
+    const colorVariants = variationsMatch ? parseInt(variationsMatch[1]) : 0;
+
+    // Brand — sometimes in seller block as "por BRAND"
+    const brandMatch = seller.match(/por\s+(.+)/i);
+    const brand = brandMatch?.[1]?.trim() || '';
+    const storeName = seller.replace(/\s*por\s+.*/i, '').trim();
+
+    // Coupon
+    const couponMatch = chunk.match(/poly-component__coupons[\s\S]*?>([^<]{3,40})</);
+    const coupon = couponMatch?.[1]?.trim() || '';
+
+    // MLA ID
     const mlaMatch = itemUrl.match(/(MLA[\d-]+)/);
     const mlaId = mlaMatch?.[1] || '';
+
+    // Is ad/promoted
+    const isAd = /poly-component__ads|>Ad<|>Publicidad</i.test(chunk);
 
     if (title) {
       records.push({
         title,
-        price: priceNum > 0 ? `${currency}${fraction}${cents ? `,${cents}` : ''}` : '',
+        price: priceNum > 0 ? `${currency}${fraction}` : '',
         _price_num: priceNum,
+        original_price: originalPrice > 0 ? `${currency}${allFractions[1] || ''}` : '',
+        discount,
         url: mlaId ? `https://articulo.mercadolibre.com.ar/${mlaId}` : itemUrl,
         image,
-        location,
-        seller,
+        seller: storeName || seller,
+        brand,
         shipping: freeShipping ? (shipping || 'Envío gratis') : shipping,
+        free_shipping: freeShipping,
         installments,
-        reviews,
         rating,
+        reviews,
+        color_variants: colorVariants,
+        coupon,
+        is_ad: isAd,
         source: 'mercadolibre',
       });
     }
@@ -118,13 +136,25 @@ function parseYouTube(html, url) {
       const channel = vr.ownerText?.runs?.[0]?.text || '';
       const channelUrl = vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '';
       const views = vr.viewCountText?.simpleText || vr.viewCountText?.runs?.[0]?.text || '';
+      const shortViews = vr.shortViewCountText?.simpleText || '';
       const duration = vr.lengthText?.simpleText || '';
       const published = vr.publishedTimeText?.simpleText || '';
       const thumbnail = vr.thumbnail?.thumbnails?.at(-1)?.url || '';
+      const richThumb = vr.richThumbnail?.movingThumbnailRenderer?.movingThumbnailDetails?.thumbnails?.[0]?.url || '';
       const description = vr.detailedMetadataSnippets?.[0]?.snippetText?.runs?.map(r => r.text).join('') || '';
+
+      // Channel avatar
+      const channelThumb = vr.channelThumbnailSupportedRenderers?.channelThumbnailWithLinkRenderer?.thumbnail?.thumbnails?.[0]?.url || '';
+
+      // Badges (4K, New, CC, Live, etc.)
+      const badges = (vr.badges || []).map(b => b.metadataBadgeRenderer?.label).filter(Boolean);
 
       // Parse view count to number
       const viewNum = parseInt((views.match(/[\d.,]+/) || ['0'])[0].replace(/[.,]/g, '')) || 0;
+
+      // Parse duration to seconds
+      const durParts = duration.split(':').map(Number).reverse();
+      const durationSec = (durParts[0] || 0) + (durParts[1] || 0) * 60 + (durParts[2] || 0) * 3600;
 
       if (title && videoId) {
         videos.push({
@@ -132,12 +162,17 @@ function parseYouTube(html, url) {
           url: `https://www.youtube.com/watch?v=${videoId}`,
           channel,
           channelUrl: channelUrl ? `https://www.youtube.com${channelUrl}` : '',
+          channelAvatar: channelThumb,
           views,
+          shortViews,
           _views_num: viewNum,
           duration,
+          _duration_sec: durationSec,
           published,
           thumbnail,
-          description: description.substring(0, 300),
+          richThumbnail: richThumb,
+          description: description.substring(0, 500),
+          badges: badges.join(', '),
           source: 'youtube',
         });
       }
