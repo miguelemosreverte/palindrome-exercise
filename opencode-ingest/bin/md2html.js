@@ -408,7 +408,7 @@ const TABLE_ENGINE_JS = `
   const imgCols = new Set(['photo', 'companyLogo', 'image', 'thumbnail', 'channelAvatar', 'richThumbnail']);
   const urlCols = new Set(['url', 'profileUrl', 'channelUrl']);
   const tagCols = new Set(['skills', 'badges']);
-  const hideCols = new Set(['headline', 'description', 'companyLogo', 'richThumbnail']);
+  const hideCols = new Set(['headline', 'description', 'companyLogo', 'richThumbnail', 'location', 'raw_labels', 'domain', 'seniority', 'seniority_score', 'skills_normalized', 'city', 'seniority_level', 'source']);
 
   function visibleCols() { return currentCols.filter(c => !hideCols.has(c)); }
 
@@ -545,6 +545,35 @@ const TABLE_ENGINE_JS = `
     page = 0;
     render();
     renderActiveFilters();
+    updateTreeCounts(filtered);
+  }
+
+  // Update skill tree counts to reflect filtered data
+  function updateTreeCounts(filtered) {
+    // Count people per path segment in filtered set
+    const segmentPeople = {};
+    filtered.forEach(r => {
+      try {
+        JSON.parse(r.skills_normalized || '[]').forEach(s => {
+          if (!s.path) return;
+          const parts = s.path.split('|');
+          for (let i = 0; i < parts.length; i++) {
+            const seg = parts[i];
+            if (!segmentPeople[seg]) segmentPeople[seg] = new Set();
+            segmentPeople[seg].add(r.name || r.profileUrl);
+          }
+        });
+      } catch {}
+    });
+    // Update all buttons with data-count
+    document.querySelectorAll('[data-count]').forEach(btn => {
+      const group = btn.dataset.group || btn.dataset.value;
+      if (group && segmentPeople[group]) {
+        btn.querySelector('small').textContent = segmentPeople[group].size;
+      } else if (group) {
+        btn.querySelector('small').textContent = '0';
+      }
+    });
   }
 
   // Dropdown facets
