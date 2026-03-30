@@ -1,0 +1,543 @@
+[
+  {
+    "model": "mistral-nemo",
+    "query": "show me senior backend java developers in córdoba",
+    "result": {
+      "domain": "engineering",
+      "city": "Córdoba",
+      "seniority_level": "senior",
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Backend"
+      ],
+      "skills": [
+        "Java"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 2776,
+        "tokens": 1313,
+        "promptTokens": 1264
+      }
+    },
+    "issues": [],
+    "elapsed": 2776,
+    "tokens": 1313
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "HR people who do recruiting",
+    "result": {
+      "domain": "hr",
+      "skill_categories": [
+        "HR"
+      ],
+      "skill_subcategories": [
+        "Recruiting"
+      ],
+      "skills": [
+        "Recruiting"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 1424,
+        "tokens": 1292,
+        "promptTokens": 1259
+      }
+    },
+    "issues": [
+      "skill \"Recruiting\" not in available leaves"
+    ],
+    "elapsed": 1424,
+    "tokens": 1292
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "find me data scientists",
+    "result": {
+      "domain": "data",
+      "skill_categories": [
+        "Data"
+      ],
+      "skill_subcategories": [
+        "Science"
+      ],
+      "skills": [
+        "Machine Learning",
+        "Data Science"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 921,
+        "tokens": 1292,
+        "promptTokens": 1258
+      }
+    },
+    "issues": [],
+    "elapsed": 921,
+    "tokens": 1292
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "managers in buenos aires",
+    "result": {
+      "domain": "management",
+      "city": "Buenos Aires",
+      "seniority_level": "director",
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 728,
+        "tokens": 1283,
+        "promptTokens": 1259
+      }
+    },
+    "issues": [],
+    "elapsed": 728,
+    "tokens": 1283
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "devops engineers with docker experience",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "DevOps"
+      ],
+      "skill_subcategories": [
+        "Containers"
+      ],
+      "skills": [
+        "Docker"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 1360,
+        "tokens": 1293,
+        "promptTokens": 1260
+      }
+    },
+    "issues": [],
+    "elapsed": 1360,
+    "tokens": 1293
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "senior engineers who know python or go",
+    "result": {
+      "domain": "engineering",
+      "seniority_level": "senior",
+      "skills": [
+        "Python",
+        "Go"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 1095,
+        "tokens": 1290,
+        "promptTokens": 1262
+      }
+    },
+    "issues": [],
+    "elapsed": 1095,
+    "tokens": 1290
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "people in consulting",
+    "result": {
+      "domain": "consulting",
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 611,
+        "tokens": 1266,
+        "promptTokens": 1257
+      }
+    },
+    "issues": [],
+    "elapsed": 611,
+    "tokens": 1266
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "frontend developers",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "Frontend"
+      ],
+      "skills": [
+        "JavaScript",
+        "React",
+        "Vue.js"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 849,
+        "tokens": 1287,
+        "promptTokens": 1256
+      }
+    },
+    "issues": [
+      "skill_category \"Frontend\" not available"
+    ],
+    "elapsed": 849,
+    "tokens": 1287
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "everyone with machine learning skills",
+    "result": {
+      "skill_categories": [
+        "Data"
+      ],
+      "skill_subcategories": [
+        "Science"
+      ],
+      "skills": [
+        "Machine Learning"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 766,
+        "tokens": 1284,
+        "promptTokens": 1260
+      }
+    },
+    "issues": [],
+    "elapsed": 766,
+    "tokens": 1284
+  },
+  {
+    "model": "mistral-nemo",
+    "query": "show architects and leads",
+    "result": {
+      "skill_subcategories": [
+        "Architecture"
+      ],
+      "skill_categories": [
+        "Leadership"
+      ],
+      "_meta": {
+        "model": "mistral-nemo",
+        "modelId": "unsloth/Mistral-Nemo-Instruct-2407",
+        "elapsedMs": 701,
+        "tokens": 1277,
+        "promptTokens": 1258
+      }
+    },
+    "issues": [
+      "skill_category \"Leadership\" not available"
+    ],
+    "elapsed": 701,
+    "tokens": 1277
+  },
+  {
+    "model": "gemma-4b",
+    "query": "show me senior backend java developers in córdoba",
+    "result": {
+      "domain": "engineering",
+      "seniority_level": "senior",
+      "city": "Córdoba",
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Backend"
+      ],
+      "skills": [
+        "Java"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 2525,
+        "tokens": 1155,
+        "promptTokens": 1109
+      }
+    },
+    "issues": [],
+    "elapsed": 2525,
+    "tokens": 1155
+  },
+  {
+    "model": "gemma-4b",
+    "query": "HR people who do recruiting",
+    "result": {
+      "domain": "hr",
+      "seniority_level": "senior",
+      "skills": [
+        "Recruiting"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1724,
+        "tokens": 1128,
+        "promptTokens": 1105
+      }
+    },
+    "issues": [
+      "skill \"Recruiting\" not in available leaves"
+    ],
+    "elapsed": 1724,
+    "tokens": 1128
+  },
+  {
+    "model": "gemma-4b",
+    "query": "find me data scientists",
+    "result": {
+      "domain": "data",
+      "skill_categories": [
+        "Data"
+      ],
+      "skills": [
+        "Data Science"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1551,
+        "tokens": 1126,
+        "promptTokens": 1104
+      }
+    },
+    "issues": [],
+    "elapsed": 1551,
+    "tokens": 1126
+  },
+  {
+    "model": "gemma-4b",
+    "query": "managers in buenos aires",
+    "result": {
+      "domain": "management",
+      "city": "Buenos Aires",
+      "seniority_level": "director",
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1639,
+        "tokens": 1127,
+        "promptTokens": 1104
+      }
+    },
+    "issues": [],
+    "elapsed": 1639,
+    "tokens": 1127
+  },
+  {
+    "model": "gemma-4b",
+    "query": "devops engineers with docker experience",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "DevOps"
+      ],
+      "skill_subcategories": [
+        "Containers"
+      ],
+      "skills": [
+        "Docker"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1635,
+        "tokens": 1137,
+        "promptTokens": 1106
+      }
+    },
+    "issues": [],
+    "elapsed": 1635,
+    "tokens": 1137
+  },
+  {
+    "model": "gemma-4b",
+    "query": "senior engineers who know python or go",
+    "result": {
+      "domain": "engineering",
+      "seniority_level": "senior",
+      "skills": [
+        "Python",
+        "Go"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1764,
+        "tokens": 1132,
+        "promptTokens": 1107
+      }
+    },
+    "issues": [],
+    "elapsed": 1764,
+    "tokens": 1132
+  },
+  {
+    "model": "gemma-4b",
+    "query": "people in consulting",
+    "result": {
+      "domain": "consulting",
+      "seniority_level": "senior",
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1531,
+        "tokens": 1120,
+        "promptTokens": 1103
+      }
+    },
+    "issues": [],
+    "elapsed": 1531,
+    "tokens": 1120
+  },
+  {
+    "model": "gemma-4b",
+    "query": "frontend developers",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Frontend"
+      ],
+      "skills": [
+        "JavaScript",
+        "React",
+        "Vue.js"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1798,
+        "tokens": 1140,
+        "promptTokens": 1102
+      }
+    },
+    "issues": [],
+    "elapsed": 1798,
+    "tokens": 1140
+  },
+  {
+    "model": "gemma-4b",
+    "query": "everyone with machine learning skills",
+    "result": {
+      "skill_categories": [
+        "Data"
+      ],
+      "skills": [
+        "AI",
+        "Machine Learning"
+      ],
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1543,
+        "tokens": 1124,
+        "promptTokens": 1105
+      }
+    },
+    "issues": [],
+    "elapsed": 1543,
+    "tokens": 1124
+  },
+  {
+    "model": "gemma-4b",
+    "query": "show architects and leads",
+    "result": {
+      "seniority_level": "senior",
+      "domain": "engineering",
+      "_meta": {
+        "model": "gemma-4b",
+        "modelId": "unsloth/gemma-3-4b-it",
+        "elapsedMs": 1464,
+        "tokens": 1120,
+        "promptTokens": 1104
+      }
+    },
+    "issues": [],
+    "elapsed": 1464,
+    "tokens": 1120
+  },
+  {
+    "model": "hermes-14b",
+    "query": "show me senior backend java developers in córdoba",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "HR people who do recruiting",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "find me data scientists",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "managers in buenos aires",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "devops engineers with docker experience",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "senior engineers who know python or go",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "people in consulting",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "frontend developers",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "everyone with machine learning skills",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  },
+  {
+    "model": "hermes-14b",
+    "query": "show architects and leads",
+    "error": "Cannot read properties of null (reading 'match')",
+    "elapsed": 0,
+    "tokens": 0
+  }
+]
