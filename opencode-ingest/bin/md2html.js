@@ -1038,10 +1038,10 @@ const CSS_LAYOUTS = `
   .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
   .facet-tag-sub.active { background: #2c5070; }
-  .facet-tags { flex-direction: column !important; }
+  .facet-tags { flex-direction: column !important; align-items: flex-start !important; }
   .stree-row { margin-bottom: 0.15rem; }
   .stree-parent { display: block; }
-  .stree-parent .facet-tag-parent { display: flex; align-items: center; gap: 0.3rem; width: 100%; text-align: left; justify-content: space-between; padding: 0.35rem 0.7rem; }
+  .stree-parent .facet-tag-parent { display: inline-flex; align-items: center; gap: 0.3rem; text-align: left; padding: 0.35rem 0.7rem; }
   .stree-parent .facet-tag-parent::after { content: '▸'; font-size: 0.7rem; opacity: 0.5; transition: transform 0.15s; }
   .stree-parent .facet-tag-parent.expanded::after { transform: rotate(90deg); }
   .stree-children { display: none; margin: 0.2rem 0 0.3rem 0; padding-left: 1rem; border-left: 2px solid #d4cdc4; }
