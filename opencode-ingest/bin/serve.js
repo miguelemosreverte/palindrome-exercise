@@ -98,46 +98,73 @@ async function nlToSQL(question, schema) {
 
 function fallbackNLtoSQL(question, schema) {
   const q = question.toLowerCase().trim();
-  const cols = schema.map(c => c.name).filter(c => !c.startsWith('_'));
-  const select = 'SELECT ' + cols.filter(c => c !== 'source').join(', ') + ' FROM records';
+  const S = 'SELECT _id FROM records';
 
-  // Skills: "know X", "X skills", "with X"
-  const skillPatterns = [
-    /(?:know|knows|with|have|has|using)\s+(\w[\w\s]*?)(?:\s+skills?)?$/i,
-    /(\w+)\s+(?:skills?|developers?|engineers?|devs?)/i,
-    /(?:skills?\s+(?:like|in|include)\s+)(.+)/i,
-  ];
-  for (const p of skillPatterns) {
-    const m = q.match(p);
-    if (m) return select + ` WHERE skills LIKE '%${m[1].trim()}%'`;
-  }
-
-  // Company: "at X", "from X", "works at X"
-  const coMatch = q.match(/(?:works?\s+at|from|at|company)\s+(.+)/i);
-  if (coMatch) return select + ` WHERE company LIKE '%${coMatch[1].trim()}%'`;
-
-  // Location: "in X", "from X city"
-  const locMatch = q.match(/\bin\s+([\wáéíóúñ\s]+?)$/i);
-  if (locMatch) return select + ` WHERE location LIKE '%${locMatch[1].trim()}%'`;
-
-  // Seniority: "senior", "lead", "manager", etc.
-  const senMatch = q.match(/\b(senior|lead|staff|principal|architect|manager|executive|director)\b/i);
-  if (senMatch) return select + ` WHERE seniority = '${senMatch[1].toLowerCase()}'`;
-
-  // Group by: "by company", "count", "group"
-  if (/group|count|by company/i.test(q)) {
+  // Aggregation queries (these need full columns, not just _id)
+  if (/group\s+by|count\s+by|by company|by seniority|breakdown|distribution/i.test(q)) {
+    if (/company/i.test(q)) return `SELECT company, COUNT(*) as count FROM records WHERE company != '' GROUP BY company ORDER BY count DESC`;
+    if (/seniority|level/i.test(q)) return `SELECT seniority, COUNT(*) as count FROM records GROUP BY seniority ORDER BY count DESC`;
+    if (/skill/i.test(q)) return `SELECT skills, COUNT(*) as count FROM records WHERE skills != '' GROUP BY skills ORDER BY count DESC`;
+    if (/location|city/i.test(q)) return `SELECT location, COUNT(*) as count FROM records GROUP BY location ORDER BY count DESC`;
     return `SELECT company, COUNT(*) as count FROM records WHERE company != '' GROUP BY company ORDER BY count DESC`;
   }
 
-  // Name search
-  const nameMatch = q.match(/(?:find|show|search)\s+(.+)/i);
-  if (nameMatch) {
-    const term = nameMatch[1].trim();
-    return select + ` WHERE name LIKE '%${term}%' OR title LIKE '%${term}%' OR skills LIKE '%${term}%' OR company LIKE '%${term}%'`;
+  // Extract the actual search terms — strip filler words
+  const stripped = q
+    .replace(/\b(show|find|get|list|display|me|all|the|people|who|that|those|which|with|from|please|can you)\b/gi, '')
+    .replace(/\s+/g, ' ').trim();
+
+  // Seniority keywords (exact match on known values)
+  const seniorityLevels = ['senior', 'lead', 'staff', 'principal', 'architect', 'manager', 'executive', 'director'];
+  const senMatch = seniorityLevels.find(s => q.includes(s));
+
+  // "works at <company>" — only if "at" is followed by a proper noun-ish thing
+  const atMatch = q.match(/(?:works?\s+at|employed\s+at|at\s+company)\s+([A-Z][\w\s]+)/i);
+  if (atMatch && atMatch[1].trim().length > 1) {
+    const where = [`company LIKE '%${atMatch[1].trim()}%'`];
+    if (senMatch) where.push(`seniority = '${senMatch}'`);
+    return S + ' WHERE ' + where.join(' AND ');
   }
 
-  // Default: show all
-  return select + ' LIMIT 100';
+  // "in <location>" — only match known Argentine cities/regions
+  const locPattern = /\b(?:in|from|located in)\s+(córdoba|cordoba|buenos aires|rosario|mendoza|argentina|tucumán|tucuman|santa fe|mar del plata)/i;
+  const locMatch = q.match(locPattern);
+
+  // "know/with <skill>" — skill search
+  const skillPatterns = [
+    /(?:know|knows|using|use|experience with|skilled in)\s+([\w#.+]+)/i,
+    /([\w#.+]+)\s+(?:skills?|developers?|engineers?|devs?|experience)/i,
+  ];
+  let skillTerm = null;
+  for (const p of skillPatterns) {
+    const m = q.match(p);
+    if (m && m[1].length > 1 && !seniorityLevels.includes(m[1].toLowerCase())) {
+      skillTerm = m[1].trim();
+      break;
+    }
+  }
+
+  // Build WHERE clauses
+  const where = [];
+  if (skillTerm) where.push(`skills LIKE '%${skillTerm}%'`);
+  if (locMatch) where.push(`location LIKE '%${locMatch[1]}%'`);
+  if (senMatch) where.push(`seniority = '${senMatch}'`);
+
+  if (where.length) return S + ' WHERE ' + where.join(' AND ');
+
+  // Fulltext search on remaining terms — search across all text columns
+  if (stripped.length > 1) {
+    const terms = stripped.split(/\s+/).filter(t => t.length > 2);
+    if (terms.length) {
+      const conditions = terms.map(t =>
+        `(name LIKE '%${t}%' OR title LIKE '%${t}%' OR skills LIKE '%${t}%' OR company LIKE '%${t}%' OR headline LIKE '%${t}%')`
+      );
+      return S + ' WHERE ' + conditions.join(' AND ');
+    }
+  }
+
+  // Default
+  return S + ' LIMIT 100';
 }
 
 // ─── Server ───────────────────────────────────────────────────────────
@@ -168,9 +195,20 @@ const server = createServer(async (req, res) => {
         try {
           result = await execSQL(task, sql);
         } catch (err) {
-          res.writeHead(200);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ sql, error: 'SQL error: ' + err.message }));
           return;
+        }
+
+        // If query returned _id only, hydrate with full records
+        if (result.columns.length === 1 && result.columns[0] === '_id') {
+          const ids = result.rows.map(r => r[0]);
+          if (ids.length) {
+            const fullCols = schema.map(c => c.name).filter(c => c !== 'source');
+            const hydrated = await execSQL(task,
+              `SELECT ${fullCols.map(c => '"' + c + '"').join(',')} FROM records WHERE _id IN (${ids.join(',')})`)
+            result = hydrated;
+          }
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
