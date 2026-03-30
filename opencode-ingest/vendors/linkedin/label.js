@@ -12,7 +12,8 @@
  */
 
 import initSqlJs from 'sql.js';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 // ─── Model Catalog ───────────────────────────────────────────────────
 
@@ -46,37 +47,44 @@ async function callLLM(modelId, prompt, apiKey) {
 
 // ─── Pass 1: Extract ─────────────────────────────────────────────────
 
-const EXTRACT_PROMPT = `You are a senior technical recruiter. Extract ALL skills from this LinkedIn profile.
+const EXTRACT_PROMPT = `You are a senior technical recruiter. You are given the FULL TEXT of a LinkedIn profile page. Extract structured information.
 
-Profile:
-- Name: {name}
-- Title: {title}
-- Headline: {headline}
-- Raw Skills (NOISY — may contain names, UI text. IGNORE non-skills): {skills}
-- Company: {company}
-- Location: {location}
+The text contains navigation, UI elements, ads — IGNORE all of that. Focus on:
+- The person's name, title, headline
+- Their "About" / "Acerca de" section
+- Their experience / work history
+- Their skills / "Aptitudes" section
+- Their education
+
+FULL PROFILE TEXT:
+---
+{profile_text}
+---
 
 Return JSON:
 {
-  "domain": "engineering|hr|design|data|product|management|sales|other",
+  "name": "Full Name",
+  "title": "Current Job Title",
+  "company": "Current Company",
+  "headline": "Full headline text",
+  "city": "Normalized City (e.g. Córdoba, Buenos Aires)",
+  "domain": "engineering|hr|design|data|product|management|sales|education|consulting",
   "seniority_level": "junior|mid|senior|staff|principal|lead|manager|director|vp|cto",
   "seniority_score": 65,
-  "city": "Normalized City Name",
+  "about": "Summary from About section (1-2 sentences)",
   "labels": [
     {"label": "Spring Boot", "confidence": 1.0, "source": "explicit"},
-    {"label": "Docker", "confidence": 0.85, "source": "inferred"},
-    ...
+    {"label": "Docker", "confidence": 0.85, "source": "inferred"}
   ]
 }
 
 RULES:
-- Extract EVERY real skill/technology/competency. Min 5, max 15.
-- "explicit": directly mentioned in title, headline, or skills
-- "inferred": not mentioned but highly likely given the role. A Java backend dev probably knows Maven, Git, REST APIs, SQL. An HR recruiter probably knows ATS systems, interviewing, sourcing.
-- Confidence 0-1: how sure are you this person has this skill
-- Disambiguate by domain: "Automation" for HR = "HR Process Automation". "Automation" for DevOps = "CI/CD Automation"
-- NO names, NO Spanish UI text, NO "Mostrar todo"/"Validar"/etc.
-- Include soft skills for non-tech roles (negotiation, stakeholder management, etc.)`;
+- Extract 5-15 REAL skills/technologies/competencies
+- "explicit": directly mentioned anywhere in the profile text
+- "inferred": highly likely given the role but not mentioned
+- Confidence 0-1
+- Disambiguate: "Automation" for HR ≠ "Automation" for DevOps
+- IGNORE: navigation text, UI labels, names of other people, ads, "Mostrar todo", "Validar", timestamps`;
 
 // ─── Pass 2: Normalize ───────────────────────────────────────────────
 
@@ -159,7 +167,7 @@ export async function labelRecords(dbPath, options = {}) {
   }
 
   // Get unlabeled records
-  const q = `SELECT _id, name, title, headline, skills, company, location FROM records WHERE _labeled IS NULL OR _labeled = 0`
+  const q = `SELECT _id, name, profileUrl FROM records WHERE _labeled IS NULL OR _labeled = 0`
     + (limit > 0 ? ` LIMIT ${limit} OFFSET ${offset}` : '');
   const unlabeled = db.exec(q);
   if (!unlabeled.length || !unlabeled[0].values.length) { console.log('All records labeled'); db.close(); return 0; }
@@ -167,10 +175,15 @@ export async function labelRecords(dbPath, options = {}) {
   const records = unlabeled[0].values;
   const cols = unlabeled[0].columns;
 
+  // Find HTML directory
+  const htmlDir = dbPath.replace('/db.sqlite', '/html');
+  const { readdirSync } = await import('fs');
+  const htmlFiles = existsSync(htmlDir) ? readdirSync(htmlDir).filter(f => f.includes('profile')) : [];
+
   const taxonomy = FIXED_TAXONOMY.split('\n').map(l => l.trim()).filter(Boolean);
 
   console.log(`Labeling ${records.length} records with ${model} (${modelConfig.id})`);
-  console.log(`Existing taxonomy: ${taxonomy.length} paths`);
+  console.log(`HTML profiles available: ${htmlFiles.length}`);
 
   let labeled = 0;
   for (const row of records) {
@@ -178,14 +191,45 @@ export async function labelRecords(dbPath, options = {}) {
     const id = record._id;
 
     try {
-      // ── Pass 1: Extract raw labels ──
-      const extractPrompt = EXTRACT_PROMPT
-        .replace('{name}', record.name || '')
-        .replace('{title}', record.title || '')
-        .replace('{headline}', record.headline || '')
-        .replace('{skills}', record.skills || '')
-        .replace('{company}', record.company || '')
-        .replace('{location}', record.location || '');
+      // ── Find the HTML file for this profile ──
+      const slug = (record.profileUrl || '').split('/in/')[1]?.replace(/\//g, '') || record.name?.toLowerCase().replace(/\s/g, '-');
+      const htmlFile = htmlFiles.find(f => f.includes(slug));
+      let profileText = '';
+
+      if (htmlFile) {
+        const html = readFileSync(join(htmlDir, htmlFile), 'utf8');
+        // Convert HTML to clean text
+        profileText = html
+          .replace(/<script.*?<\/script>/gis, '')
+          .replace(/<style.*?<\/style>/gis, '')
+          .replace(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gis, '\n## $1\n')
+          .replace(/<li[^>]*>/gi, '\n- ')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<p[^>]*>/gi, '\n')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
+        // Truncate to ~12K chars (~3K tokens) to stay well within limits
+        if (profileText.length > 12000) profileText = profileText.substring(0, 12000);
+      }
+
+      // ── Pass 1: Extract from full profile text ──
+      let extractPrompt;
+      if (profileText) {
+        extractPrompt = EXTRACT_PROMPT.replace('{profile_text}', profileText);
+      } else {
+        // Fallback: use DB fields if no HTML available
+        extractPrompt = EXTRACT_PROMPT.replace('{profile_text}',
+          `Name: ${record.name}\nNo HTML available — limited data.`);
+      }
 
       const raw = await callLLM(modelConfig.id, extractPrompt, apiKey);
 
@@ -253,14 +297,16 @@ export async function labelRecords(dbPath, options = {}) {
         raw.city = cityMap[raw.city.toLowerCase()] || raw.city;
       }
 
-      // NEVER overwrite the original skills column — it's raw data.
-      // Write labels to their own columns only.
+      // Write labels + LLM-extracted profile fields
+      // The LLM now extracts name/title/company/headline from the full text — update those too
       db.run(`UPDATE records SET
         _labeled = 1, raw_labels = ?,
+        title = COALESCE(?, title), company = COALESCE(?, company), headline = COALESCE(?, headline),
         domain = ?, seniority_level = ?, seniority_score = ?, city = ?,
         skills_normalized = ?
         WHERE _id = ?`, [
         JSON.stringify(raw),
+        raw.title || null, raw.company || null, raw.headline || null,
         raw.domain, raw.seniority_level, raw.seniority_score, raw.city,
         JSON.stringify(normalized.skills || []),
         id,
