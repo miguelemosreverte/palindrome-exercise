@@ -207,13 +207,23 @@ function buildGraph(records, columns, showcaseResults) {
   };
   const allTechStack = {};
   const allIndustries = {};
+  const skillTree = {};  // parent → Set of children
 
   records.forEach(r => {
     for (const f of Object.keys(facets)) {
       const v = r[f];
       if (v && v.length > 0) facets[f][v] = (facets[f][v] || 0) + 1;
     }
-    try { JSON.parse(r.tech_stack || '[]').forEach(t => { allTechStack[t] = (allTechStack[t] || 0) + 1; }); } catch {}
+    // tech_stack: [{name,parent}] or ["string"] — handle both
+    try {
+      const parsed = JSON.parse(r.tech_stack || '[]');
+      parsed.forEach(t => {
+        const name = typeof t === 'string' ? t : t.name;
+        const parent = typeof t === 'object' ? t.parent : null;
+        if (name) allTechStack[name] = (allTechStack[name] || 0) + 1;
+        if (parent) { if (!skillTree[parent]) skillTree[parent] = new Set(); skillTree[parent].add(name); }
+      });
+    } catch {}
     try { JSON.parse(r.industries || '[]').forEach(t => { allIndustries[t] = (allIndustries[t] || 0) + 1; }); } catch {}
   });
 
@@ -233,11 +243,17 @@ function buildGraph(records, columns, showcaseResults) {
     return `<select class="facet-select" data-facet="${id}"><option value="">All ${label}</option>${opts}</select>`;
   };
 
-  // Build tag pills (top 20 tech stack)
-  const topTech = Object.entries(allTechStack).sort((a,b) => b[1]-a[1]).slice(0, 25);
-  const techPills = topTech.map(([t, c]) =>
-    `<button class="facet-tag" data-facet="tech_stack" data-value="${escHtml(t)}">${escHtml(t)} <small>${c}</small></button>`
-  ).join('');
+  // Build skill tree pills — parent nodes are clickable to expand children
+  const treeEntries = Object.entries(skillTree).sort((a,b) => b[1].size - a[1].size);
+  const techPills = treeEntries.map(([parent, children]) => {
+    const childArr = [...children].sort();
+    const childPills = childArr.map(c => {
+      const count = allTechStack[c] || 0;
+      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(c)}" style="display:none">${escHtml(c)} <small>${count}</small></button>`;
+    }).join('');
+    const totalCount = childArr.reduce((s, c) => s + (allTechStack[c] || 0), 0);
+    return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(parent)}">${escHtml(parent)} <small>${totalCount}</small></button>${childPills}</span>`;
+  }).join('');
 
   const topIndustries = Object.entries(allIndustries).sort((a,b) => b[1]-a[1]).slice(0, 15);
   const industryPills = topIndustries.map(([t, c]) =>
@@ -390,9 +406,20 @@ const TABLE_ENGINE_JS = `
 
       if (facet === 'seniority_score_min') {
         filtered = filtered.filter(r => parseInt(r.seniority_score) >= value);
-      } else if (facet === 'tech_stack' || facet === 'industries') {
-        // Multi-select: record must have ALL selected tags
+      } else if (facet === 'tech_stack') {
         const tags = value; // Set
+        filtered = filtered.filter(r => {
+          // tech_stack is [{name,parent}] or check skills column (comma-separated names)
+          const skills = (r.skills || '').toLowerCase();
+          try {
+            const arr = JSON.parse(r.tech_stack || '[]').map(s => (typeof s === 'string' ? s : s.name || '').toLowerCase());
+            return [...tags].every(t => arr.some(a => a.includes(t.toLowerCase())) || skills.includes(t.toLowerCase()));
+          } catch {
+            return [...tags].every(t => skills.includes(t.toLowerCase()));
+          }
+        });
+      } else if (facet === 'industries') {
+        const tags = value;
         filtered = filtered.filter(r => {
           try {
             const arr = JSON.parse(r[facet] || '[]').map(s => s.toLowerCase());
@@ -425,8 +452,20 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Tag pills (toggle)
-  document.querySelectorAll('.facet-tag').forEach(btn => {
+  // Skill tree parent click → expand/collapse children
+  document.querySelectorAll('.facet-tag-parent').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
+      const children = btn.parentElement.querySelectorAll('.facet-tag-child');
+      const visible = children[0]?.style.display !== 'none';
+      children.forEach(c => c.style.display = visible ? 'none' : 'inline-block');
+      btn.classList.toggle('expanded', !visible);
+    });
+  });
+
+  // Tag pills (toggle) — only child tags, not parent group buttons
+  document.querySelectorAll('.facet-tag[data-facet]').forEach(btn => {
+    if (btn.classList.contains('facet-tag-parent')) return;
     btn.addEventListener('click', () => {
       const facet = btn.dataset.facet;
       const value = btn.dataset.value;
@@ -850,6 +889,12 @@ const CSS_LAYOUTS = `
   .facet-tag:hover { border-color: #2c3e50; color: #2c3e50; }
   .facet-tag.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
   .facet-tag small { opacity: 0.6; margin-left: 2px; }
+  .facet-tag-parent { background: #2c3e50; color: #fff; border-color: #2c3e50; font-weight: 500; }
+  .facet-tag-parent:hover { background: #34495e; }
+  .facet-tag-parent.expanded { background: #1a252f; }
+  .facet-tag-parent small { opacity: 0.7; }
+  .facet-tag-child { margin-left: 0; }
+  .skill-group { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
   .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
   .slider-label span { font-weight: 600; color: #c0392b; }
   .facet-slider { flex: 1; max-width: 300px; accent-color: #c0392b; }
