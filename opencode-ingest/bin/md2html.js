@@ -914,8 +914,9 @@ const TABLE_ENGINE_JS = `
     }
   });
 
-  // Initial render — show all
+  // Initial render — show all + charts
   render();
+  renderCharts(DATA.allRecords);
 })();
 `;
 
