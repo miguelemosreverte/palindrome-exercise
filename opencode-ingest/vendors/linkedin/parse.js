@@ -48,13 +48,31 @@ export function parseProfile(html, filename) {
     if (expLines[1] && !company) company = expLines[1];
   }
 
+  // Skills: find "Aptitudes"/"Skills" section, filter aggressively
+  const SKILL_NOISE = /^(ha comentado|ha indicado|ha recomendado|ha publicado|mostrar|ver más|más$|validar|recomendar|recibidas|enviadas|seguir|conectar|mensaje|•|…|actividad)/i;
+  const TIMESTAMP = /^\d+\s+(mes|año|día|hour|min|week|month|year|day|de\s)/i;
+  const NAME_PATTERN = /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ]/; // "María Laura", "Guillermo Rafael"
+  const VALIDATION = /\d+\s+validaci/i; // "26 validaciones", "1 validación"
+  const DATE_PATTERN = /^\d+\s+de\s+\w+\s+de\s+\d{4}/; // "3 de octubre de 2020"
+  const NOISE_PHRASES = /^(estudió con|trabaj[óo] con|compartir con|suertón|Thank you)/i;
+
   const skillIdx = lines.findIndex(l => /^aptitudes$|^skills$|^competencias$/i.test(l));
   const skills = [];
   if (skillIdx > 0) {
-    for (let i = skillIdx + 1; i < Math.min(skillIdx + 20, lines.length); i++) {
+    for (let i = skillIdx + 1; i < Math.min(skillIdx + 30, lines.length); i++) {
       const l = lines[i];
-      if (/^(experiencia|experience|educación|education|idiomas|languages|intereses)/i.test(l)) break;
-      if (l.length > 1 && l.length < 40 && !/^\d+/.test(l)) skills.push(l);
+      if (/^(experiencia|experience|educación|education|idiomas|languages|intereses|actividad|activity)/i.test(l)) break;
+      if (l.length <= 1 || l.length > 50) continue;
+      if (SKILL_NOISE.test(l)) continue;
+      if (TIMESTAMP.test(l)) continue;
+      if (VALIDATION.test(l)) continue;
+      if (DATE_PATTERN.test(l)) continue;
+      if (NOISE_PHRASES.test(l)) continue;
+      if (NAME_PATTERN.test(l) && !l.includes('(') && l.split(' ').length <= 3) continue;
+      if (/^\d+$/.test(l)) continue;
+      if (/^(que |Que |lo |Lo |me |Me |se |Se |es |Es )/.test(l)) continue;
+      if (l === 'más' || l === 'Más') continue;
+      skills.push(l);
     }
   }
 
