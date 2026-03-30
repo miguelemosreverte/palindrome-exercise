@@ -538,7 +538,10 @@ const TABLE_ENGINE_JS = `
               if (typeof s === 'string') return s.toLowerCase();
               return (s.name || '').toLowerCase();
             });
-            return [...tags].every(t => names.some(n => n.includes(t.toLowerCase())) || skills.includes(t.toLowerCase()));
+            return [...tags].every(t => {
+              const tl = t.toLowerCase();
+              return names.some(n => n === tl);
+            });
           } catch {
             return [...tags].every(t => skills.includes(t.toLowerCase()));
           }
