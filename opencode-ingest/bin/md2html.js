@@ -409,9 +409,7 @@ const TABLE_ENGINE_JS = `
     currentLabel = question;
 
     try {
-      const API = window.location.hostname === 'localhost'
-        ? 'https://palindrome-exercise.vercel.app'
-        : window.location.origin;
+      const API = 'https://palindrome-exercise.vercel.app';
 
       const schema = DATA.columns.map(c => ({ name: c, type: 'TEXT' }));
       const res = await fetch(API + '/api/bridge/query', {
