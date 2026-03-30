@@ -103,17 +103,14 @@ Return JSON:
   ]
 }
 
-RULES:
-- Map EACH raw label to a pipe-delimited path in the taxonomy
-- If a raw label doesn't fit existing paths, create a new path following the pattern
-- Keep confidence and source from the raw labels
-- You may infer skills ONLY if they are directly implied by the person's actual role/domain.
-  Do NOT copy skills from the taxonomy that don't match the person's domain.
-  An Operations Manager should NOT get Java/Docker/Kubernetes unless their profile mentions coding.
-- Every path MUST have at least 2 levels (parent|child). No orphan top-level labels.
-- Each skill can only appear ONCE in the taxonomy. If "Kubernetes" already has a path, reuse it.
-- The domain context is critical: HR person → HR paths. Manager → Management paths. Engineer → Engineering paths.
-- Normalize spelling: "Kubernetes" not "k8s", "JavaScript" not "js"`;
+CRITICAL RULES:
+1. ONLY map the raw labels listed above. Do NOT add ANY skills that are not in the raw labels list.
+2. For each raw label, find or create ONE pipe-delimited path in the taxonomy.
+3. If a raw label says "Coaching", map it to "Management|Coaching" — do NOT also add "Engineering|Backend|Java".
+4. The output must have EXACTLY the same number of skills as raw labels (plus/minus 1-2 for splits/merges).
+5. NEVER add Java, Spring Boot, Docker, REST APIs, or any engineering skill unless it appears in the raw labels.
+6. Every path MUST have at least 2 levels (parent|child).
+7. Reuse existing taxonomy paths when the raw label matches.`;
 
 // ─── Pipeline ────────────────────────────────────────────────────────
 
@@ -212,7 +209,7 @@ export async function labelRecords(dbPath, options = {}) {
       console.log(`  [${pct}%] ${record.name} → ${raw.domain}/${raw.seniority_level} | ${skillSummary}`);
 
     } catch (err) {
-      console.log(`  ✗ ${record.name} — ${err.message.substring(0, 80)}`);
+      console.log(`  ✗ ${record.name} — ${(err.message || String(err)).substring(0, 80)}`);
     }
   }
 
