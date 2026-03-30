@@ -205,35 +205,27 @@ function buildGraph(records, columns, showcaseResults) {
   const facets = {
     domain: {}, seniority_level: {}, city: {},
   };
-  const allTechStack = {};
+  const allPaths = {};       // full pipe path → count
+  const personPaths = {};    // record index → Set of paths
   const allIndustries = {};
-  const skillTree = {};  // parent → Set of children
 
-  records.forEach(r => {
+  records.forEach((r, i) => {
     for (const f of Object.keys(facets)) {
       const v = r[f];
       if (v && v.length > 0) facets[f][v] = (facets[f][v] || 0) + 1;
     }
-    // skills_normalized: [{path:"Parent|Child", confidence, source}] — pipe-delimited hierarchy
+    // skills_normalized: [{path:"Parent|Mid|Leaf", confidence, source}]
+    // Build a proper nested tree and track which people have which paths
     try {
       const parsed = JSON.parse(r.skills_normalized || r.tech_stack || '[]');
       parsed.forEach(t => {
-        if (typeof t === 'string') {
-          // Old format: plain string
-          allTechStack[t] = (allTechStack[t] || 0) + 1;
-        } else if (t.path) {
-          // New format: pipe-delimited path
-          const parts = t.path.split('|');
-          const leaf = parts[parts.length - 1];
-          const parent = parts.length > 1 ? parts[0] : 'Other';
-          allTechStack[leaf] = (allTechStack[leaf] || 0) + 1;
-          if (!skillTree[parent]) skillTree[parent] = new Set();
-          skillTree[parent].add(leaf);
-        } else if (t.name) {
-          // Old {name, parent} format
-          allTechStack[t.name] = (allTechStack[t.name] || 0) + 1;
-          if (t.parent) { if (!skillTree[t.parent]) skillTree[t.parent] = new Set(); skillTree[t.parent].add(t.name); }
-        }
+        const path = t.path || (typeof t === 'string' ? t : t.name || '');
+        if (!path) return;
+        // Track full paths per person
+        if (!personPaths[i]) personPaths[i] = new Set();
+        personPaths[i].add(path);
+        // Count each full path
+        allPaths[path] = (allPaths[path] || 0) + 1;
       });
     } catch {}
     try { JSON.parse(r.industries || '[]').forEach(t => { allIndustries[t] = (allIndustries[t] || 0) + 1; }); } catch {}
@@ -241,11 +233,72 @@ function buildGraph(records, columns, showcaseResults) {
 
   const isLabeled = records.some(r => r.domain);
 
-  // Stat cards
+  // Build nested tree from paths + determine discriminators
+  // A tag is a discriminator if it doesn't select the exact same people as its parent
+  const nestedTree = {}; // { "Engineering": { _count: N, _people: Set, "Backend": { _count: N, _people: Set, "Java": { _count: N, _people: Set } } } }
+  const labeledRecords = records.filter((_, i) => personPaths[i]);
+
+  for (let i = 0; i < records.length; i++) {
+    const paths = personPaths[i];
+    if (!paths) continue;
+    for (const path of paths) {
+      const parts = path.split('|');
+      let node = nestedTree;
+      for (const part of parts) {
+        if (!node[part]) node[part] = { _count: 0, _people: new Set() };
+        node[part]._count++;
+        node[part]._people.add(i);
+        node = node[part];
+      }
+    }
+  }
+
+  // Render skill tree — only show nodes that discriminate
+  function renderTreeNode(name, node, depth = 0) {
+    const children = Object.entries(node).filter(([k]) => !k.startsWith('_'));
+    const count = node._count || 0;
+    const people = node._people || new Set();
+
+    // Skip non-discriminating: if this node covers the SAME people as its only child, collapse
+    if (children.length === 1) {
+      const [childName, childNode] = children[0];
+      const childPeople = childNode._people || new Set();
+      if (people.size === childPeople.size && [...people].every(p => childPeople.has(p))) {
+        return renderTreeNode(childName, childNode, depth);
+      }
+    }
+
+    // Skip if only 1 person and there's a sibling with the same person (redundant)
+    // We'll handle this by just showing it — the parent click already filters
+
+    const childHtml = children
+      .sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0))
+      .map(([k, v]) => renderTreeNode(k, v, depth + 1))
+      .filter(Boolean)
+      .join('');
+
+    if (depth === 0) {
+      // Top-level: always visible as parent pill
+      return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${count}">${escHtml(name)} <small>${count}</small></button>${childHtml ? '<span class="skill-children" style="display:none">' + childHtml + '</span>' : ''}</span>`;
+    } else if (children.length > 0) {
+      // Mid-level with children: acts as sub-parent
+      return `<span class="skill-subgroup"><button class="facet-tag facet-tag-sub" data-group="${escHtml(name)}" data-count="${count}">${escHtml(name)} <small>${count}</small></button>${childHtml ? '<span class="skill-children" style="display:none">' + childHtml + '</span>' : ''}</span>`;
+    } else {
+      // Leaf node
+      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(name)}" data-count="${count}" style="display:none">${escHtml(name)} <small>${count}</small></button>`;
+    }
+  }
+
+  const treeHtml = Object.entries(nestedTree)
+    .sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0))
+    .map(([name, node]) => renderTreeNode(name, node, 0))
+    .filter(Boolean)
+    .join('');
+
   const stats = `<div class="stat-cards">
     <div class="stat-card"><div class="stat-number">${records.length}</div><div class="stat-label">Professionals</div></div>
     <div class="stat-card"><div class="stat-number">${Object.keys(facets.city).length}</div><div class="stat-label">Cities</div></div>
-    <div class="stat-card"><div class="stat-number">${Object.keys(allTechStack).length}</div><div class="stat-label">Technologies</div></div>
+    <div class="stat-card"><div class="stat-number">${Object.keys(allPaths).length}</div><div class="stat-label">Skills</div></div>
   </div>`;
 
   // Build facet dropdowns
@@ -255,17 +308,7 @@ function buildGraph(records, columns, showcaseResults) {
     return `<select class="facet-select" data-facet="${id}"><option value="">All ${label}</option>${opts}</select>`;
   };
 
-  // Build skill tree pills — parent nodes are clickable to expand children
-  const treeEntries = Object.entries(skillTree).sort((a,b) => b[1].size - a[1].size);
-  const techPills = treeEntries.map(([parent, children]) => {
-    const childArr = [...children].sort();
-    const childPills = childArr.map(c => {
-      const count = allTechStack[c] || 0;
-      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(c)}" style="display:none">${escHtml(c)} <small>${count}</small></button>`;
-    }).join('');
-    const totalCount = childArr.reduce((s, c) => s + (allTechStack[c] || 0), 0);
-    return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(parent)}">${escHtml(parent)} <small>${totalCount}</small></button>${childPills}</span>`;
-  }).join('');
+  const techPills = treeHtml;
 
   const topIndustries = Object.entries(allIndustries).sort((a,b) => b[1]-a[1]).slice(0, 15);
   const industryPills = topIndustries.map(([t, c]) =>
@@ -480,24 +523,26 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Skill tree parent click → immediately filter by category + expand children
-  document.querySelectorAll('.facet-tag-parent').forEach(btn => {
+  // Skill tree: click parent/sub-parent → filter by category + expand children
+  document.querySelectorAll('.facet-tag-parent, .facet-tag-sub').forEach(btn => {
     btn.addEventListener('click', () => {
       const group = btn.dataset.group;
-      const children = btn.parentElement.querySelectorAll('.facet-tag-child');
+      const childContainer = btn.parentElement.querySelector('.skill-children');
 
-      // Always expand children on click
-      children.forEach(c => c.style.display = 'inline-block');
-      btn.classList.add('expanded');
+      // Toggle expand
+      if (childContainer) {
+        const visible = childContainer.style.display !== 'none';
+        childContainer.style.display = visible ? 'none' : 'flex';
+        // Also show leaf children inside
+        childContainer.querySelectorAll('.facet-tag-child').forEach(c => c.style.display = 'inline-block');
+        btn.classList.toggle('expanded', !visible);
+      }
 
-      // Toggle category filter
+      // Toggle filter
       if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
       if (activeFilters.skill_category.has(group)) {
         activeFilters.skill_category.delete(group);
         btn.classList.remove('active');
-        // Collapse if deselecting
-        children.forEach(c => { c.style.display = 'none'; c.classList.remove('active'); });
-        btn.classList.remove('expanded');
       } else {
         activeFilters.skill_category.add(group);
         btn.classList.add('active');
@@ -938,7 +983,13 @@ const CSS_LAYOUTS = `
   .facet-tag-parent.expanded { background: #1a252f; }
   .facet-tag-parent small { opacity: 0.7; }
   .facet-tag-child { margin-left: 0; }
+  .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.7rem; }
+  .facet-tag-sub:hover { background: #4a6d8a; }
+  .facet-tag-sub.active { background: #2c5070; }
+  .facet-tag-sub.expanded { background: #2c5070; }
   .skill-group { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+  .skill-subgroup { display: inline-flex; flex-wrap: wrap; gap: 0.2rem; align-items: center; }
+  .skill-children { display: none; flex-wrap: wrap; gap: 0.2rem; align-items: center; margin-left: 0.1rem; }
   .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
   .slider-label span { font-weight: 600; color: #c0392b; }
   .facet-slider { flex: 1; max-width: 300px; accent-color: #c0392b; }
