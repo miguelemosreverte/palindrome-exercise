@@ -254,69 +254,80 @@ function buildGraph(records, columns, showcaseResults) {
   }
 
   // Render skill tree — only show nodes that discriminate
-  function renderTreeNode(name, node, depth = 0) {
-    const children = Object.entries(node).filter(([k]) => !k.startsWith('_'));
-    const count = node._count || 0;
-    const people = node._people || new Set();
-
-    // Skip non-discriminating: if this node covers the SAME people as its only child, collapse
-    if (children.length === 1) {
-      const [childName, childNode] = children[0];
-      const childPeople = childNode._people || new Set();
-      if (people.size === childPeople.size && [...people].every(p => childPeople.has(p))) {
-        return renderTreeNode(childName, childNode, depth);
-      }
-    }
-
-    // Skip if only 1 person and there's a sibling with the same person (redundant)
-    // We'll handle this by just showing it — the parent click already filters
-
-    const childHtml = children
-      .sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0))
-      .map(([k, v]) => renderTreeNode(k, v, depth + 1))
-      .filter(Boolean)
-      .join('');
-
-    // Deduplicate children:
-    // 1. Remove siblings with identical people sets (keep highest count)
-    // 2. Remove children whose people set equals the parent's (not discriminating)
-    // 3. Remove children with count=1 if another sibling covers the same person
-    const childEntries = children.sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0));
-    const parentPeopleKey = [...people].sort().join(',');
-    const seenPeopleSets = new Map();
-    const uniqueChildren = [];
-    for (const [cName, cNode] of childEntries) {
-      const cPeople = cNode._people || new Set();
-      const key = [...cPeople].sort().join(',');
-      // Skip if same people as parent AND it's the only child (collapsible)
-      // Keep it if there are other siblings — user needs to see the split
-      if (key === parentPeopleKey && depth > 0 && childEntries.length === 1) continue;
-      // Skip if same people as already-seen sibling
-      if (key && seenPeopleSets.has(key)) continue;
-      if (key) seenPeopleSets.set(key, cName);
-      uniqueChildren.push([cName, cNode]);
-    }
-
-
-    const uniqueChildHtml = uniqueChildren
-      .map(([k, v]) => renderTreeNode(k, v, depth + 1))
-      .filter(Boolean)
-      .join('');
-
-    if (depth === 0) {
-      return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>${uniqueChildHtml ? '<span class="skill-children" style="display:none">' + uniqueChildHtml + '</span>' : ''}</span>`;
-    } else if (uniqueChildren.length > 0) {
-      return `<span class="skill-subgroup"><button class="facet-tag facet-tag-sub" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>${uniqueChildHtml ? '<span class="skill-children" style="display:none">' + uniqueChildHtml + '</span>' : ''}</span>`;
-    } else {
-      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(name)}" data-count="${people.size}" style="display:none">${escHtml(name)} <small>${people.size}</small></button>`;
-    }
+  // Deduplicate children: remove siblings with identical people sets
+  function dedup(entries, parentPeople) {
+    const seen = new Map();
+    return entries.filter(([name, node]) => {
+      const key = [...(node._people || [])].sort().join(',');
+      const parentKey = [...(parentPeople || [])].sort().join(',');
+      if (key === parentKey && entries.length === 1) return false;
+      if (key && seen.has(key)) return false;
+      if (key) seen.set(key, name);
+      return true;
+    });
   }
 
-  const treeHtml = Object.entries(nestedTree)
-    .sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0))
-    .map(([name, node]) => renderTreeNode(name, node, 0))
-    .filter(Boolean)
-    .join('');
+  // Collapse: if node has one child with same people, skip to child
+  function collapse(name, node) {
+    const children = Object.entries(node).filter(([k]) => !k.startsWith('_'));
+    if (children.length === 1) {
+      const [cName, cNode] = children[0];
+      const cPeople = cNode._people || new Set();
+      const people = node._people || new Set();
+      if (people.size === cPeople.size && [...people].every(p => cPeople.has(p))) {
+        return collapse(cName, cNode);
+      }
+    }
+    return [name, node];
+  }
+
+  // Render YAML-style: one row per parent, children indented below
+  function renderTree(tree) {
+    const topEntries = Object.entries(tree)
+      .filter(([k]) => !k.startsWith('_'))
+      .sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0));
+
+    return topEntries.map(([topName, topNode]) => {
+      const [name, node] = collapse(topName, topNode);
+      const people = node._people || new Set();
+      const midChildren = Object.entries(node).filter(([k]) => !k.startsWith('_'));
+      const dedupedMid = dedup(midChildren.sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0)), people);
+
+      // Build rows for mid-level children + their leaves
+      const childRows = dedupedMid.map(([midName, midNode]) => {
+        const [mName, mNode] = collapse(midName, midNode);
+        const mPeople = mNode._people || new Set();
+        const leaves = Object.entries(mNode).filter(([k]) => !k.startsWith('_'));
+        const dedupedLeaves = dedup(leaves.sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0)), mPeople);
+
+        if (dedupedLeaves.length > 0) {
+          // Mid-level with leaves: sub-parent + indented children
+          const leafPills = dedupedLeaves.map(([lName, lNode]) => {
+            const [leafName] = collapse(lName, lNode);
+            const lPeople = lNode._people || new Set();
+            return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(leafName)}" data-count="${lPeople.size}">${escHtml(leafName)} <small>${lPeople.size}</small></button>`;
+          }).join('');
+
+          return `<div class="stree-mid">
+            <button class="facet-tag facet-tag-sub" data-group="${escHtml(mName)}" data-count="${mPeople.size}">${escHtml(mName)} <small>${mPeople.size}</small></button>
+            <div class="stree-leaves">${leafPills}</div>
+          </div>`;
+        } else {
+          // Leaf directly under parent
+          return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(mName)}" data-count="${mPeople.size}">${escHtml(mName)} <small>${mPeople.size}</small></button>`;
+        }
+      }).join('');
+
+      return `<div class="stree-row">
+        <div class="stree-parent">
+          <button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>
+        </div>
+        <div class="stree-children" style="display:none">${childRows}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const treeHtml = renderTree(nestedTree);
 
   const stats = `<div class="stat-cards">
     <div class="stat-card"><div class="stat-number">${records.length}</div><div class="stat-label">Professionals</div></div>
@@ -546,40 +557,50 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Skill tree: click parent/sub-parent → filter by category + expand children
-  document.querySelectorAll('.facet-tag-parent, .facet-tag-sub').forEach(btn => {
+  // Skill tree: click parent → expand children row + filter
+  document.querySelectorAll('.facet-tag-parent').forEach(btn => {
     btn.addEventListener('click', () => {
       const group = btn.dataset.group;
-      const childContainer = btn.parentElement.querySelector('.skill-children');
-
-      // Toggle expand
+      const row = btn.closest('.stree-row');
+      const childContainer = row?.querySelector('.stree-children');
       const isCollapsing = childContainer && childContainer.style.display !== 'none';
 
       if (childContainer) {
-        childContainer.style.display = isCollapsing ? 'none' : 'flex';
-        childContainer.querySelectorAll('.facet-tag-child').forEach(c => c.style.display = isCollapsing ? 'none' : 'inline-block');
+        childContainer.style.display = isCollapsing ? 'none' : 'block';
         btn.classList.toggle('expanded', !isCollapsing);
       }
 
-      // When COLLAPSING: clear all child tag filters from this branch
+      // Collapse: clear all child filters in this branch
       if (isCollapsing && childContainer) {
         childContainer.querySelectorAll('.facet-tag-child.active, .facet-tag-sub.active').forEach(child => {
           child.classList.remove('active');
           const val = child.dataset.value;
           const facet = child.dataset.facet;
-          if (val && facet && activeFilters[facet] instanceof Set) {
-            activeFilters[facet].delete(val);
-            if (activeFilters[facet].size === 0) delete activeFilters[facet];
-          }
-          // Also clear sub-parent category filters
-          const subGroup = child.dataset.group;
-          if (subGroup && activeFilters.skill_category instanceof Set) {
-            activeFilters.skill_category.delete(subGroup);
-          }
+          if (val && facet && activeFilters[facet] instanceof Set) activeFilters[facet].delete(val);
+          const sg = child.dataset.group;
+          if (sg && activeFilters.skill_category instanceof Set) activeFilters.skill_category.delete(sg);
         });
+        if (activeFilters.tech_stack?.size === 0) delete activeFilters.tech_stack;
       }
 
       // Toggle category filter
+      if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
+      if (activeFilters.skill_category.has(group)) {
+        activeFilters.skill_category.delete(group);
+        btn.classList.remove('active');
+      } else {
+        activeFilters.skill_category.add(group);
+        btn.classList.add('active');
+      }
+      if (activeFilters.skill_category.size === 0) delete activeFilters.skill_category;
+      applyFilters();
+    });
+  });
+
+  // Sub-parent click → filter by sub-category
+  document.querySelectorAll('.facet-tag-sub').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
       if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
       if (activeFilters.skill_category.has(group)) {
         activeFilters.skill_category.delete(group);
@@ -1027,10 +1048,20 @@ const CSS_LAYOUTS = `
   .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.7rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
   .facet-tag-sub.active { background: #2c5070; }
-  .facet-tag-sub.expanded { background: #2c5070; }
-  .skill-group { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
-  .skill-subgroup { display: inline-flex; flex-wrap: wrap; gap: 0.2rem; align-items: center; }
-  .skill-children { display: none; flex-wrap: wrap; gap: 0.2rem; align-items: center; margin-left: 0.1rem; }
+
+  /* YAML-style skill tree: one row per parent */
+  .stree-row { border-bottom: 1px solid #f0ebe4; padding: 0.4rem 0; }
+  .stree-row:last-child { border-bottom: none; }
+  .stree-parent { display: inline-block; }
+  .stree-children { padding-left: 1.2rem; margin-top: 0.3rem; }
+  .stree-mid { margin-bottom: 0.3rem; }
+  .stree-mid .facet-tag-sub { margin-bottom: 0.2rem; }
+  .stree-leaves { padding-left: 1.2rem; display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.15rem; }
+
+  @media (max-width: 640px) {
+    .stree-children { padding-left: 0.6rem; }
+    .stree-leaves { padding-left: 0.6rem; }
+  }
   .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
   .slider-label span { font-weight: 600; color: #c0392b; }
   .facet-slider { flex: 1; max-width: 300px; accent-color: #c0392b; }
