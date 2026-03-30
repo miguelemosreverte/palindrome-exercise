@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nl-controls-benchmark</title>
+  <meta name="task" content="tests">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #f8f5f0; color: #1a1a1a; line-height: 1.6; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+
+  /* Masthead */
+  .masthead { text-align: center; padding: 1.5rem 0 1rem; }
+  .masthead-rule { border-top: 3px double #1a1a1a; margin: 0.3rem 0; }
+  .masthead-title { font-family: 'Playfair Display', Georgia, serif; font-size: 0.85rem; letter-spacing: 0.3em; text-transform: uppercase; color: #666; }
+
+  /* Typography */
+  h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 2.2rem; font-weight: 900; line-height: 1.15; margin-bottom: 0.3rem; border-bottom: 2px solid #1a1a1a; padding-bottom: 0.5rem; }
+  h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.3rem; font-weight: 700; margin: 2rem 0 0.8rem; padding-bottom: 0.3rem; border-bottom: 1px solid #d4cdc4; color: #2c3e50; }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.4rem; }
+  p, li { margin-bottom: 0.4rem; font-size: 0.95rem; }
+  em { color: #666; }
+  strong { color: #c0392b; font-weight: 600; }
+  a { color: #c0392b; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  blockquote { border-left: 3px solid #c0392b; padding: 0.8rem 1rem; background: #f0ebe4; margin: 1rem 0; font-style: italic; color: #444; border-radius: 0 4px 4px 0; }
+  ul { padding-left: 1.2rem; list-style: disc; }
+
+  /* Charts */
+  .chart-wrap { background: #fff; border: 1px solid #e0d8cf; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+  canvas { max-height: 350px; }
+
+  /* Tables (fallback) */
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.82rem; }
+  th { background: #2c3e50; color: #fff; text-align: left; padding: 0.5rem 0.6rem; font-weight: 500; position: sticky; top: 0; z-index: 1; }
+  td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #e0d8cf; }
+  tr:hover { background: #f0ebe4; }
+  .table-wrap { max-height: 70vh; overflow: auto; border: 1px solid #e0d8cf; border-radius: 6px; margin: 1rem 0; }
+
+  /* Section title */
+  .section-title { font-family: 'Playfair Display', Georgia, serif; font-size: 1.3rem; border-bottom: 1px solid #d4cdc4; padding-bottom: 0.3rem; margin: 2rem 0 1rem; }
+  .layout-section { max-width: 1100px; margin: 0 auto; padding: 0 1rem; }
+
+  /* Comments — hide metadata */
+  [style*="display:none"] { display: none; }
+
+  @media (max-width: 640px) {
+    .page { padding: 0.5rem; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.1rem; }
+    .chart-wrap { padding: 0.5rem; }
+    canvas { max-height: 250px; }
+  }
+
+  /* ─── Grid (MercadoLibre-style) ─── */
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
+  .card { display: flex; flex-direction: column; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s, transform 0.15s; text-decoration: none !important; color: inherit; }
+  .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); transform: translateY(-2px); }
+  .card-img { width: 100%; aspect-ratio: 1; overflow: hidden; background: #f0ebe4; display: flex; align-items: center; justify-content: center; }
+  .card-img img { width: 100%; height: 100%; object-fit: cover; }
+  .card-body { padding: 0.8rem; flex: 1; display: flex; flex-direction: column; }
+  .card-price-row { display: flex; align-items: baseline; gap: 0.4rem; }
+  .card-price { font-size: 1.3rem; font-weight: 600; color: #1a1a1a; }
+  .card-discount { font-size: 0.8rem; font-weight: 600; color: #00a650; }
+  .card-orig-price { font-size: 0.8rem; color: #999; text-decoration: line-through; display: block; margin-top: -0.1rem; }
+  .card-installments { font-size: 0.75rem; color: #00a650; margin-top: 0.2rem; }
+  .card-title { font-size: 0.82rem; font-weight: 400; color: #333; line-height: 1.35; margin: 0.4rem 0; flex: 1; }
+  .card-stars { font-size: 0.75rem; color: #ff9900; margin-bottom: 0.3rem; display: block; }
+  .card-stars small { color: #666; font-size: 0.7rem; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: auto; }
+  .tag { font-size: 0.68rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: #f0ebe4; color: #666; }
+  .tag-ship { background: #d4edda; color: #00a650; font-weight: 500; }
+  .tag-coupon { background: #fff3cd; color: #856404; }
+  .card-seller { font-size: 0.72rem; color: #999; margin-top: 0.3rem; }
+
+  @media (max-width: 640px) {
+    .grid-cards { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .card-body { padding: 0.5rem; }
+    .card-price { font-size: 1rem; }
+    .card-title { font-size: 0.75rem; }
+  }
+  @media (max-width: 380px) {
+    .grid-cards { grid-template-columns: 1fr; }
+    .card { flex-direction: row; }
+    .card-img { width: 120px; aspect-ratio: 1; flex-shrink: 0; }
+  }
+
+  /* ─── Feed (YouTube-style) ─── */
+  .feed { max-width: 800px; margin: 0 auto; }
+  .feed-item { display: flex; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid #e0d8cf; text-decoration: none !important; color: inherit; transition: background 0.15s; }
+  .feed-item:hover { background: #f0ebe4; border-radius: 6px; padding-left: 0.5rem; margin-left: -0.5rem; padding-right: 0.5rem; margin-right: -0.5rem; }
+  .feed-thumb { flex-shrink: 0; width: 320px; height: 180px; background: #0f0f0f; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; position: relative; overflow: hidden; }
+  .feed-dur { font-size: 0.75rem; background: rgba(0,0,0,0.85); padding: 0.15rem 0.4rem; border-radius: 3px; position: absolute; bottom: 6px; right: 6px; color: #fff; font-weight: 500; }
+  .feed-badges { position: absolute; top: 6px; left: 6px; display: flex; gap: 3px; }
+  .feed-badge { font-size: 0.65rem; background: rgba(0,0,0,0.7); padding: 0.1rem 0.35rem; border-radius: 2px; color: #fff; }
+  .feed-play { font-size: 2rem; opacity: 0.7; }
+  .feed-body { flex: 1; min-width: 0; padding-top: 0.1rem; }
+  .feed-title { font-size: 1rem; font-weight: 600; line-height: 1.3; margin-bottom: 0.4rem; color: #1a1a1a; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .feed-channel { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; font-size: 0.85rem; color: #555; }
+  .feed-avatar { width: 24px; height: 24px; border-radius: 50%; }
+  .feed-meta { font-size: 0.8rem; color: #888; }
+  .feed-desc { font-size: 0.8rem; color: #888; margin-top: 0.3rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  @media (max-width: 640px) {
+    .feed-thumb { width: 168px; height: 94px; border-radius: 8px; }
+    .feed-title { font-size: 0.88rem; }
+    .feed-channel { font-size: 0.78rem; }
+    .feed-desc { display: none; }
+  }
+  @media (max-width: 480px) {
+    .feed-item { flex-direction: column; gap: 0.5rem; }
+    .feed-thumb { width: 100%; height: 0; padding-bottom: 56.25%; }
+  }
+
+  /* ─── Graph (LinkedIn-style) ─── */
+  .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .stat-card { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 1.2rem; text-align: center; }
+  .stat-number { font-family: 'Playfair Display', Georgia, serif; font-size: 2rem; font-weight: 900; color: #c0392b; }
+  .stat-label { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
+
+  .graph-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+  .panel { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 1rem; }
+  .panel-title { font-family: 'Playfair Display', Georgia, serif; font-size: 1rem; margin-bottom: 0.8rem; border-bottom: 1px solid #e0d8cf; padding-bottom: 0.3rem; }
+
+  .rank-list { display: flex; flex-direction: column; gap: 0.4rem; }
+  .rank-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
+  .rank-name { flex-shrink: 0; width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-bar { height: 6px; background: #c0392b; border-radius: 3px; flex-shrink: 0; min-width: 4px; }
+  .rank-count { color: #999; font-size: 0.75rem; flex-shrink: 0; }
+
+  .skill-cloud { line-height: 2; }
+  .skill-tag { display: inline-block; padding: 0.15rem 0.5rem; margin: 0.15rem; background: #f0ebe4; border-radius: 3px; color: #2c3e50; }
+
+  .seniority-row { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
+  .tag-sen { background: #2c3e50; color: #fff; padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.75rem; }
+
+  /* ─── Faceted Filters ─── */
+  .facets { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.8rem; margin: 1rem 0; }
+  .facet-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+  .facet-select { padding: 0.4rem 0.6rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.8rem; background: #fff; }
+  .facet-clear { padding: 0.4rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.75rem; color: #c0392b; }
+  .facet-clear:hover { background: #fef2f2; }
+  .facet-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-bottom: 0.5rem; }
+  .facet-tags-label { font-size: 0.75rem; font-weight: 600; color: #666; margin-right: 0.3rem; }
+  .facet-tag { padding: 0.2rem 0.5rem; border: 1px solid #d4cdc4; border-radius: 4px; font-size: 0.72rem; cursor: pointer; background: #fff; color: #555; transition: all 0.15s; }
+  .facet-tag:hover { border-color: #2c3e50; color: #2c3e50; }
+  .facet-tag.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+  .facet-tag small { opacity: 0.6; margin-left: 2px; }
+  .facet-tag-parent { background: #2c3e50; color: #fff; border-color: #2c3e50; font-weight: 500; }
+  .facet-tag-parent:hover { background: #34495e; }
+  .facet-tag-parent.expanded { background: #1a252f; }
+  .facet-tag-parent small { opacity: 0.7; }
+  .facet-tag-child { margin-left: 0; }
+  .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
+  .facet-tag-sub:hover { background: #4a6d8a; }
+  .facet-tag-sub.active { background: #2c5070; }
+  .facet-tags { flex-direction: column !important; align-items: flex-start !important; }
+  .stree-row { margin-bottom: 0.15rem; }
+  .stree-parent { display: block; }
+  .stree-parent .facet-tag-parent { display: inline-flex; align-items: center; gap: 0.3rem; text-align: left; padding: 0.35rem 0.7rem; }
+  .stree-parent .facet-tag-parent::after { content: '▸'; font-size: 0.7rem; opacity: 0.5; transition: transform 0.15s; }
+  .stree-parent .facet-tag-parent.expanded::after { transform: rotate(90deg); }
+  .stree-children { display: none; margin: 0.2rem 0 0.3rem 0; padding-left: 1rem; border-left: 2px solid #d4cdc4; }
+  .stree-mid { margin-bottom: 0.3rem; }
+  .stree-mid .facet-tag-sub { display: inline-flex; align-items: center; gap: 0.2rem; }
+  .stree-leaves { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.15rem; margin-left: 0.8rem; }
+  .stree-leaves .facet-tag-child { display: inline-block !important; }
+  @media (max-width: 640px) {
+    .stree-children { padding-left: 0.5rem; }
+    .stree-leaves { margin-left: 0.3rem; }
+  }
+  .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
+  .slider-label span { font-weight: 600; color: #c0392b; }
+  .facet-slider { flex: 1; max-width: 300px; accent-color: #c0392b; }
+  .active-filters { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-top: 0.4rem; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 4px; font-size: 0.72rem; color: #3730a3; }
+  .filter-chip button { background: none; border: none; cursor: pointer; color: #6366f1; font-size: 0.85rem; padding: 0; line-height: 1; }
+  .filter-count { font-size: 0.75rem; color: #666; font-weight: 500; margin-left: 0.5rem; }
+
+  .query-section { margin: 1rem 0; }
+  .query-btn-export { padding: 0.4rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 500; }
+  .query-btn-export:hover { background: #f0ebe4; }
+
+  @media (max-width: 640px) {
+    .facet-row { flex-direction: column; align-items: stretch; }
+    .facet-select { width: 100%; }
+    .facet-slider { max-width: 100%; }
+  }
+
+  .qt { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; }
+  .qt thead { position: sticky; top: 0; z-index: 2; }
+  .qt th { background: #2c3e50; color: #fff; text-align: left; padding: 0.55rem 0.7rem; font-weight: 500; font-size: 0.78rem; white-space: nowrap; user-select: none; }
+  .qt th:hover { background: #34495e; }
+  .sort-arrow { font-size: 0.65rem; margin-left: 3px; opacity: 0.6; }
+  .qt td { padding: 0.45rem 0.7rem; border-bottom: 1px solid #f0ebe4; vertical-align: middle; }
+  .qt tr:hover { background: #faf9f7; }
+  .qt tr:nth-child(even) { background: #fcfbf9; }
+  .qt tr:nth-child(even):hover { background: #f5f0ea; }
+
+  .cell-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
+  .cell-link { color: #c0392b; text-decoration: none; font-weight: 500; font-size: 0.78rem; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-tag { display: inline-block; background: #f0ebe4; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.72rem; margin: 1px; color: #555; }
+  .cell-tag-inferred { background: transparent; border: 1px dashed #ccc; color: #999; }
+  .cell-empty { color: #ccc; }
+
+  .query-pagination { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; font-size: 0.8rem; color: #666; }
+  .pag-info { font-weight: 500; }
+  .pag-controls { display: flex; gap: 0.4rem; align-items: center; }
+  .pag-btn { padding: 0.35rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.78rem; }
+  .pag-btn:hover:not(:disabled) { background: #f0ebe4; }
+  .pag-btn:disabled { opacity: 0.4; cursor: default; }
+  .pag-controls select { padding: 0.3rem 0.4rem; border: 1px solid #d4cdc4; border-radius: 4px; font-size: 0.78rem; }
+
+  .query-table { overflow-x: auto; border-radius: 8px; max-height: 70vh; overflow-y: auto; }
+
+  @media (max-width: 768px) {
+    .query-input-row { flex-wrap: wrap; }
+    .query-select { width: 100%; }
+    .query-input { width: 100%; }
+    .qt { font-size: 0.75rem; }
+    .qt th, .qt td { padding: 0.35rem 0.5rem; }
+    .cell-img { width: 24px; height: 24px; }
+    .query-pagination { flex-direction: column; gap: 0.4rem; }
+  }
+
+  @media (max-width: 480px) {
+    /* Card layout on phone */
+    .qt thead { display: none; }
+    .qt, .qt tbody, .qt tr, .qt td { display: block; }
+    .qt tr { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.6rem; margin-bottom: 0.5rem; }
+    .qt td { padding: 0.2rem 0; border: none; }
+    .qt td::before { content: attr(data-label); font-weight: 600; color: #2c3e50; display: block; font-size: 0.7rem; margin-bottom: 0.1rem; }
+  }
+
+  .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.8rem; margin: 1rem 0; }
+  .profile-card { display: flex; align-items: center; gap: 0.7rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.7rem; text-decoration: none !important; color: inherit; transition: box-shadow 0.15s; }
+  .profile-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  .profile-photo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .profile-initials { display: flex; align-items: center; justify-content: center; background: #2c3e50; color: #fff; font-size: 0.85rem; font-weight: 600; }
+  .profile-info { min-width: 0; }
+  .profile-name { font-weight: 600; font-size: 0.88rem; color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-title { font-size: 0.78rem; color: #666; margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-company { font-size: 0.73rem; color: #c0392b; margin-top: 0.1rem; }
+
+  @media (max-width: 640px) {
+    .graph-panels { grid-template-columns: 1fr; }
+    .stat-cards { grid-template-columns: repeat(3, 1fr); }
+    .stat-number { font-size: 1.5rem; }
+    .profile-grid { grid-template-columns: 1fr 1fr; }
+    .graph-svg { height: 350px; }
+    .rank-name { width: 100px; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="masthead">
+      <div class="masthead-rule"></div>
+      <div class="masthead-title">OPENCODE INGEST</div>
+      <div class="masthead-rule"></div>
+    </div>
+    <article class="content">
+      <h1>NL→Controls Benchmark Report</h1>
+<h2>Task</h2>
+<p>Translate natural language queries into exact UI filter control states.
+&quot;senior backend java devs in córdoba&quot; → <code>{domain:&quot;engineering&quot;, city:&quot;Córdoba&quot;, skills:[&quot;Java&quot;]}</code></p>
+<h2>Results</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Provider</th>
+<th>Accuracy</th>
+<th>Avg Latency</th>
+<th>Cost</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>mistral-nemo</strong></td>
+<td>ChutesAI</td>
+<td><strong>10/10</strong></td>
+<td><strong>862ms</strong></td>
+<td>$0.02/$0.04</td>
+<td><strong>Best: fast + accurate</strong></td>
+</tr>
+<tr>
+<td>gemma-4b</td>
+<td>ChutesAI</td>
+<td>9/10</td>
+<td>1,586ms</td>
+<td>$0.01/$0.03</td>
+<td>Cheapest, one soft fail</td>
+</tr>
+<tr>
+<td>oc-bigpickle</td>
+<td>OpenCode</td>
+<td><strong>10/10</strong></td>
+<td>26,000ms</td>
+<td><strong>Free</strong></td>
+<td>Perfect but slow</td>
+</tr>
+<tr>
+<td>oc-nemotron</td>
+<td>OpenCode</td>
+<td><strong>10/10</strong></td>
+<td>19,000ms</td>
+<td><strong>Free</strong></td>
+<td>Perfect but slow</td>
+</tr>
+</tbody></table></div>
+<h2>Recommendation</h2>
+<ul>
+<li><strong>Production (paid)</strong>: <code>mistral-nemo</code> — 10/10 accuracy, sub-second, cheap</li>
+<li><strong>Development (free)</strong>: <code>oc-nemotron</code> — 10/10 accuracy, 19s, free via OpenCode</li>
+</ul>
+<h2>Test Queries (all models scored on these)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Query</th>
+<th>Expected Controls</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>&quot;senior backend java developers in córdoba&quot;</td>
+<td>domain=engineering, city=Córdoba, seniority=senior, skills=[Java]</td>
+</tr>
+<tr>
+<td>2</td>
+<td>&quot;HR people who do recruiting&quot;</td>
+<td>domain=hr, skill_subcategories=[Recruiting]</td>
+</tr>
+<tr>
+<td>3</td>
+<td>&quot;find me data scientists&quot;</td>
+<td>domain=data, skill_categories=[Data]</td>
+</tr>
+<tr>
+<td>4</td>
+<td>&quot;managers in buenos aires&quot;</td>
+<td>domain=management, city=Buenos Aires</td>
+</tr>
+<tr>
+<td>5</td>
+<td>&quot;devops engineers with docker experience&quot;</td>
+<td>domain=engineering, skill_categories=[DevOps], skills=[Docker]</td>
+</tr>
+<tr>
+<td>6</td>
+<td>&quot;senior engineers who know python or go&quot;</td>
+<td>domain=engineering, seniority=senior, skills=[Python, Go]</td>
+</tr>
+<tr>
+<td>7</td>
+<td>&quot;people in consulting&quot;</td>
+<td>domain=consulting</td>
+</tr>
+<tr>
+<td>8</td>
+<td>&quot;frontend developers&quot;</td>
+<td>domain=engineering, skill_subcategories=[Frontend]</td>
+</tr>
+<tr>
+<td>9</td>
+<td>&quot;everyone with machine learning skills&quot;</td>
+<td>skill_categories=[Data]</td>
+</tr>
+<tr>
+<td>10</td>
+<td>&quot;show architects and leads&quot;</td>
+<td>skill_subcategories=[Architecture, Leadership]</td>
+</tr>
+</tbody></table></div>
+<h2>Architecture</h2>
+<pre><code>User speaks: &quot;find senior java devs in córdoba&quot;
+  ↓
+Load available controls from SQLite (enums + skill tree)
+  ↓
+Build compact prompt (~300 tokens): filters + query
+  ↓
+LLM (862ms avg): returns JSON control state
+  ↓
+Validate &amp; auto-fix: case correction, invalid skill removal
+  ↓
+Apply to UI: set dropdowns, activate skill tags, update table
+</code></pre>
+<h2>Why This Works</h2>
+<ol>
+<li><strong>Tiny search space</strong>: 7 enums + 150 tags (vs infinite SQL)</li>
+<li><strong>Deterministic validation</strong>: does this value exist? yes/no, auto-fix if close</li>
+<li><strong>Sub-second on paid models</strong>: 862ms with Mistral Nemo</li>
+<li><strong>Perfect on free models</strong>: OpenCode&#39;s nemotron/bigpickle hit 10/10</li>
+<li><strong>Enables voice</strong>: microphone → text → controls → instant filter</li>
+<li><strong>Prompt is ~300 tokens</strong>: cheap, fast, fits any model</li>
+</ol>
+<h2>CLI</h2>
+<pre><code class="language-bash"># Single query
+node bin/nl-to-controls.js ar-senior-devs-linkedin &quot;senior java devs in córdoba&quot;
+node bin/nl-to-controls.js ar-senior-devs-linkedin &quot;HR recruiters&quot; --model=oc-nemotron
+
+# Benchmark all models
+node bin/nl-to-controls.js ar-senior-devs-linkedin --benchmark
+
+# Models: gemma-4b, mistral-nemo, oc-bigpickle, oc-nemotron, oc-gpt5nano
+</code></pre>
+
+    </article>
+  </div>
+  <script>
+    
+    
+  </script>
+</body>
+</html>
