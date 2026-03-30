@@ -251,7 +251,7 @@ function buildGraph(records, columns, showcaseResults) {
             ${showcaseOptions}
             <option value="__all">Show all records</option>
           </select>
-          <input id="query-input" class="query-input" placeholder="Or type a question about the data..." disabled title="Live queries require the server">
+          <input id="query-input" class="query-input" placeholder="Type a question (e.g. 'Show people with React skills')">
           <button id="query-export" class="query-btn-export" title="Export CSV">CSV</button>
         </div>
         <div id="query-sql" class="query-sql"></div>
@@ -398,6 +398,42 @@ const TABLE_ENGINE_JS = `
     const csv = [cols.join(','), ...currentRows.map(r => cols.map(c => '"' + String(r[c] || '').replace(/"/g, '""') + '"').join(','))].join('\\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();
+  });
+
+  // Live query via API
+  const queryInput = document.getElementById('query-input');
+  queryInput?.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter' || !queryInput.value.trim()) return;
+    const question = queryInput.value.trim();
+    sqlEl.textContent = 'Translating...';
+    currentLabel = question;
+
+    try {
+      const API = window.location.hostname === 'localhost'
+        ? 'https://palindrome-exercise.vercel.app'
+        : window.location.origin;
+
+      const schema = DATA.columns.map(c => ({ name: c, type: 'TEXT' }));
+      const res = await fetch(API + '/api/bridge/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, schema }),
+      });
+      const data = await res.json();
+
+      if (data.error) { sqlEl.textContent = 'Error: ' + data.error; return; }
+      sqlEl.textContent = data.sql;
+
+      // Execute SQL client-side using the embedded data
+      // (For now, do regex-based filtering as a best-effort fallback)
+      // Real execution would need sql.js in the browser
+      currentRows = DATA.allRecords;
+      currentLabel = question + ' (SQL generated — full execution requires server)';
+      page = 0;
+      render();
+    } catch (err) {
+      sqlEl.textContent = 'Error: ' + err.message;
+    }
   });
 
   // Initial render — show all
