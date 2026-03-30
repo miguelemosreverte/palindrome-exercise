@@ -14,6 +14,8 @@ export function md2html(inputPath, outputPath) {
   // Extract layout hint
   const layoutMatch = md.match(/<!-- layout: (\w+) -->/);
   const layout = layoutMatch ? layoutMatch[1] : 'table';
+  const taskMatch = md.match(/<!-- task: ([^\s]+) -->/);
+  const taskName = taskMatch?.[1] || inputPath.split('/').at(-2) || '';
 
   // Extract JSON data block
   let dataBlock = null;
@@ -46,6 +48,7 @@ export function md2html(inputPath, outputPath) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${inputPath.split('/').pop().replace('.md', '')}</title>
+  <meta name="task" content="${taskName}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
@@ -438,28 +441,42 @@ const TABLE_ENGINE_JS = `
     sqlEl.textContent = 'Translating...';
 
     try {
-      const API = 'https://palindrome-exercise.vercel.app';
-      const schema = DATA.columns.map(c => ({ name: c, type: 'TEXT' }));
-      const res = await fetch(API + '/api/bridge/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, schema }),
-      });
-      const data = await res.json();
+      // Try local server first, then Vercel
+      const TASK = document.querySelector('meta[name=task]')?.content || 'ar-senior-devs-linkedin';
+      const apis = ['http://localhost:3456', 'https://palindrome-exercise.vercel.app'];
+      let data = null;
 
-      if (data.error) { sqlEl.textContent = 'Error: ' + data.error; return; }
+      for (const api of apis) {
+        try {
+          const endpoint = api.includes('localhost') ? '/api/query' : '/api/bridge/query';
+          const body = api.includes('localhost')
+            ? { task: TASK, question }
+            : { question, schema: DATA.columns.map(c => ({ name: c, type: 'TEXT' })) };
+          const r = await fetch(api + endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          data = await r.json();
+          if (data.sql) break;
+        } catch {}
+      }
+
+      if (!data || data.error) { sqlEl.textContent = 'Error: ' + (data?.error || 'No server available. Run: node bin/serve.js'); return; }
       sqlEl.textContent = data.sql;
 
-      // Execute the SQL client-side
-      const result = await execSQL(data.sql);
-      if (result) {
-        currentCols = result.columns;
-        currentRows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c, row[i]])));
-        currentLabel = question;
+      // If server returned rows, use them directly. Otherwise execute client-side.
+      if (data.rows) {
+        currentCols = data.columns;
+        currentRows = data.rows.map(row => Object.fromEntries(data.columns.map((c, i) => [c, row[i]])));
       } else {
-        currentRows = DATA.allRecords;
-        currentLabel = question + ' (could not execute locally)';
+        const result = await execSQL(data.sql);
+        if (result) {
+          currentCols = result.columns;
+          currentRows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c, row[i]])));
+        }
       }
+      currentLabel = question;
       page = 0; sortCol = null;
       render();
     } catch (err) {
