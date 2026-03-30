@@ -28,6 +28,7 @@ export const MODELS = {
 // ─── LLM Call ────────────────────────────────────────────────────────
 
 async function callLLM(modelId, prompt, apiKey) {
+  const start = Date.now();
   const res = await fetch('https://llm.chutes.ai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -38,11 +39,22 @@ async function callLLM(modelId, prompt, apiKey) {
     }),
   });
   const data = await res.json();
+  const elapsed = Date.now() - start;
   if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+  const usage = data.usage || {};
   const text = data.choices[0].message.content;
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('No JSON in response');
-  return JSON.parse(match[0]);
+
+  const result = JSON.parse(match[0]);
+  result._llm_metrics = {
+    promptTokens: usage.prompt_tokens || 0,
+    completionTokens: usage.completion_tokens || 0,
+    totalTokens: usage.total_tokens || 0,
+    elapsedMs: elapsed,
+  };
+  return result;
 }
 
 // ─── Pass 1: Extract ─────────────────────────────────────────────────
@@ -162,9 +174,23 @@ export async function labelRecords(dbPath, options = {}) {
   const db = new SQL.Database(readFileSync(dbPath));
 
   // Add columns
-  for (const col of ['_labeled', 'raw_labels', 'domain', 'seniority_level', 'seniority_score', 'city', 'skills_normalized']) {
+  for (const col of ['_labeled', 'raw_labels', 'domain', 'seniority_level', 'seniority_score', 'city', 'skills_normalized', '_metrics']) {
     try { db.run(`ALTER TABLE records ADD COLUMN "${col}" TEXT`); } catch {}
   }
+
+  // Pipeline metrics aggregated across all records
+  const pipelineMetrics = {
+    model: model,
+    modelId: modelConfig.id,
+    records: 0,
+    totalTimeMs: 0,
+    stages: {
+      htmlToText: { totalBytes: 0, totalChars: 0, totalMs: 0 },
+      extract: { totalTokensIn: 0, totalTokensOut: 0, totalMs: 0, totalCost: 0 },
+      normalize: { totalTokensIn: 0, totalTokensOut: 0, totalMs: 0, totalCost: 0 },
+      postProcess: { synonymsMerged: 0, orphansFixed: 0, duplicatesRemoved: 0, totalMs: 0 },
+    },
+  };
 
   // Get unlabeled records
   const q = `SELECT _id, name, profileUrl FROM records WHERE _labeled IS NULL OR _labeled = 0`
@@ -231,16 +257,47 @@ export async function labelRecords(dbPath, options = {}) {
           `Name: ${record.name}\nNo HTML available — limited data.`);
       }
 
+      const t1 = Date.now();
       const raw = await callLLM(modelConfig.id, extractPrompt, apiKey);
+      const extractMetrics = raw._llm_metrics || {};
+      delete raw._llm_metrics;
+      pipelineMetrics.stages.extract.totalMs += extractMetrics.elapsedMs || 0;
+      pipelineMetrics.stages.extract.totalTokensIn += extractMetrics.promptTokens || 0;
+      pipelineMetrics.stages.extract.totalTokensOut += extractMetrics.completionTokens || 0;
+
+      // ── Option B: Feed existing labels to normalize prompt ──
+      let existingLabels = '';
+      try {
+        const existing = db.exec("SELECT skills_normalized FROM records WHERE skills_normalized IS NOT NULL AND skills_normalized != ''");
+        if (existing.length) {
+          const leafCounts = {};
+          existing[0].values.forEach(row => {
+            try { JSON.parse(row[0]).forEach(s => { const leaf = s.path?.split('|').pop(); if (leaf) leafCounts[leaf] = (leafCounts[leaf]||0)+1; }); } catch {}
+          });
+          const sorted = Object.entries(leafCounts).sort((a,b) => b[1]-a[1]).slice(0, 50);
+          if (sorted.length) {
+            existingLabels = '\n\nALREADY USED LABELS (reuse these exact names, do NOT create synonyms):\n' +
+              sorted.map(([name, count]) => `  ${name} (${count}x)`).join('\n');
+          }
+        }
+      } catch {}
 
       // ── Pass 2: Normalize to taxonomy ──
       const rawLabelsStr = (raw.labels || []).map(l => `${l.label} (${l.confidence}, ${l.source})`).join('\n');
 
       const normPrompt = NORMALIZE_PROMPT
-        .replace('{raw_labels}', rawLabelsStr)
+        .replace('{raw_labels}', rawLabelsStr + existingLabels)
         .replace('{domain}', raw.domain || 'unknown');
 
       const normalized = await callLLM(modelConfig.id, normPrompt, apiKey);
+      const normMetrics = normalized._llm_metrics || {};
+      delete normalized._llm_metrics;
+      pipelineMetrics.stages.normalize.totalMs += normMetrics.elapsedMs || 0;
+      pipelineMetrics.stages.normalize.totalTokensIn += normMetrics.promptTokens || 0;
+      pipelineMetrics.stages.normalize.totalTokensOut += normMetrics.completionTokens || 0;
+
+      const t2 = Date.now();
+      let synonymsMerged = 0, orphansFixed = 0, duplicatesRemoved = 0;
 
       // Post-process: fix common LLM mistakes
       if (normalized.skills) {
@@ -249,9 +306,9 @@ export async function labelRecords(dbPath, options = {}) {
           let p = s.path;
           // Fix spelling variants
           p = p.replace('Problem-solving', 'Problem Solving').replace('Problem-Solving', 'Problem Solving');
-          // Fix stuttering: "Management|Leadership|Leadership" → "Management|Leadership"
+          // Fix stuttering
           const parts = p.split('|');
-          if (parts.length >= 2 && parts[parts.length - 1] === parts[parts.length - 2]) parts.pop();
+          if (parts.length >= 2 && parts[parts.length - 1] === parts[parts.length - 2]) { parts.pop(); synonymsMerged++; }
           // Fix misplacements
           if (p.startsWith('Languages|Programming|Spanish')) p = 'Languages|Spoken|Spanish';
           if (p.startsWith('Languages|Programming|English')) p = 'Languages|Spoken|English';
@@ -267,6 +324,7 @@ export async function labelRecords(dbPath, options = {}) {
               'teamwork': 'Practices|Collaboration', 'negotiation': 'Management|Operations',
             };
             p = (orphanMap[p.toLowerCase()] || 'Management|Operations') + '|' + p;
+            orphansFixed++;
           }
           // Fix "DevOps|CI/CD|CI/CD" stutter
           if (p === 'DevOps|CI/CD|CI/CD' || p === 'DevOps|CI/CD|Continuous Integration/Continuous Deployment (CI/CD)') p = 'DevOps|CI/CD';
@@ -278,11 +336,13 @@ export async function labelRecords(dbPath, options = {}) {
 
         // Deduplicate paths
         const seen = new Set();
+        const beforeDedup = normalized.skills.length;
         normalized.skills = normalized.skills.filter(s => {
           if (seen.has(s.path)) return false;
           seen.add(s.path);
           return true;
         });
+        duplicatesRemoved = beforeDedup - normalized.skills.length;
       }
 
       // Post-process domain: ensure single clean value
@@ -305,15 +365,35 @@ export async function labelRecords(dbPath, options = {}) {
         raw.city = cityMap[raw.city.toLowerCase()] || raw.city;
       }
 
-      // Write labels + LLM-extracted profile fields
-      // The LLM now extracts name/title/company/headline from the full text — update those too
+      const t3 = Date.now();
+      pipelineMetrics.stages.postProcess.synonymsMerged += synonymsMerged;
+      pipelineMetrics.stages.postProcess.orphansFixed += orphansFixed;
+      pipelineMetrics.stages.postProcess.duplicatesRemoved += duplicatesRemoved;
+      pipelineMetrics.stages.postProcess.totalMs += (t3 - t2);
+
+      // Per-record metrics
+      const recordMetrics = {
+        htmlBytes: htmlFile ? readFileSync(join(htmlDir, htmlFile)).length : 0,
+        textChars: profileText.length,
+        extract: { tokens: extractMetrics.totalTokens || 0, ms: extractMetrics.elapsedMs || 0 },
+        normalize: { tokens: normMetrics.totalTokens || 0, ms: normMetrics.elapsedMs || 0 },
+        postProcess: { synonymsMerged, orphansFixed, duplicatesRemoved, ms: t3 - t2 },
+        totalMs: t3 - t1,
+        rawLabelsCount: (raw.labels || []).length,
+        normalizedCount: (normalized.skills || []).length,
+      };
+
+      pipelineMetrics.stages.htmlToText.totalBytes += recordMetrics.htmlBytes;
+      pipelineMetrics.stages.htmlToText.totalChars += recordMetrics.textChars;
+
+      // Write labels + metrics
       db.run(`UPDATE records SET
-        _labeled = 1, raw_labels = ?,
+        _labeled = 1, raw_labels = ?, _metrics = ?,
         title = COALESCE(?, title), company = COALESCE(?, company), headline = COALESCE(?, headline),
         domain = ?, seniority_level = ?, seniority_score = ?, city = ?,
         skills_normalized = ?
         WHERE _id = ?`, [
-        JSON.stringify(raw),
+        JSON.stringify(raw), JSON.stringify(recordMetrics),
         raw.title || null, raw.company || null, raw.headline || null,
         raw.domain, raw.seniority_level, raw.seniority_score, raw.city,
         JSON.stringify(normalized.skills || []),
@@ -321,19 +401,103 @@ export async function labelRecords(dbPath, options = {}) {
       ]);
 
       labeled++;
+      pipelineMetrics.records = labeled;
+      pipelineMetrics.totalTimeMs += recordMetrics.totalMs;
       const pct = Math.round(labeled / records.length * 100);
       const skillSummary = (normalized.skills || []).slice(0, 4).map(s => s.path.split('|').pop()).join(', ');
-      console.log(`  [${pct}%] ${record.name} → ${raw.domain}/${raw.seniority_level} | ${skillSummary}`);
+      console.log(`  [${pct}%] ${record.name} → ${raw.domain}/${raw.seniority_level} | ${skillSummary} (${(recordMetrics.totalMs/1000).toFixed(1)}s)`);
 
     } catch (err) {
       console.log(`  ✗ ${record.name} — ${(err.message || String(err)).substring(0, 80)}`);
     }
   }
 
+  // ── Option A: Dedup pass — merge synonyms across all records ──
+  console.log('\n  Running dedup pass...');
+  const dedupStart = Date.now();
+  try {
+    const allLabeled = db.exec("SELECT _id, skills_normalized FROM records WHERE skills_normalized IS NOT NULL");
+    if (allLabeled.length) {
+      // Collect all leaf names
+      const leafCounts = {};
+      allLabeled[0].values.forEach(row => {
+        try { JSON.parse(row[1]).forEach(s => { const leaf = s.path?.split('|').pop(); if (leaf) leafCounts[leaf] = (leafCounts[leaf]||0)+1; }); } catch {}
+      });
+
+      // Find likely synonyms (similar names)
+      const synonyms = {};
+      const leaves = Object.keys(leafCounts);
+      for (let i = 0; i < leaves.length; i++) {
+        for (let j = i + 1; j < leaves.length; j++) {
+          const a = leaves[i], b = leaves[j];
+          const al = a.toLowerCase(), bl = b.toLowerCase();
+          if (al === bl && a !== b) { synonyms[b] = a; } // case diff
+          else if (al.replace(/[^a-z]/g, '') === bl.replace(/[^a-z]/g, '')) { synonyms[leafCounts[a] < leafCounts[b] ? a : b] = leafCounts[a] >= leafCounts[b] ? a : b; }
+          else if (al === bl + 's' || bl === al + 's') { synonyms[a.length > b.length ? a : b] = a.length <= b.length ? a : b; } // plural
+        }
+      }
+      // Known synonyms
+      const knownSynonyms = { 'Golang': 'Go', 'Spring Framework': 'Spring Boot', 'Problem-Solving': 'Problem Solving', 'Problem-solving': 'Problem Solving', 'Code Reviews': 'Code Review' };
+      Object.assign(synonyms, knownSynonyms);
+
+      if (Object.keys(synonyms).length) {
+        console.log('  Merging synonyms:', Object.entries(synonyms).map(([from, to]) => `${from}→${to}`).join(', '));
+        let totalMerged = 0;
+        allLabeled[0].values.forEach(row => {
+          const skills = JSON.parse(row[1]);
+          let changed = false;
+          skills.forEach(s => {
+            const leaf = s.path?.split('|').pop();
+            if (leaf && synonyms[leaf]) {
+              const parts = s.path.split('|');
+              parts[parts.length - 1] = synonyms[leaf];
+              s.path = parts.join('|');
+              changed = true;
+              totalMerged++;
+            }
+          });
+          if (changed) {
+            // Dedup after merge
+            const seen = new Set();
+            const deduped = skills.filter(s => { if (seen.has(s.path)) return false; seen.add(s.path); return true; });
+            db.run('UPDATE records SET skills_normalized = ? WHERE _id = ?', [JSON.stringify(deduped), row[0]]);
+          }
+        });
+        pipelineMetrics.stages.postProcess.synonymsMerged += totalMerged;
+        console.log(`  Merged ${totalMerged} synonym occurrences`);
+      } else {
+        console.log('  No synonyms found');
+      }
+    }
+  } catch (err) {
+    console.log(`  Dedup error: ${err.message}`);
+  }
+  pipelineMetrics.stages.postProcess.totalMs += (Date.now() - dedupStart);
+
   // Save
   writeFileSync(dbPath, Buffer.from(db.export()));
+
+  // Save pipeline metrics alongside the DB
+  const metricsPath = dbPath.replace('db.sqlite', 'pipeline-metrics.json');
+  writeFileSync(metricsPath, JSON.stringify(pipelineMetrics, null, 2));
+
   db.close();
 
-  console.log(`\nLabeled ${labeled}/${records.length}. Taxonomy: ${taxonomy.length} paths.`);
+  // Print summary
+  const s = pipelineMetrics.stages;
+  const pricing = modelConfig.cost;
+  console.log(`\n  ╔═══════════════════════════════════════╗`);
+  console.log(`  ║        Pipeline Metrics Summary        ║`);
+  console.log(`  ╚═══════════════════════════════════════╝`);
+  console.log(`  Records:    ${labeled}/${records.length}`);
+  console.log(`  Model:      ${model} (${modelConfig.id})`);
+  console.log(`  Total time: ${(pipelineMetrics.totalTimeMs/1000).toFixed(1)}s`);
+  console.log(`  ─────────────────────────────────────────`);
+  console.log(`  HTML→Text:  ${(s.htmlToText.totalBytes/1024).toFixed(0)}KB → ${(s.htmlToText.totalChars/1024).toFixed(0)}KB text`);
+  console.log(`  Extract:    ${s.extract.totalTokensIn}+${s.extract.totalTokensOut} tokens, ${(s.extract.totalMs/1000).toFixed(1)}s`);
+  console.log(`  Normalize:  ${s.normalize.totalTokensIn}+${s.normalize.totalTokensOut} tokens, ${(s.normalize.totalMs/1000).toFixed(1)}s`);
+  console.log(`  PostProc:   ${s.postProcess.synonymsMerged} synonyms, ${s.postProcess.orphansFixed} orphans, ${s.postProcess.duplicatesRemoved} dupes`);
+  console.log(`  Saved:      ${metricsPath}`);
+
   return labeled;
 }
