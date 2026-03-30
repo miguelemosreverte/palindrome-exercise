@@ -52,52 +52,123 @@ async function getSchema(task) {
 
 // ─── NL→SQL via OpenCode ──────────────────────────────────────────────
 
-async function nlToSQL(question, schema) {
-  // Try fallback first (instant) — it handles most common patterns
-  const fallback = fallbackNLtoSQL(question, schema);
+async function nlToSQL(question, schema, task) {
+  // Expand abbreviations before anything
+  const expanded = expandAbbreviations(question);
 
-  // Try OpenCode in parallel (non-blocking, 15s timeout)
-  const ocPromise = (async () => {
-    try {
-      const session = await fetch(`http://127.0.0.1:${OC_PORT}/session`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-        signal: AbortSignal.timeout(5000),
-      }).then(r => r.json());
+  // Try fallback first (instant)
+  const fallback = fallbackNLtoSQL(expanded, schema);
 
-      await fetch(`http://127.0.0.1:${OC_PORT}/session/${session.id}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parts: [{ type: 'text', text:
-          `SQLite table "records" columns: ${schema.map(c => c.name).join(', ')}. SQL only, no text:\n"${question}"`
-        }] }),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      for (let i = 0; i < 5; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        const msgs = await fetch(`http://127.0.0.1:${OC_PORT}/session/${session.id}/message`,
-          { signal: AbortSignal.timeout(3000) }).then(r => r.json());
-        for (let j = (Array.isArray(msgs) ? msgs : []).length - 1; j >= 0; j--) {
-          const m = msgs[j];
-          if (m.info?.role !== 'assistant') continue;
-          if ((m.parts || []).some(p => p.type === 'step-finish')) {
-            const text = (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
-            const match = text.match(/```sql\n([\s\S]*?)```/) || text.match(/(SELECT\s[\s\S]*?;?)\s*$/i);
-            if (match) return match[1].trim();
-          }
-        }
-      }
-    } catch {}
-    return null;
-  })();
-
-  // Race: return OpenCode result if it arrives in 15s, otherwise use fallback
-  const oc = await Promise.race([ocPromise, new Promise(r => setTimeout(() => r(null), 15000))]);
+  // Try OpenCode with iterative refinement (async, 30s budget)
+  const ocPromise = ocIterativeSQL(expanded, schema, fallback, task);
+  const oc = await Promise.race([ocPromise, new Promise(r => setTimeout(() => r(null), 30000))]);
   return oc || fallback;
 }
 
+/** Send a message to an OpenCode session and wait for response */
+async function ocSend(sessionId, text, timeoutMs = 15000) {
+  await fetch(`http://127.0.0.1:${OC_PORT}/session/${sessionId}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parts: [{ type: 'text', text }] }),
+    signal: AbortSignal.timeout(5000),
+  });
+
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, 2000));
+    const msgs = await fetch(`http://127.0.0.1:${OC_PORT}/session/${sessionId}/message`,
+      { signal: AbortSignal.timeout(3000) }).then(r => r.json());
+    for (let j = (Array.isArray(msgs) ? msgs : []).length - 1; j >= 0; j--) {
+      const m = msgs[j];
+      if (m.info?.role !== 'assistant') continue;
+      if ((m.parts || []).some(p => p.type === 'step-finish')) {
+        return (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+      }
+    }
+  }
+  return null;
+}
+
+function extractSQLFromText(text) {
+  if (!text) return null;
+  const match = text.match(/```sql\n([\s\S]*?)```/) || text.match(/(SELECT\s[\s\S]*?;?)\s*$/im);
+  return match ? (match[1] || match[0]).trim().replace(/;$/, '') : null;
+}
+
+/** Iterative NL→SQL: generate, execute, review results, refine if bad */
+async function ocIterativeSQL(question, schema, fallbackSQL, task) {
+  try {
+    const session = await fetch(`http://127.0.0.1:${OC_PORT}/session`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      signal: AbortSignal.timeout(5000),
+    }).then(r => r.json());
+
+    const colNames = schema.map(c => c.name).filter(c => !c.startsWith('_'));
+    const sampleRows = await execSQL(task,
+      `SELECT ${colNames.slice(0, 6).map(c => '"' + c + '"').join(',')} FROM records LIMIT 3`
+    ).catch(() => ({ rows: [] }));
+
+    const sampleStr = sampleRows.rows?.slice(0, 3).map(r => r.join(' | ')).join('\n') || '(no sample)';
+
+    // Round 1: generate SQL
+    const prompt1 = `SQLite table "records" with columns: ${colNames.join(', ')}
+
+Sample data:
+${sampleStr}
+
+IMPORTANT:
+- "sr" or "Sr" means "senior" (abbreviation), NOT a skill
+- "devs" means developers/engineers
+- Return ONLY a \`\`\`sql code block. SELECT _id FROM records WHERE ...
+
+User query: "${question}"`;
+
+    const resp1 = await ocSend(session.id, prompt1, 15000);
+    const sql1 = extractSQLFromText(resp1);
+    if (!sql1) return null;
+
+    // Execute it
+    let result1;
+    try {
+      result1 = await execSQL(task, sql1);
+    } catch (err) {
+      // SQL error — ask OpenCode to fix
+      const resp2 = await ocSend(session.id,
+        `That SQL failed: ${err.message}. Fix it. Return ONLY \`\`\`sql.`, 10000);
+      return extractSQLFromText(resp2) || null;
+    }
+
+    // Round 2: if results look bad (0 rows or clearly wrong), ask to refine
+    if (result1.rows.length === 0) {
+      const count = await execSQL(task, 'SELECT COUNT(*) FROM records').then(r => r.rows[0][0]).catch(() => '?');
+      const resp2 = await ocSend(session.id,
+        `That query returned 0 rows. The table has ${count} records. Try a broader query. Maybe the abbreviation needs expanding. Return ONLY \`\`\`sql.`, 10000);
+      return extractSQLFromText(resp2) || sql1;
+    }
+
+    return sql1;
+  } catch (err) {
+    console.log(`[query] OpenCode iterative failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ─── Abbreviation expansion ──────────────────────────────────────────
+
+const ABBREVIATIONS = {
+  'sr': 'senior', 'jr': 'junior', 'devs': 'developers', 'dev': 'developer',
+  'eng': 'engineer', 'mgr': 'manager', 'dir': 'director', 'ba': 'buenos aires',
+  'cba': 'córdoba', 'cordoba': 'córdoba', 'fullstack': 'full stack',
+  'fe': 'frontend', 'be': 'backend', 'bsas': 'buenos aires',
+};
+
+function expandAbbreviations(text) {
+  return text.replace(/\b(\w+)\b/g, (m) => ABBREVIATIONS[m.toLowerCase()] || m);
+}
+
 function fallbackNLtoSQL(question, schema) {
-  const q = question.toLowerCase().trim();
+  const q = expandAbbreviations(question).toLowerCase().trim();
   const S = 'SELECT _id FROM records';
 
   // Aggregation queries (these need full columns, not just _id)
@@ -127,7 +198,7 @@ function fallbackNLtoSQL(question, schema) {
   }
 
   // "in <location>" — only match known Argentine cities/regions
-  const locPattern = /\b(?:in|from|located in)\s+(córdoba|cordoba|buenos aires|rosario|mendoza|argentina|tucumán|tucuman|santa fe|mar del plata)/i;
+  const locPattern = /\b(?:in|from|located in)\s+(córdoba|cordoba|buenos aires|rosario|mendoza|argentina|tucumán|tucuman|santa fe|mar del plata|remote|remoto)/i;
   const locMatch = q.match(locPattern);
 
   // "know/with <skill>" — skill search
@@ -190,7 +261,7 @@ const server = createServer(async (req, res) => {
         const schema = await getSchema(task);
         if (!schema.length) { res.writeHead(404); res.end(JSON.stringify({ error: 'no database for ' + task })); return; }
 
-        const sql = await nlToSQL(question, schema);
+        const sql = await nlToSQL(question, schema, task);
         let result;
         try {
           result = await execSQL(task, sql);
