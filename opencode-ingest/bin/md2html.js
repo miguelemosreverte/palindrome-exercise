@@ -375,8 +375,17 @@ function buildGraph(records, columns, showcaseResults) {
       </div>
     <script id="controls-schema" type="application/json">${controlsSchema}</script>
       <div class="facet-row">
-        <label class="slider-label">Seniority Score: <span id="slider-val">0</span>+</label>
-        <input type="range" id="facet-seniority-score" class="facet-slider" min="0" max="100" value="0">
+        <label class="slider-label">Min. Seniority:</label>
+        <select id="facet-seniority-tier" class="facet-select">
+          <option value="0">Any level</option>
+          <option value="15">Junior+</option>
+          <option value="35">Semi-Senior+</option>
+          <option value="60">Senior+</option>
+          <option value="75">Staff / Senior++</option>
+          <option value="85">Lead / Principal</option>
+          <option value="90">Director+</option>
+          <option value="95">VP / CTO</option>
+        </select>
       </div>
       ${techPills ? `<div class="facet-tags"><span class="facet-tags-label">Stack:</span> ${techPills}</div>` : ''}
       ${industryPills ? `<div class="facet-tags"><span class="facet-tags-label">Industry:</span> ${industryPills}</div>` : ''}
@@ -601,13 +610,26 @@ const TABLE_ENGINE_JS = `
         });
       } catch {}
     });
-    // Update all buttons with data-count
+    // Update all buttons with data-count + dim zeros + collapse empty branches
     document.querySelectorAll('[data-count]').forEach(btn => {
       const group = btn.dataset.group || btn.dataset.value;
-      if (group && segmentPeople[group]) {
-        btn.querySelector('small').textContent = segmentPeople[group].size;
-      } else if (group) {
-        btn.querySelector('small').textContent = '0';
+      const count = segmentPeople[group]?.size || 0;
+      const small = btn.querySelector('small');
+      if (small) small.textContent = count;
+
+      // Dim zero-count pills
+      btn.classList.toggle('facet-tag-empty', count === 0);
+    });
+
+    // Auto-collapse expanded parent branches that have zero results
+    document.querySelectorAll('.facet-tag-parent.expanded').forEach(btn => {
+      const group = btn.dataset.group;
+      const count = segmentPeople[group]?.size || 0;
+      if (count === 0) {
+        const row = btn.closest('.stree-row');
+        const children = row?.querySelector('.stree-children');
+        if (children) children.style.display = 'none';
+        btn.classList.remove('expanded');
       }
     });
   }
@@ -687,25 +709,26 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Seniority slider
-  const slider = document.getElementById('facet-seniority-score');
-  const sliderVal = document.getElementById('slider-val');
-  slider?.addEventListener('input', () => {
-    const v = parseInt(slider.value);
-    sliderVal.textContent = v;
+  // Seniority tier selector
+  const senTier = document.getElementById('facet-seniority-tier');
+  senTier?.addEventListener('change', () => {
+    const v = parseInt(senTier.value);
     if (v > 0) activeFilters.seniority_score_min = v;
     else delete activeFilters.seniority_score_min;
     applyFilters();
   });
 
-  // Clear all
-  document.getElementById('facet-clear')?.addEventListener('click', () => {
+  // Clear all — reset everything including tree state
+  function clearAll() {
     for (const key of Object.keys(activeFilters)) delete activeFilters[key];
     document.querySelectorAll('.facet-select').forEach(s => s.value = '');
     document.querySelectorAll('.facet-tag.active').forEach(b => b.classList.remove('active'));
-    if (slider) { slider.value = 0; sliderVal.textContent = '0'; }
+    document.querySelectorAll('.facet-tag-parent.expanded, .facet-tag-sub.expanded').forEach(b => b.classList.remove('expanded'));
+    document.querySelectorAll('.stree-children').forEach(c => c.style.display = 'none');
+    if (senTier) senTier.value = '0';
     applyFilters();
-  });
+  }
+  document.getElementById('facet-clear')?.addEventListener('click', clearAll);
 
   // Render active filter chips
   function renderActiveFilters() {
@@ -767,8 +790,8 @@ const TABLE_ENGINE_JS = `
       nlStatus.textContent = data.model + ' · ' + data.elapsed + 'ms';
       nlStatus.className = 'nl-status';
 
-      // Clear existing filters first
-      document.getElementById('facet-clear')?.click();
+      // Clear existing filters + collapse tree
+      clearAll();
 
       // Apply controls to UI
 
@@ -813,10 +836,16 @@ const TABLE_ENGINE_JS = `
         }
       }
 
-      // 5. Seniority slider
-      if (c.seniority_min) {
-        const slider = document.getElementById('facet-seniority-score');
-        if (slider) { slider.value = c.seniority_min; slider.dispatchEvent(new Event('input')); }
+      // 5. Seniority tier — map NL model's seniority_level to tier value
+      if (c.seniority_level && senTier) {
+        const tierMap = { junior: '15', mid: '35', senior: '60', staff: '75', principal: '85', lead: '85', manager: '85', director: '90', vp: '95', cto: '95' };
+        const val = tierMap[c.seniority_level] || '0';
+        senTier.value = val;
+        senTier.dispatchEvent(new Event('change'));
+      }
+      if (c.seniority_min && senTier) {
+        senTier.value = String(c.seniority_min);
+        senTier.dispatchEvent(new Event('change'));
       }
 
     } catch (err) {
@@ -1181,6 +1210,8 @@ const CSS_LAYOUTS = `
   .facet-tag-parent:hover { background: #34495e; }
   .facet-tag-parent.expanded { background: #1a252f; }
   .facet-tag-parent small { opacity: 0.7; }
+  .facet-tag-empty { opacity: 0.3; pointer-events: none; }
+  .facet-tag-parent.facet-tag-empty { opacity: 0.4; pointer-events: auto; }
   .facet-tag-child { margin-left: 0; }
   .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
