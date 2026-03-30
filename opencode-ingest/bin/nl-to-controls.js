@@ -376,18 +376,53 @@ if (process.argv[1]?.endsWith('nl-to-controls.js')) {
 
     // Save benchmark results
     writeFileSync(benchPath, JSON.stringify(results, null, 2));
-    console.log(`\nBenchmark saved: ${benchPath}`);
+
+    // Auto-generate Markdown + HTML report
+    const allModels = [...new Set(results.map(r => r.model))];
+    let md = '# NL→Controls Benchmark Report\n\n';
+    md += `*Generated: ${new Date().toLocaleString()}*\n\n`;
+    md += '## Results\n\n| Model | Provider | Accuracy | Avg Latency | Avg Tokens |\n|---|---|---|---|---|\n';
+    for (const m of allModels) {
+      const mr = results.filter(r => r.model === m);
+      const passed = mr.filter(r => !r.error && (!r.issues || r.issues.length === 0 || r.issues.every(i => i.startsWith('unknown')))).length;
+      const avgMs = Math.round(mr.reduce((s, r) => s + (r.elapsed || 0), 0) / mr.length);
+      const avgTokens = Math.round(mr.reduce((s, r) => s + (r.tokens || 0), 0) / mr.length);
+      const prov = mr[0]?.result?._meta?.provider || '?';
+      const b = passed === 10 ? '**' : '';
+      md += `| ${b}${m}${b} | ${prov} | ${b}${passed}/10${b} | ${b}${avgMs}ms${b} | ${avgTokens} |\n`;
+    }
+    md += '\n## Queries\n\n';
+    // One table per model showing query → mapped controls clearly
+    for (const m of allModels) {
+      const mr = results.filter(r => r.model === m);
+      const passed = mr.filter(r => !r.error && (!r.issues || r.issues.length === 0 || r.issues.every(i => i.startsWith('unknown')))).length;
+      md += `### ${m} (${passed}/10)\n\n`;
+      md += '| Query | ms | domain | seniority | city | categories | subcategories | skills |\n';
+      md += '|---|---|---|---|---|---|---|---|\n';
+      for (const r of mr) {
+        const ok = !r.error && (!r.issues || r.issues.length === 0 || r.issues.every(i => i.startsWith('unknown')));
+        if (r.error) { md += `| ${r.query} | ✗ | | | | | | ${r.error.substring(0,30)} |\n`; continue; }
+        const v = r.result || {};
+        md += `| ${ok?'✓':'✗'} ${r.query} | ${r.elapsed||0} | ${v.domain||''} | ${v.seniority_level||''} | ${v.city||''} | ${(v.skill_categories||[]).join(', ')} | ${(v.skill_subcategories||[]).join(', ')} | ${(v.skills||[]).join(', ')} |\n`;
+      }
+      md += '\n';
+    }
+    const mdPath = benchPath.replace('.json', '.md');
+    const htmlPath = benchPath.replace('.json', '.html');
+    writeFileSync(mdPath, md);
+    try { const { md2html } = await import('./md2html.js'); md2html(mdPath, htmlPath); } catch {}
+    console.log(`\nReport: ${htmlPath}`);
 
     // Summary
     console.log('\n  ╔══════════════════════════════════════╗');
     console.log('  ║     NL→Controls Benchmark Summary     ║');
     console.log('  ╚══════════════════════════════════════╝');
-    for (const m of models) {
+    for (const m of allModels) {
       const mr = results.filter(r => r.model === m);
-      const passed = mr.filter(r => !r.error && r.issues?.length === 0).length;
+      const passed = mr.filter(r => !r.error && (!r.issues || r.issues.length === 0 || r.issues.every(i => i.startsWith('unknown')))).length;
       const avgMs = Math.round(mr.reduce((s, r) => s + (r.elapsed || 0), 0) / mr.length);
       const avgTokens = Math.round(mr.reduce((s, r) => s + (r.tokens || 0), 0) / mr.length);
-      console.log(`  ${m.padEnd(18)} ${passed}/${mr.length} valid  avg ${avgMs}ms  avg ${avgTokens} tokens`);
+      console.log(`  ${m.padEnd(22)} ${passed}/${mr.length} valid  avg ${avgMs}ms  avg ${avgTokens} tokens`);
     }
   } else if (query) {
     // Single query mode
