@@ -49,6 +49,7 @@ export function md2html(inputPath, outputPath) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/sql-wasm.min.js"></script>
   <style>${CSS_BASE}${CSS_LAYOUTS}</style>
 </head>
 <body>
@@ -400,17 +401,44 @@ const TABLE_ENGINE_JS = `
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();
   });
 
-  // Live query via API
+  // Build in-browser SQLite DB from embedded data
+  let clientDB = null;
+  async function getClientDB() {
+    if (clientDB) return clientDB;
+    if (typeof initSqlJs === 'undefined') return null;
+    const SQL = await initSqlJs({ locateFile: f => 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/' + f });
+    clientDB = new SQL.Database();
+    // Create table from data
+    const cols = DATA.columns;
+    const colDefs = cols.map(c => '"' + c + '" TEXT').join(', ');
+    clientDB.run('CREATE TABLE records (_id INTEGER PRIMARY KEY AUTOINCREMENT, ' + colDefs + ')');
+    const placeholders = cols.map(() => '?').join(',');
+    const stmt = clientDB.prepare('INSERT INTO records (' + cols.map(c => '"' + c + '"').join(',') + ') VALUES (' + placeholders + ')');
+    for (const r of DATA.allRecords) {
+      stmt.run(cols.map(c => r[c] == null ? null : String(r[c])));
+    }
+    stmt.free();
+    return clientDB;
+  }
+
+  // Execute SQL on client-side DB
+  async function execSQL(sql) {
+    const db = await getClientDB();
+    if (!db) return null;
+    const result = db.exec(sql);
+    if (!result.length) return { columns: [], rows: [] };
+    return { columns: result[0].columns, rows: result[0].values };
+  }
+
+  // Live query via API + client-side execution
   const queryInput = document.getElementById('query-input');
   queryInput?.addEventListener('keydown', async (e) => {
     if (e.key !== 'Enter' || !queryInput.value.trim()) return;
     const question = queryInput.value.trim();
     sqlEl.textContent = 'Translating...';
-    currentLabel = question;
 
     try {
       const API = 'https://palindrome-exercise.vercel.app';
-
       const schema = DATA.columns.map(c => ({ name: c, type: 'TEXT' }));
       const res = await fetch(API + '/api/bridge/query', {
         method: 'POST',
@@ -422,12 +450,17 @@ const TABLE_ENGINE_JS = `
       if (data.error) { sqlEl.textContent = 'Error: ' + data.error; return; }
       sqlEl.textContent = data.sql;
 
-      // Execute SQL client-side using the embedded data
-      // (For now, do regex-based filtering as a best-effort fallback)
-      // Real execution would need sql.js in the browser
-      currentRows = DATA.allRecords;
-      currentLabel = question + ' (SQL generated — full execution requires server)';
-      page = 0;
+      // Execute the SQL client-side
+      const result = await execSQL(data.sql);
+      if (result) {
+        currentCols = result.columns;
+        currentRows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c, row[i]])));
+        currentLabel = question;
+      } else {
+        currentRows = DATA.allRecords;
+        currentLabel = question + ' (could not execute locally)';
+      }
+      page = 0; sortCol = null;
       render();
     } catch (err) {
       sqlEl.textContent = 'Error: ' + err.message;
