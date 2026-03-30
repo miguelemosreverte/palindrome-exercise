@@ -203,7 +203,7 @@ function buildFeed(records, columns) {
 function buildGraph(records, columns, showcaseResults) {
   // Collect facet values from labeled data
   const facets = {
-    domain: {}, seniority_level: {}, role_type: {}, city: {},
+    domain: {}, seniority_level: {}, city: {},
   };
   const allTechStack = {};
   const allIndustries = {};
@@ -214,14 +214,26 @@ function buildGraph(records, columns, showcaseResults) {
       const v = r[f];
       if (v && v.length > 0) facets[f][v] = (facets[f][v] || 0) + 1;
     }
-    // tech_stack: [{name,parent}] or ["string"] — handle both
+    // skills_normalized: [{path:"Parent|Child", confidence, source}] — pipe-delimited hierarchy
     try {
-      const parsed = JSON.parse(r.tech_stack || '[]');
+      const parsed = JSON.parse(r.skills_normalized || r.tech_stack || '[]');
       parsed.forEach(t => {
-        const name = typeof t === 'string' ? t : t.name;
-        const parent = typeof t === 'object' ? t.parent : null;
-        if (name) allTechStack[name] = (allTechStack[name] || 0) + 1;
-        if (parent) { if (!skillTree[parent]) skillTree[parent] = new Set(); skillTree[parent].add(name); }
+        if (typeof t === 'string') {
+          // Old format: plain string
+          allTechStack[t] = (allTechStack[t] || 0) + 1;
+        } else if (t.path) {
+          // New format: pipe-delimited path
+          const parts = t.path.split('|');
+          const leaf = parts[parts.length - 1];
+          const parent = parts.length > 1 ? parts[0] : 'Other';
+          allTechStack[leaf] = (allTechStack[leaf] || 0) + 1;
+          if (!skillTree[parent]) skillTree[parent] = new Set();
+          skillTree[parent].add(leaf);
+        } else if (t.name) {
+          // Old {name, parent} format
+          allTechStack[t.name] = (allTechStack[t.name] || 0) + 1;
+          if (t.parent) { if (!skillTree[t.parent]) skillTree[t.parent] = new Set(); skillTree[t.parent].add(t.name); }
+        }
       });
     } catch {}
     try { JSON.parse(r.industries || '[]').forEach(t => { allIndustries[t] = (allIndustries[t] || 0) + 1; }); } catch {}
@@ -269,7 +281,6 @@ function buildGraph(records, columns, showcaseResults) {
       <div class="facet-row">
         ${dropdown('domain', 'Domains', facets.domain)}
         ${dropdown('seniority_level', 'Seniority', facets.seniority_level)}
-        ${dropdown('role_type', 'Role Type', facets.role_type)}
         ${dropdown('city', 'Cities', facets.city)}
         <button id="facet-clear" class="facet-clear">Clear all</button>
       </div>
@@ -411,18 +422,26 @@ const TABLE_ENGINE_JS = `
         const cats = value; // Set of parent category names
         filtered = filtered.filter(r => {
           try {
-            const arr = JSON.parse(r.tech_stack || '[]');
-            return [...cats].some(cat => arr.some(s => (typeof s === 'object' ? s.parent : '') === cat));
+            const arr = JSON.parse(r.skills_normalized || r.tech_stack || '[]');
+            return [...cats].some(cat => arr.some(s => {
+              if (s.path) return s.path.split('|')[0] === cat;
+              if (s.parent) return s.parent === cat;
+              return false;
+            }));
           } catch { return false; }
         });
       } else if (facet === 'tech_stack') {
         const tags = value; // Set
         filtered = filtered.filter(r => {
-          // tech_stack is [{name,parent}] or check skills column (comma-separated names)
           const skills = (r.skills || '').toLowerCase();
           try {
-            const arr = JSON.parse(r.tech_stack || '[]').map(s => (typeof s === 'string' ? s : s.name || '').toLowerCase());
-            return [...tags].every(t => arr.some(a => a.includes(t.toLowerCase())) || skills.includes(t.toLowerCase()));
+            const arr = JSON.parse(r.skills_normalized || r.tech_stack || '[]');
+            const names = arr.map(s => {
+              if (s.path) return s.path.split('|').pop().toLowerCase();
+              if (typeof s === 'string') return s.toLowerCase();
+              return (s.name || '').toLowerCase();
+            });
+            return [...tags].every(t => names.some(n => n.includes(t.toLowerCase())) || skills.includes(t.toLowerCase()));
           } catch {
             return [...tags].every(t => skills.includes(t.toLowerCase()));
           }
