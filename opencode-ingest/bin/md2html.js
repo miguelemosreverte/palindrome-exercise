@@ -1097,6 +1097,7 @@ const CSS_LAYOUTS = `
   .stree-mid { margin-bottom: 0.3rem; }
   .stree-mid .facet-tag-sub { display: inline-flex; align-items: center; gap: 0.2rem; }
   .stree-leaves { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.15rem; margin-left: 0.8rem; }
+  .stree-leaves .facet-tag-child { display: inline-block !important; }
   @media (max-width: 640px) {
     .stree-children { padding-left: 0.5rem; }
     .stree-leaves { margin-left: 0.3rem; }
