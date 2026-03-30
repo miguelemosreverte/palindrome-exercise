@@ -198,6 +198,60 @@ export async function labelRecords(dbPath, options = {}) {
 
       const normalized = await callLLM(modelConfig.id, normPrompt, apiKey);
 
+      // Post-process: fix common LLM mistakes
+      if (normalized.skills) {
+        normalized.skills = normalized.skills.map(s => {
+          if (!s.path) return s;
+          let p = s.path;
+          // Fix spelling variants
+          p = p.replace('Problem-solving', 'Problem Solving').replace('Problem-Solving', 'Problem Solving');
+          // Fix stuttering: "Management|Leadership|Leadership" → "Management|Leadership"
+          const parts = p.split('|');
+          if (parts.length >= 2 && parts[parts.length - 1] === parts[parts.length - 2]) parts.pop();
+          // Fix misplacements
+          if (p.startsWith('Languages|Programming|Spanish')) p = 'Languages|Spoken|Spanish';
+          if (p.startsWith('Languages|Programming|English')) p = 'Languages|Spoken|English';
+          if (p.startsWith('Languages|Programming|French')) p = 'Languages|Spoken|French';
+          if (p.startsWith('Languages|Programming|Portuguese')) p = 'Languages|Spoken|Portuguese';
+          if (p.startsWith('Languages|Programming|Git')) p = 'Practices|Tools|Git';
+          // Fix orphans: ensure at least 2 levels
+          if (!p.includes('|')) p = 'Other|' + p;
+          // Fix "DevOps|CI/CD|CI/CD" stutter
+          if (p === 'DevOps|CI/CD|CI/CD' || p === 'DevOps|CI/CD|Continuous Integration/Continuous Deployment (CI/CD)') p = 'DevOps|CI/CD';
+          // Remove "Custom Skill" prefix
+          p = p.replace('|Custom Skill|', '|');
+          s.path = parts.length >= 2 ? parts.join('|') : p;
+          return s;
+        }).filter(s => s.path && s.path.length > 2);
+
+        // Deduplicate paths
+        const seen = new Set();
+        normalized.skills = normalized.skills.filter(s => {
+          if (seen.has(s.path)) return false;
+          seen.add(s.path);
+          return true;
+        });
+      }
+
+      // Post-process domain: ensure single clean value
+      if (raw.domain) {
+        const d = raw.domain.split('|')[0].trim().toLowerCase();
+        if (d === 'other') raw.domain = 'management'; // no wildcards
+        else raw.domain = d;
+      }
+
+      // Post-process seniority: clean
+      if (raw.seniority_level) {
+        const s = raw.seniority_level.split('|')[0].trim().toLowerCase();
+        const valid = ['junior','mid','senior','staff','principal','lead','manager','director','vp','cto'];
+        raw.seniority_level = valid.includes(s) ? s : (s === 'co-founder' ? 'director' : 'senior');
+      }
+
+      // Post-process city
+      if (raw.city) {
+        const cityMap = { 'cordoba': 'Córdoba', 'córdoba': 'Córdoba', 'buenos aires': 'Buenos Aires' };
+        raw.city = cityMap[raw.city.toLowerCase()] || raw.city;
+      }
 
       // NEVER overwrite the original skills column — it's raw data.
       // Write labels to their own columns only.

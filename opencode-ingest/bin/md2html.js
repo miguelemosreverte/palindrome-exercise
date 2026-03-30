@@ -553,15 +553,33 @@ const TABLE_ENGINE_JS = `
       const childContainer = btn.parentElement.querySelector('.skill-children');
 
       // Toggle expand
+      const isCollapsing = childContainer && childContainer.style.display !== 'none';
+
       if (childContainer) {
-        const visible = childContainer.style.display !== 'none';
-        childContainer.style.display = visible ? 'none' : 'flex';
-        // Also show leaf children inside
-        childContainer.querySelectorAll('.facet-tag-child').forEach(c => c.style.display = 'inline-block');
-        btn.classList.toggle('expanded', !visible);
+        childContainer.style.display = isCollapsing ? 'none' : 'flex';
+        childContainer.querySelectorAll('.facet-tag-child').forEach(c => c.style.display = isCollapsing ? 'none' : 'inline-block');
+        btn.classList.toggle('expanded', !isCollapsing);
       }
 
-      // Toggle filter
+      // When COLLAPSING: clear all child tag filters from this branch
+      if (isCollapsing && childContainer) {
+        childContainer.querySelectorAll('.facet-tag-child.active, .facet-tag-sub.active').forEach(child => {
+          child.classList.remove('active');
+          const val = child.dataset.value;
+          const facet = child.dataset.facet;
+          if (val && facet && activeFilters[facet] instanceof Set) {
+            activeFilters[facet].delete(val);
+            if (activeFilters[facet].size === 0) delete activeFilters[facet];
+          }
+          // Also clear sub-parent category filters
+          const subGroup = child.dataset.group;
+          if (subGroup && activeFilters.skill_category instanceof Set) {
+            activeFilters.skill_category.delete(subGroup);
+          }
+        });
+      }
+
+      // Toggle category filter
       if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
       if (activeFilters.skill_category.has(group)) {
         activeFilters.skill_category.delete(group);
