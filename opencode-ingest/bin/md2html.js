@@ -406,6 +406,15 @@ const TABLE_ENGINE_JS = `
 
       if (facet === 'seniority_score_min') {
         filtered = filtered.filter(r => parseInt(r.seniority_score) >= value);
+      } else if (facet === 'skill_category') {
+        // OR within categories: person has ANY skill in ANY selected category
+        const cats = value; // Set of parent category names
+        filtered = filtered.filter(r => {
+          try {
+            const arr = JSON.parse(r.tech_stack || '[]');
+            return [...cats].some(cat => arr.some(s => (typeof s === 'object' ? s.parent : '') === cat));
+          } catch { return false; }
+        });
       } else if (facet === 'tech_stack') {
         const tags = value; // Set
         filtered = filtered.filter(r => {
@@ -452,14 +461,30 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Skill tree parent click → expand/collapse children
+  // Skill tree parent click → immediately filter by category + expand children
   document.querySelectorAll('.facet-tag-parent').forEach(btn => {
     btn.addEventListener('click', () => {
       const group = btn.dataset.group;
       const children = btn.parentElement.querySelectorAll('.facet-tag-child');
-      const visible = children[0]?.style.display !== 'none';
-      children.forEach(c => c.style.display = visible ? 'none' : 'inline-block');
-      btn.classList.toggle('expanded', !visible);
+
+      // Always expand children on click
+      children.forEach(c => c.style.display = 'inline-block');
+      btn.classList.add('expanded');
+
+      // Toggle category filter
+      if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
+      if (activeFilters.skill_category.has(group)) {
+        activeFilters.skill_category.delete(group);
+        btn.classList.remove('active');
+        // Collapse if deselecting
+        children.forEach(c => { c.style.display = 'none'; c.classList.remove('active'); });
+        btn.classList.remove('expanded');
+      } else {
+        activeFilters.skill_category.add(group);
+        btn.classList.add('active');
+      }
+      if (activeFilters.skill_category.size === 0) delete activeFilters.skill_category;
+      applyFilters();
     });
   });
 
