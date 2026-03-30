@@ -80,14 +80,41 @@ RULES:
 
 // ─── Pass 2: Normalize ───────────────────────────────────────────────
 
-const NORMALIZE_PROMPT = `You are normalizing skill labels into a standard taxonomy using pipe-delimited hierarchy.
+// Fixed taxonomy skeleton — the LLM maps to these, never invents top/mid levels
+const FIXED_TAXONOMY = `Engineering|Backend (Java, Spring Boot, Node.js, Python, Go, C#, REST APIs, GraphQL, Microservices)
+Engineering|Frontend (JavaScript, TypeScript, React, Vue, Angular, Nuxt.js, Next.js, CSS)
+Engineering|Databases (SQL, NoSQL, PostgreSQL, MongoDB, Redis, Elasticsearch)
+Engineering|Architecture (System Design, API Design, Event-Driven, Domain-Driven Design)
+Engineering|Mobile (iOS, Android, React Native, Flutter)
+DevOps|Containers (Docker, Kubernetes, OpenShift)
+DevOps|CI/CD (Jenkins, GitHub Actions, GitLab CI, CircleCI)
+DevOps|Cloud (AWS, GCP, Azure, Terraform, Infrastructure as Code)
+DevOps|Monitoring (Prometheus, Grafana, DataDog, New Relic)
+Data|Analysis (Data Analysis, Data Visualization, Business Intelligence)
+Data|Engineering (ETL, Data Pipelines, Spark, Kafka, Big Data)
+Data|Science (Machine Learning, Deep Learning, NLP, Statistics, Python)
+HR|Recruiting (Talent Acquisition, Sourcing, Candidate Screening, Interviewing)
+HR|Tools (ATS, AVATURE, LinkedIn Recruiter, HR Automation)
+HR|Strategy (Employer Branding, Workforce Planning, Talent Analytics, D&I)
+HR|Executive (Executive Search, Headhunting, Strategic Recruitment)
+Management|Leadership (Team Leadership, Team Management, Mentoring, Coaching)
+Management|Operations (Process Improvement, Service Delivery, Change Management, Stakeholder Management)
+Management|Strategy (Strategic Planning, Business Development, Digital Transformation, Innovation)
+Management|Project (Project Management, Agile, Scrum, Program Management)
+Management|Product (Product Management, Product Strategy, Roadmapping)
+Management|Finance (Investment, Fundraising, M&A, Venture Capital, Entrepreneurship)
+Practices|Collaboration (Teamwork, Cross-functional, Pair Programming)
+Practices|Quality (Problem Solving, Troubleshooting, Code Review, Testing)
+Practices|Tools (Git, Maven, Gradle, npm, IDE)
+Languages|Spoken (English, Spanish, Portuguese, French)
+Languages|Programming (Python, Java, JavaScript, Go, Rust, Scala, C#, C++)`;
 
-Format: "Parent|Child|Grandchild" — left is broader, right is more specific.
+const NORMALIZE_PROMPT = `Map each raw label to ONE path from the FIXED taxonomy below. Use EXACT paths.
 
-EXISTING TAXONOMY (use these paths when possible, add new ones if needed):
-{taxonomy}
+FIXED TAXONOMY:
+${FIXED_TAXONOMY}
 
-RAW LABELS from previous extraction:
+RAW LABELS to map:
 {raw_labels}
 
 Person's domain: {domain}
@@ -96,21 +123,19 @@ Return JSON:
 {
   "skills": [
     {"path": "Engineering|Backend|Java", "confidence": 1.0, "source": "explicit"},
-    {"path": "Engineering|Backend|Spring Boot", "confidence": 1.0, "source": "explicit"},
-    {"path": "DevOps|Containers|Docker", "confidence": 0.85, "source": "inferred"},
-    {"path": "Engineering|Practices|REST APIs", "confidence": 0.9, "source": "inferred"},
-    ...
+    {"path": "DevOps|Containers|Docker", "confidence": 0.85, "source": "inferred"}
   ]
 }
 
-CRITICAL RULES:
-1. ONLY map the raw labels listed above. Do NOT add ANY skills that are not in the raw labels list.
-2. For each raw label, find or create ONE pipe-delimited path in the taxonomy.
-3. If a raw label says "Coaching", map it to "Management|Coaching" — do NOT also add "Engineering|Backend|Java".
-4. The output must have EXACTLY the same number of skills as raw labels (plus/minus 1-2 for splits/merges).
-5. NEVER add Java, Spring Boot, Docker, REST APIs, or any engineering skill unless it appears in the raw labels.
-6. Every path MUST have at least 2 levels (parent|child).
-7. Reuse existing taxonomy paths when the raw label matches.`;
+RULES:
+1. ONLY map raw labels listed above — do NOT add skills not in the list
+2. Use EXACT taxonomy paths. Pick the BEST match from the fixed taxonomy.
+3. If a raw label doesn't fit any path, use the closest parent + the label name: e.g. "Management|Operations|Custom Skill"
+4. "REST APIs" → "Engineering|Backend|REST APIs" (NEVER "Engineering|Practices|REST APIs")
+5. "Backend Development" is not a skill — skip it or map to "Engineering|Backend"
+6. "Python" the programming language → "Languages|Programming|Python", NOT "Languages|Spoken"
+7. "Nuxt.js" → "Engineering|Frontend|Nuxt.js", NOT top-level
+8. One skill = one path. No duplicates. No stuttering (no "Management|Leadership|Leadership").`;
 
 // ─── Pipeline ────────────────────────────────────────────────────────
 
@@ -142,18 +167,7 @@ export async function labelRecords(dbPath, options = {}) {
   const records = unlabeled[0].values;
   const cols = unlabeled[0].columns;
 
-  // Build existing taxonomy from already-labeled records
-  let taxonomy = [];
-  try {
-    const existing = db.exec("SELECT skills_normalized FROM records WHERE skills_normalized IS NOT NULL AND skills_normalized != ''");
-    if (existing.length) {
-      const paths = new Set();
-      existing[0].values.forEach(row => {
-        try { JSON.parse(row[0]).forEach(s => paths.add(s.path)); } catch {}
-      });
-      taxonomy = [...paths].sort();
-    }
-  } catch {}
+  const taxonomy = FIXED_TAXONOMY.split('\n').map(l => l.trim()).filter(Boolean);
 
   console.log(`Labeling ${records.length} records with ${model} (${modelConfig.id})`);
   console.log(`Existing taxonomy: ${taxonomy.length} paths`);
@@ -177,18 +191,13 @@ export async function labelRecords(dbPath, options = {}) {
 
       // ── Pass 2: Normalize to taxonomy ──
       const rawLabelsStr = (raw.labels || []).map(l => `${l.label} (${l.confidence}, ${l.source})`).join('\n');
-      const taxonomyStr = taxonomy.length ? taxonomy.join('\n') : '(empty — you are building the initial taxonomy)';
 
       const normPrompt = NORMALIZE_PROMPT
-        .replace('{taxonomy}', taxonomyStr)
         .replace('{raw_labels}', rawLabelsStr)
         .replace('{domain}', raw.domain || 'unknown');
 
       const normalized = await callLLM(modelConfig.id, normPrompt, apiKey);
 
-      // Update taxonomy with new paths
-      (normalized.skills || []).forEach(s => { if (s.path && !taxonomy.includes(s.path)) taxonomy.push(s.path); });
-      taxonomy.sort();
 
       // NEVER overwrite the original skills column — it's raw data.
       // Write labels to their own columns only.
