@@ -253,81 +253,81 @@ function buildGraph(records, columns, showcaseResults) {
     }
   }
 
-  // Render skill tree — only show nodes that discriminate
-  // Deduplicate children: remove siblings with identical people sets
-  function dedup(entries, parentPeople) {
+  // Deduplicate children helper
+  function dedup(children, parentPeople) {
+    const parentKey = [...parentPeople].sort().join(',');
     const seen = new Map();
-    return entries.filter(([name, node]) => {
-      const key = [...(node._people || [])].sort().join(',');
-      const parentKey = [...(parentPeople || [])].sort().join(',');
-      if (key === parentKey && entries.length === 1) return false;
-      if (key && seen.has(key)) return false;
-      if (key) seen.set(key, name);
-      return true;
-    });
+    const result = [];
+    for (const [cName, cNode] of children.sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0))) {
+      const key = [...(cNode._people || [])].sort().join(',');
+      if (key === parentKey && children.length === 1) continue;
+      if (key && seen.has(key)) continue;
+      if (key) seen.set(key, cName);
+      result.push([cName, cNode]);
+    }
+    return result;
   }
 
-  // Collapse: if node has one child with same people, skip to child
+  // Collapse: if node has one child with same people, skip this level
   function collapse(name, node) {
     const children = Object.entries(node).filter(([k]) => !k.startsWith('_'));
     if (children.length === 1) {
       const [cName, cNode] = children[0];
-      const cPeople = cNode._people || new Set();
-      const people = node._people || new Set();
-      if (people.size === cPeople.size && [...people].every(p => cPeople.has(p))) {
-        return collapse(cName, cNode);
-      }
+      if (cNode._people?.size === node._people?.size) return collapse(cName, cNode);
     }
     return [name, node];
   }
 
-  // Render YAML-style: one row per parent, children indented below
-  function renderTree(tree) {
-    const topEntries = Object.entries(tree)
-      .filter(([k]) => !k.startsWith('_'))
-      .sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0));
+  // Render using stree-* structure
+  function renderRow(name, node) {
+    [name, node] = collapse(name, node);
+    const children = Object.entries(node).filter(([k]) => !k.startsWith('_'));
+    const unique = dedup(children, node._people || new Set());
+    const midLevel = unique.filter(([, n]) => Object.keys(n).some(k => !k.startsWith('_') && n[k]._people));
+    const leaves = unique.filter(([, n]) => !Object.keys(n).some(k => !k.startsWith('_') && n[k]._people));
 
-    return topEntries.map(([topName, topNode]) => {
-      const [name, node] = collapse(topName, topNode);
-      const people = node._people || new Set();
-      const midChildren = Object.entries(node).filter(([k]) => !k.startsWith('_'));
-      const dedupedMid = dedup(midChildren.sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0)), people);
-
-      // Build rows for mid-level children + their leaves
-      const childRows = dedupedMid.map(([midName, midNode]) => {
-        const [mName, mNode] = collapse(midName, midNode);
-        const mPeople = mNode._people || new Set();
-        const leaves = Object.entries(mNode).filter(([k]) => !k.startsWith('_'));
-        const dedupedLeaves = dedup(leaves.sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0)), mPeople);
-
-        if (dedupedLeaves.length > 0) {
-          // Mid-level with leaves: sub-parent + indented children
-          const leafPills = dedupedLeaves.map(([lName, lNode]) => {
-            const [leafName] = collapse(lName, lNode);
-            const lPeople = lNode._people || new Set();
-            return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(leafName)}" data-count="${lPeople.size}">${escHtml(leafName)} <small>${lPeople.size}</small></button>`;
-          }).join('');
-
-          return `<div class="stree-mid">
-            <button class="facet-tag facet-tag-sub" data-group="${escHtml(mName)}" data-count="${mPeople.size}">${escHtml(mName)} <small>${mPeople.size}</small></button>
-            <div class="stree-leaves">${leafPills}</div>
+    let childrenHtml = '';
+    for (const [mName, mNode] of midLevel) {
+      const [cName, cNode] = collapse(mName, mNode);
+      const mChildren = Object.entries(cNode).filter(([k]) => !k.startsWith('_'));
+      const mUnique = dedup(mChildren, cNode._people || new Set());
+      const leafHtml = mUnique
+        .filter(([, n]) => !Object.keys(n).some(k => !k.startsWith('_') && n[k]._people))
+        .map(([lName, lNode]) =>
+          `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(lName)}" data-count="${lNode._people?.size || 0}">${escHtml(lName)} <small>${lNode._people?.size || 0}</small></button>`)
+        .join('');
+      // Recurse for deeper mid-levels
+      const deepMids = mUnique.filter(([, n]) => Object.keys(n).some(k => !k.startsWith('_') && n[k]._people));
+      let deepHtml = '';
+      for (const [dName, dNode] of deepMids) {
+        const dLeaves = dedup(Object.entries(dNode).filter(([k]) => !k.startsWith('_')), dNode._people || new Set());
+        deepHtml += dLeaves.map(([lName, lNode]) =>
+          `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(lName)}" data-count="${lNode._people?.size || 0}">${escHtml(lName)} <small>${lNode._people?.size || 0}</small></button>`
+        ).join('');
+      }
+      childrenHtml += `<div class="stree-mid">
+            <button class="facet-tag facet-tag-sub" data-group="${escHtml(cName)}" data-count="${cNode._people?.size || 0}">${escHtml(cName)} <small>${cNode._people?.size || 0}</small></button>
+            <div class="stree-leaves">${leafHtml}${deepHtml}</div>
           </div>`;
-        } else {
-          // Leaf directly under parent
-          return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(mName)}" data-count="${mPeople.size}">${escHtml(mName)} <small>${mPeople.size}</small></button>`;
-        }
-      }).join('');
+    }
+    // Orphan leaves directly under parent
+    childrenHtml += leaves.map(([lName, lNode]) =>
+      `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(lName)}" data-count="${lNode._people?.size || 0}">${escHtml(lName)} <small>${lNode._people?.size || 0}</small></button>`
+    ).join('');
 
-      return `<div class="stree-row">
+    return `<div class="stree-row">
         <div class="stree-parent">
-          <button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>
+          <button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${node._people?.size || 0}">${escHtml(name)} <small>${node._people?.size || 0}</small></button>
         </div>
-        <div class="stree-children" style="display:none">${childRows}</div>
+        <div class="stree-children" style="display:none">${childrenHtml}</div>
       </div>`;
-    }).join('');
   }
 
-  const treeHtml = renderTree(nestedTree);
+  const treeHtml = Object.entries(nestedTree)
+    .filter(([k]) => !k.startsWith('_'))
+    .sort((a, b) => (b[1]._people?.size || 0) - (a[1]._people?.size || 0))
+    .map(([name, node]) => renderRow(name, node))
+    .join('');
 
   const stats = `<div class="stat-cards">
     <div class="stat-card"><div class="stat-number">${records.length}</div><div class="stat-label">Professionals</div></div>
@@ -557,12 +557,14 @@ const TABLE_ENGINE_JS = `
     });
   });
 
-  // Skill tree: click parent → expand children row + filter
-  document.querySelectorAll('.facet-tag-parent').forEach(btn => {
+  // Skill tree: click parent/sub-parent → filter by category + expand children
+  document.querySelectorAll('.facet-tag-parent, .facet-tag-sub').forEach(btn => {
     btn.addEventListener('click', () => {
       const group = btn.dataset.group;
-      const row = btn.closest('.stree-row');
-      const childContainer = row?.querySelector('.stree-children');
+      const row = btn.closest('.stree-row') || btn.closest('.stree-mid') || btn.parentElement;
+      const childContainer = row.querySelector('.stree-children') || row.querySelector('.stree-leaves');
+
+      // Toggle expand
       const isCollapsing = childContainer && childContainer.style.display !== 'none';
 
       if (childContainer) {
@@ -570,37 +572,25 @@ const TABLE_ENGINE_JS = `
         btn.classList.toggle('expanded', !isCollapsing);
       }
 
-      // Collapse: clear all child filters in this branch
+      // When COLLAPSING: clear all child tag filters from this branch
       if (isCollapsing && childContainer) {
         childContainer.querySelectorAll('.facet-tag-child.active, .facet-tag-sub.active').forEach(child => {
           child.classList.remove('active');
           const val = child.dataset.value;
           const facet = child.dataset.facet;
-          if (val && facet && activeFilters[facet] instanceof Set) activeFilters[facet].delete(val);
-          const sg = child.dataset.group;
-          if (sg && activeFilters.skill_category instanceof Set) activeFilters.skill_category.delete(sg);
+          if (val && facet && activeFilters[facet] instanceof Set) {
+            activeFilters[facet].delete(val);
+            if (activeFilters[facet].size === 0) delete activeFilters[facet];
+          }
+          // Also clear sub-parent category filters
+          const subGroup = child.dataset.group;
+          if (subGroup && activeFilters.skill_category instanceof Set) {
+            activeFilters.skill_category.delete(subGroup);
+          }
         });
-        if (activeFilters.tech_stack?.size === 0) delete activeFilters.tech_stack;
       }
 
       // Toggle category filter
-      if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
-      if (activeFilters.skill_category.has(group)) {
-        activeFilters.skill_category.delete(group);
-        btn.classList.remove('active');
-      } else {
-        activeFilters.skill_category.add(group);
-        btn.classList.add('active');
-      }
-      if (activeFilters.skill_category.size === 0) delete activeFilters.skill_category;
-      applyFilters();
-    });
-  });
-
-  // Sub-parent click → filter by sub-category
-  document.querySelectorAll('.facet-tag-sub').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const group = btn.dataset.group;
       if (!activeFilters.skill_category) activeFilters.skill_category = new Set();
       if (activeFilters.skill_category.has(group)) {
         activeFilters.skill_category.delete(group);
@@ -1045,22 +1035,18 @@ const CSS_LAYOUTS = `
   .facet-tag-parent.expanded { background: #1a252f; }
   .facet-tag-parent small { opacity: 0.7; }
   .facet-tag-child { margin-left: 0; }
-  .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.7rem; }
+  .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
   .facet-tag-sub.active { background: #2c5070; }
-
-  /* YAML-style skill tree: one row per parent */
-  .stree-row { border-bottom: 1px solid #f0ebe4; padding: 0.4rem 0; }
-  .stree-row:last-child { border-bottom: none; }
+  .stree-row { margin-bottom: 0.5rem; }
   .stree-parent { display: inline-block; }
-  .stree-children { padding-left: 1.2rem; margin-top: 0.3rem; }
-  .stree-mid { margin-bottom: 0.3rem; }
-  .stree-mid .facet-tag-sub { margin-bottom: 0.2rem; }
-  .stree-leaves { padding-left: 1.2rem; display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.15rem; }
-
+  .stree-children { display: none; margin-top: 0.3rem; margin-left: 0.5rem; padding-left: 0.8rem; border-left: 2px solid #e0d8cf; }
+  .stree-children[style*="block"], .stree-children[style*="flex"] { display: block !important; }
+  .stree-mid { margin-bottom: 0.4rem; }
+  .stree-leaves { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.2rem; margin-left: 1rem; }
   @media (max-width: 640px) {
-    .stree-children { padding-left: 0.6rem; }
-    .stree-leaves { padding-left: 0.6rem; }
+    .stree-children { margin-left: 0.2rem; padding-left: 0.4rem; }
+    .stree-leaves { margin-left: 0.3rem; }
   }
   .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
   .slider-label span { font-weight: 600; color: #c0392b; }
