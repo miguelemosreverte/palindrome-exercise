@@ -59,33 +59,33 @@ async function nlToSQL(question, schema, task) {
   // Try fallback first (instant)
   const fallback = fallbackNLtoSQL(expanded, schema);
 
-  // Try OpenCode with iterative refinement (async, 30s budget)
+  // Try OpenCode with iterative refinement (60s budget — it needs ~20s)
   const ocPromise = ocIterativeSQL(expanded, schema, fallback, task);
-  const oc = await Promise.race([ocPromise, new Promise(r => setTimeout(() => r(null), 30000))]);
+  const oc = await Promise.race([ocPromise, new Promise(r => setTimeout(() => r(null), 60000))]);
   return oc || fallback;
 }
 
 /** Send a message to an OpenCode session and wait for response */
-async function ocSend(sessionId, text, timeoutMs = 15000) {
+async function ocSend(sessionId, text, timeoutMs = 30000) {
   await fetch(`http://127.0.0.1:${OC_PORT}/session/${sessionId}/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parts: [{ type: 'text', text }] }),
-    signal: AbortSignal.timeout(5000),
   });
 
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 2000));
-    const msgs = await fetch(`http://127.0.0.1:${OC_PORT}/session/${sessionId}/message`,
-      { signal: AbortSignal.timeout(3000) }).then(r => r.json());
-    for (let j = (Array.isArray(msgs) ? msgs : []).length - 1; j >= 0; j--) {
-      const m = msgs[j];
-      if (m.info?.role !== 'assistant') continue;
-      if ((m.parts || []).some(p => p.type === 'step-finish')) {
-        return (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+    try {
+      const msgs = await fetch(`http://127.0.0.1:${OC_PORT}/session/${sessionId}/message`).then(r => r.json());
+      for (let j = (Array.isArray(msgs) ? msgs : []).length - 1; j >= 0; j--) {
+        const m = msgs[j];
+        if (m.info?.role !== 'assistant') continue;
+        if ((m.parts || []).some(p => p.type === 'step-finish')) {
+          return (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+        }
       }
-    }
+    } catch {}
   }
   return null;
 }
@@ -101,15 +101,14 @@ async function ocIterativeSQL(question, schema, fallbackSQL, task) {
   try {
     const session = await fetch(`http://127.0.0.1:${OC_PORT}/session`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      signal: AbortSignal.timeout(5000),
     }).then(r => r.json());
 
     const colNames = schema.map(c => c.name).filter(c => !c.startsWith('_'));
     const sampleRows = await execSQL(task,
-      `SELECT ${colNames.slice(0, 6).map(c => '"' + c + '"').join(',')} FROM records LIMIT 3`
+      `SELECT ${colNames.slice(0, 6).map(c => '"' + c + '"').join(',')} FROM records LIMIT 5`
     ).catch(() => ({ rows: [] }));
 
-    const sampleStr = sampleRows.rows?.slice(0, 3).map(r => r.join(' | ')).join('\n') || '(no sample)';
+    const sampleStr = sampleRows.rows?.slice(0, 5).map(r => r.join(' | ')).join('\n') || '(no sample)';
 
     // Round 1: generate SQL
     const prompt1 = `SQLite table "records" with columns: ${colNames.join(', ')}
@@ -118,13 +117,14 @@ Sample data:
 ${sampleStr}
 
 IMPORTANT:
-- "sr" or "Sr" means "senior" (abbreviation), NOT a skill
-- "devs" means developers/engineers
+- Understand synonyms: "HR" = talent acquisition, recruiting, RRHH, headhunting, selección de personal
+- "sr"/"Sr" = senior, "devs" = developers/engineers
+- Search across title, skills, AND headline for role/domain terms
 - Return ONLY a \`\`\`sql code block. SELECT _id FROM records WHERE ...
 
 User query: "${question}"`;
 
-    const resp1 = await ocSend(session.id, prompt1, 15000);
+    const resp1 = await ocSend(session.id, prompt1, 30000);
     const sql1 = extractSQLFromText(resp1);
     if (!sql1) return null;
 
@@ -135,7 +135,7 @@ User query: "${question}"`;
     } catch (err) {
       // SQL error — ask OpenCode to fix
       const resp2 = await ocSend(session.id,
-        `That SQL failed: ${err.message}. Fix it. Return ONLY \`\`\`sql.`, 10000);
+        `That SQL failed: ${err.message}. Fix it. Return ONLY \`\`\`sql.`, 20000);
       return extractSQLFromText(resp2) || null;
     }
 
@@ -143,7 +143,7 @@ User query: "${question}"`;
     if (result1.rows.length === 0) {
       const count = await execSQL(task, 'SELECT COUNT(*) FROM records').then(r => r.rows[0][0]).catch(() => '?');
       const resp2 = await ocSend(session.id,
-        `That query returned 0 rows. The table has ${count} records. Try a broader query. Maybe the abbreviation needs expanding. Return ONLY \`\`\`sql.`, 10000);
+        `That query returned 0 rows. The table has ${count} records. Try a broader query — use synonyms, LIKE patterns, OR conditions. Return ONLY \`\`\`sql.`, 20000);
       return extractSQLFromText(resp2) || sql1;
     }
 
