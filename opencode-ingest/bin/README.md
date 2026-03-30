@@ -1,119 +1,133 @@
-# LinkedIn Vendor — Two-Pass LLM Labeling Pipeline
+# bin/
 
-## Architecture
+CLI tools. Each is a standalone executable (`#!/usr/bin/env node`).
 
-```
-Profile HTML → parse.js → raw record → label.js → labeled record → report
-                                          │
-                                    ┌─────┴─────┐
-                                 Pass 1       Pass 2
-                                (Extract)   (Normalize)
-                                    │           │
-                              raw labels    pipe-delimited
-                              + confidence  taxonomy paths
-```
+## Pipeline tools
 
-## The Problem
+### ingest.js -- Orchestrator
 
-LinkedIn profile data is messy:
-- Skills contain UI text ("Mostrar todo", "Validar"), names ("María Laura Marquez"), and spam
-- Titles are inconsistent ("Sr" vs "Senior", "fullstack" vs "Full Stack")
-- The same skill appears in different forms ("REST APIs" vs "RESTful APIs")
-- Seniority is vague — "Senior" covers 83% of profiles
-- HR recruiters get classified as DevOps because they mention "automation"
-
-## The Solution: Two-Pass Pipeline
-
-### Pass 1 — Extract (raw labels)
-
-The LLM reads the profile and outputs every skill it finds:
-- **Explicit** (confidence 1.0): directly in title/headline/skills
-- **Inferred** (confidence 0.5-0.95): likely given the role
-
-A Java Backend Engineer gets: Java (explicit), Spring Boot (explicit), Docker (inferred 0.85), REST APIs (inferred 0.9), SQL (inferred 0.8)
-
-The LLM disambiguates by domain: "Automation" for HR → "HR Process Automation", not "CI/CD Automation"
-
-Output: `raw_labels` column (JSON) — inspectable, debuggable
-
-### Pass 2 — Normalize (taxonomy mapping)
-
-A **fixed taxonomy skeleton** defines the hierarchy:
-```
-Engineering|Backend (Java, Spring Boot, REST APIs, Microservices)
-Engineering|Frontend (JavaScript, React, Nuxt.js)
-Engineering|Databases (SQL, NoSQL, Elasticsearch)
-DevOps|Containers (Docker, Kubernetes, OpenShift)
-DevOps|Cloud (AWS, GCP, Terraform)
-HR|Recruiting (Talent Acquisition, Sourcing, Interviewing)
-Management|Leadership (Team Leadership, Mentoring, Coaching)
-...27 categories
-```
-
-The LLM maps each raw label to a pipe-delimited path. It follows the skeleton's structure but **can invent new leaves**. In practice, 27 fixed categories produce ~150 unique paths — 59% are LLM-original.
-
-Examples of LLM-original paths:
-- `Engineering|Backend|Payment Systems` — Fintech engineer
-- `HR|Tools|Recruitment Process Outsourcing (RPO)` — Headhunter
-- `Management|Operations|Employee Wellness` — Coach
-- `Engineering|Architecture|Cloud Engineering` — DevOps architect
-
-### Post-processing
-
-After the LLM, a cleanup step fixes common mistakes:
-- Spelling: "Problem-Solving" → "Problem Solving"
-- Stuttering: "Management|Leadership|Leadership" → "Management|Leadership"
-- Misplacements: "Languages|Programming|Spanish" → "Languages|Spoken|Spanish"
-- Orphans: bare "Mentoring" → "Management|Leadership|Mentoring"
-- Domains: "other" → inferred from context
-- Cities: "Cordoba" → "Córdoba"
-
-## Why Pipe-Delimited?
-
-`Engineering|Backend|Java` supports:
-- Unlimited depth without JSON nesting
-- SQL queries: `LIKE 'Engineering|%'` matches all engineering skills
-- Tree rendering: split on `|`, build hierarchy
-- Human-readable in the database
-
-## UI: Faceted Filter + Skill Tree
-
-The report renders the taxonomy as a clickable skill tree:
-- **Dark pills**: top-level categories (Engineering, DevOps, HR, Management)
-- **Click parent**: filters table + expands children
-- **Blue sub-pills**: mid-level (Backend, Containers, Recruiting)
-- **Light pills**: leaf skills (Java, Docker, Talent Acquisition)
-- **Collapse clears**: collapsing a branch removes all its active filters
-- **Discriminator logic**: hides siblings with identical people sets
-
-## Model Catalog
-
-Easily swap between providers:
-
-| Key | Provider | Model | Cost |
-|-----|----------|-------|------|
-| mistral-nemo | ChutesAI | Mistral Nemo 12B | $0.02/$0.04 |
-| gemma-4b | ChutesAI | Gemma 3 4B | $0.01/$0.03 |
-| hermes-14b | ChutesAI | Hermes 4 14B | $0.01/$0.05 |
-| qwen-32b | ChutesAI | Qwen 3 32B | $0.08/$0.24 |
-
-## CLI
+The main entry point. Runs the full pipeline or individual stages.
 
 ```bash
-node bin/label.js <task>                    # label all unlabeled
-node bin/label.js <task> --limit=10         # iterate on 10
-node bin/label.js <task> --reset            # clear all labels
-node bin/label.js <task> --model=qwen-32b   # use better model
-node bin/label.js --list-models             # show catalog
+node bin/ingest.js run <task> [--iterations=N] [--refetch]   # Full: fetch + parse + normalize + report
+node bin/ingest.js parse <task|all>                          # Re-parse saved HTML (offline)
+node bin/ingest.js report <task>                             # Regenerate report only
+node bin/ingest.js render <file.md> [output.html]            # Markdown -> HTML
+
+node bin/ingest.js browse <url> [--domain=.example.com]      # Open URL with Chrome cookies
+node bin/ingest.js cookies <domain>                          # Show decrypted Chrome cookies
+
+node bin/ingest.js list                                      # Show tasks + record counts
+node bin/ingest.js new <name>                                # Scaffold a new task
+node bin/ingest.js status <task>                             # Show iteration history
 ```
 
-## Files
+Pipeline stages: fetch HTML -> parse records -> clean -> normalize to SQLite -> generate report.
+
+### label.js -- Two-pass LLM labeling
+
+Enriches SQLite records with LLM-generated labels. Two passes:
+
+1. **Extract**: LLM reads raw profile text, outputs free-form labels (domain, seniority, skills, location)
+2. **Normalize**: LLM maps raw labels to pipe-delimited taxonomy paths (`Engineering|Backend|Java`)
+
+```bash
+node bin/label.js <task>                         # Label all unlabeled records
+node bin/label.js <task> --limit=10              # First 10 only (for iteration)
+node bin/label.js <task> --model=qwen-32b        # Specific model
+node bin/label.js <task> --reset                 # Clear all labels, start fresh
+node bin/label.js --list-models                  # Show available models + pricing
+```
+
+Uses ChutesAI API. Set `CHUTESAI_API_KEY` env var or in `../.env`.
+
+### normalize.js -- JSONL to SQLite
+
+Reads `data/{task}/raw/records.jsonl`, creates/updates `data/{task}/db.sqlite`. Auto-creates table schema from first record's keys. Uses sql.js (pure JS, no native dependencies).
+
+Called automatically by `ingest.js run` and `ingest.js parse`.
+
+### report.js -- SQLite to HTML report
+
+Reads SQLite, detects layout type (graph/feed/grid/table) from task name heuristics and column names, generates Markdown with embedded chart data, then converts to HTML via md2html.js.
+
+```bash
+node bin/report.js --task=<name>
+```
+
+### md2html.js -- Markdown to HTML renderer
+
+Full-featured Markdown-to-HTML converter with custom extensions: Chart.js code blocks, embedded JSON data blocks, WSJ-inspired typography, faceted filter UI injection, and responsive layouts.
+
+### charts.js -- Chart components
+
+Exports `horizontalBar()`, `tagCloud()`, `chartRow()`, and `CHARTS_CSS`. All charts are pure HTML/CSS -- no Chart.js for bar charts. Responsive, reactive to filter changes.
+
+## Query tools
+
+### serve.js -- Local HTTP server
+
+Serves generated reports from `output/` and exposes two API endpoints:
+
+- `POST /api/nl-controls` -- NL->Controls (natural language to UI filter states)
+- `POST /api/query` -- NL->SQL->results (legacy, uses OpenCode for SQL generation)
+
+```bash
+node bin/serve.js [--port=3456] [--opencode=9001]
+```
+
+The NL->Controls endpoint uses a model cascade: gemini-flash-lite -> mistral-nemo -> OpenCode free models. Each result is validated against actual filter values before returning.
+
+### nl-to-controls.js -- Natural language to UI controls
+
+Maps natural language queries to exact UI control states instead of SQL. Output is a JSON object like:
+
+```json
+{"domain": "engineering", "city": "Argentina|Cordoba", "skill_categories": ["Engineering"], "skills": ["Java"]}
+```
+
+The UI applies these as filter selections. Deterministic, sub-second, benchmarkable.
+
+```bash
+node bin/nl-to-controls.js <task> "senior java devs in cordoba"
+node bin/nl-to-controls.js <task> --benchmark              # Run all models
+node bin/nl-to-controls.js <task> --benchmark --rebuild    # Force re-run
+```
+
+### query.js -- Showcase query engine
+
+Pre-computes 10 showcase SQL queries for reports and provides a CLI for ad-hoc queries.
+
+```bash
+node bin/query.js <task>                     # Run all showcase queries
+node bin/query.js <task> senior              # Run specific showcase by ID
+node bin/query.js <task> "SELECT ..."        # Run arbitrary SQL
+```
+
+## Agent tools
+
+### agent.js -- Conversational browser agent
+
+Interactive web UI for guided scraping sessions. Agent navigates sites, takes screenshots, asks the user for credentials/decisions via chat. Uses SSE for real-time updates.
+
+```bash
+node bin/agent.js
+# Open http://localhost:3456
+```
+
+## How the tools connect
 
 ```
-vendors/linkedin/
-├── fetch.js    ← Playwright + human emulation, saves HTML per profile
-├── parse.js    ← HTML → raw records (name, title, company, photo...)
-├── clean.js    ← Record normalization (junk names, UI noise)
-├── label.js    ← Two-pass LLM labeling (extract → normalize)
-└── README.md   ← This file
+ingest.js run
+  |-> vendor/fetch.js (saves HTML)
+  |-> vendor/parse.js + clean.js (HTML -> JSONL)
+  |-> normalize.js (JSONL -> SQLite)
+  |-> report.js + md2html.js + charts.js (SQLite -> HTML)
+
+label.js (enriches SQLite with LLM labels)
+
+serve.js
+  |-> serves output/ as static files
+  |-> POST /api/nl-controls -> nl-to-controls.js -> JSON response
+  |-> POST /api/query -> serve.js NL->SQL -> SQLite -> JSON response
 ```

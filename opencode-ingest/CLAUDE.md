@@ -17,6 +17,7 @@ Use it to navigate any website, fill forms, click buttons, and extract data.
 ### Rules
 
 - **Be proactive, not passive** — research sites you don't know, navigate immediately, explore on your own. Only ask when truly stuck.
+- **Captchas**: If you encounter a captcha you can't read, take a screenshot and ask the user to tell you what it says. Don't say "I can't read images" — just ask "What does the captcha say?" and the user will read it for you.
 - Never hardcode site-specific selectors or flows — look at the page and figure it out
 - Always ask the user before entering credentials or clicking irreversible actions
 - Save HTML of every important page to `data/` — this is the raw data
@@ -77,11 +78,22 @@ node bin/ingest.js new <name>                      # Scaffold task
 ### Architecture
 
 ```
-lib/          ← Primitives imported by vendor code (browser, human, scraper)
-vendors/      ← 3 files per vendor: fetch.js, parse.js, clean.js
+lib/          ← Primitives imported by vendor code (browser, human, scraper, chrome-cookies, graph)
+vendors/      ← 3 files per vendor: fetch.js, parse.js, clean.js (+ label.js for LinkedIn)
 tasks/        ← Thin config wrappers (vendor + query params)
-bin/          ← CLI tools (ingest.js, agent.js, md2html.js, report.js, normalize.js)
+bin/          ← CLI tools (ingest.js, label.js, serve.js, nl-to-controls.js, report.js, normalize.js, charts.js, query.js, md2html.js, agent.js)
 agent/        ← Conversational agent server (web UI + SSE)
-data/         ← Raw HTML + extracted data + SQLite
-output/       ← Generated reports (HTML)
+data/         ← Raw HTML + JSONL + SQLite (gitignored)
+output/       ← Generated HTML reports (gitignored)
+tests/        ← Visual tests, filter playground, NL→Controls benchmark
 ```
+
+### Key design decisions
+
+- **HTML is the raw data** — saved once, parsed many times. Fix parser, re-run `ingest parse all`
+- **Two-pass LLM labeling** — Extract (free-form) → Normalize (pipe-delimited taxonomy)
+- **NL→Controls, not NL→SQL** — maps to UI filter states, not SQL queries
+- **Model cascade** — gemini-flash-lite → mistral-nemo → OpenCode free models
+- **Pure CSS charts** — no Chart.js for bars; responsive, reactive to filters
+- **Human emulation** — Bezier mouse, Fitts's Law, session rhythm (lib/human.js)
+- **Chrome cookie extraction** — reads macOS Keychain, decrypts AES-128-CBC (lib/chrome-cookies.js)
