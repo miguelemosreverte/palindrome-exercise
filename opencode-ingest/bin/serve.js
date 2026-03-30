@@ -53,8 +53,8 @@ async function getSchema(task) {
 // ─── NL→SQL via OpenCode ──────────────────────────────────────────────
 
 async function nlToSQL(question, schema, task) {
-  // Expand abbreviations before anything
-  const expanded = expandAbbreviations(question);
+  // Expand abbreviations once
+  const expanded = expandAbbreviations(question.replace(/\b(meaning|specifically)\b.*/i, '').trim());
 
   // Try fallback first (instant)
   const fallback = fallbackNLtoSQL(expanded, schema);
@@ -161,6 +161,10 @@ const ABBREVIATIONS = {
   'eng': 'engineer', 'mgr': 'manager', 'dir': 'director', 'ba': 'buenos aires',
   'cba': 'córdoba', 'cordoba': 'córdoba', 'fullstack': 'full stack',
   'fe': 'frontend', 'be': 'backend', 'bsas': 'buenos aires',
+  'hr': 'human resources', 'qa': 'quality assurance', 'pm': 'project manager',
+  'ux': 'user experience', 'ui': 'user interface', 'ml': 'machine learning',
+  'ai': 'artificial intelligence', 'ds': 'data science', 'sre': 'site reliability',
+  'infra': 'infrastructure', 'ops': 'operations', 'sec': 'security',
 };
 
 function expandAbbreviations(text) {
@@ -168,7 +172,7 @@ function expandAbbreviations(text) {
 }
 
 function fallbackNLtoSQL(question, schema) {
-  const q = expandAbbreviations(question).toLowerCase().trim();
+  let q = expandAbbreviations(question).toLowerCase().trim();
   const S = 'SELECT _id FROM records';
 
   // Aggregation queries (these need full columns, not just _id)
@@ -180,61 +184,57 @@ function fallbackNLtoSQL(question, schema) {
     return `SELECT company, COUNT(*) as count FROM records WHERE company != '' GROUP BY company ORDER BY count DESC`;
   }
 
-  // Extract the actual search terms — strip filler words
-  const stripped = q
-    .replace(/\b(show|find|get|list|display|me|all|the|people|who|that|those|which|with|from|please|can you)\b/gi, '')
-    .replace(/\s+/g, ' ').trim();
+  const where = [];
 
-  // Seniority keywords (exact match on known values)
+  // 1. Location — extract and remove from query
+  const locPattern = /\b(?:in|from|located in)\s+(córdoba|cordoba|buenos aires|rosario|mendoza|argentina|tucumán|tucuman|santa fe|mar del plata|remote|remoto)\b/i;
+  const locMatch = q.match(locPattern);
+  if (locMatch) {
+    where.push(`location LIKE '%${locMatch[1]}%'`);
+    q = q.replace(locMatch[0], '').trim();
+  }
+
+  // 2. Seniority — extract and remove
   const seniorityLevels = ['senior', 'lead', 'staff', 'principal', 'architect', 'manager', 'executive', 'director'];
   const senMatch = seniorityLevels.find(s => q.includes(s));
-
-  // "works at <company>" — only if "at" is followed by a proper noun-ish thing
-  const atMatch = q.match(/(?:works?\s+at|employed\s+at|at\s+company)\s+([A-Z][\w\s]+)/i);
-  if (atMatch && atMatch[1].trim().length > 1) {
-    const where = [`company LIKE '%${atMatch[1].trim()}%'`];
-    if (senMatch) where.push(`seniority = '${senMatch}'`);
-    return S + ' WHERE ' + where.join(' AND ');
+  if (senMatch) {
+    where.push(`seniority = '${senMatch}'`);
+    q = q.replace(new RegExp('\\b' + senMatch + '\\b', 'i'), '').trim();
   }
 
-  // "in <location>" — only match known Argentine cities/regions
-  const locPattern = /\b(?:in|from|located in)\s+(córdoba|cordoba|buenos aires|rosario|mendoza|argentina|tucumán|tucuman|santa fe|mar del plata|remote|remoto)/i;
-  const locMatch = q.match(locPattern);
+  // 3. "works at <company>"
+  const atMatch = q.match(/(?:works?\s+at|employed\s+at|at\s+company)\s+(.+?)(?:\s*$|\s+(?:in|from|who))/i);
+  if (atMatch && atMatch[1].trim().length > 1) {
+    where.push(`company LIKE '%${atMatch[1].trim()}%'`);
+    q = q.replace(atMatch[0], '').trim();
+  }
 
-  // "know/with <skill>" — skill search
-  const skillPatterns = [
-    /(?:know|knows|using|use|experience with|skilled in)\s+([\w#.+]+)/i,
-    /([\w#.+]+)\s+(?:skills?|developers?|engineers?|devs?|experience)/i,
-  ];
-  let skillTerm = null;
-  for (const p of skillPatterns) {
-    const m = q.match(p);
-    if (m && m[1].length > 1 && !seniorityLevels.includes(m[1].toLowerCase())) {
-      skillTerm = m[1].trim();
-      break;
+  // 4. Strip filler words — what remains is the role/skill/domain intent
+  const stripped = q
+    .replace(/\b(i need to|help me|show|find|get|list|display|me|all|the|people|persons?|who|that|those|which|with|from|please|can you|meaning|specifically|looking for|need)\b/gi, '')
+    .replace(/[,.\-]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  // 5. Remaining terms → search across title, skills, headline (the person's domain)
+  if (stripped.length > 1) {
+    const terms = stripped.split(/\s+/).filter(t => t.length > 1);
+    if (terms.length) {
+      // Search as a phrase first, then individual terms
+      const phrase = terms.join(' ');
+      const phraseCondition = `(title LIKE '%${phrase}%' OR skills LIKE '%${phrase}%' OR headline LIKE '%${phrase}%')`;
+      const termConditions = terms.map(t =>
+        `(title LIKE '%${t}%' OR skills LIKE '%${t}%' OR headline LIKE '%${t}%' OR name LIKE '%${t}%')`
+      );
+      // Use phrase match if 2+ words, otherwise individual terms
+      if (terms.length >= 2) {
+        where.push(`(${phraseCondition} OR (${termConditions.join(' AND ')}))`);
+      } else {
+        where.push(termConditions[0]);
+      }
     }
   }
-
-  // Build WHERE clauses
-  const where = [];
-  if (skillTerm) where.push(`skills LIKE '%${skillTerm}%'`);
-  if (locMatch) where.push(`location LIKE '%${locMatch[1]}%'`);
-  if (senMatch) where.push(`seniority = '${senMatch}'`);
 
   if (where.length) return S + ' WHERE ' + where.join(' AND ');
-
-  // Fulltext search on remaining terms — search across all text columns
-  if (stripped.length > 1) {
-    const terms = stripped.split(/\s+/).filter(t => t.length > 2);
-    if (terms.length) {
-      const conditions = terms.map(t =>
-        `(name LIKE '%${t}%' OR title LIKE '%${t}%' OR skills LIKE '%${t}%' OR company LIKE '%${t}%' OR headline LIKE '%${t}%')`
-      );
-      return S + ' WHERE ' + conditions.join(' AND ');
-    }
-  }
-
-  // Default
   return S + ' LIMIT 100';
 }
 
