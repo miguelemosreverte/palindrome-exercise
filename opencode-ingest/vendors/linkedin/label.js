@@ -193,20 +193,14 @@ export async function labelRecords(dbPath, options = {}) {
       (normalized.skills || []).forEach(s => { if (s.path && !taxonomy.includes(s.path)) taxonomy.push(s.path); });
       taxonomy.sort();
 
-      // Clean skills column — explicit skills only, comma-separated
-      const cleanSkills = (normalized.skills || [])
-        .filter(s => s.confidence >= 0.7)
-        .map(s => s.path.split('|').pop())
-        .join(', ');
-
-      // Write to DB
+      // NEVER overwrite the original skills column — it's raw data.
+      // Write labels to their own columns only.
       db.run(`UPDATE records SET
-        _labeled = 1, raw_labels = ?, skills = ?,
+        _labeled = 1, raw_labels = ?,
         domain = ?, seniority_level = ?, seniority_score = ?, city = ?,
         skills_normalized = ?
         WHERE _id = ?`, [
         JSON.stringify(raw),
-        cleanSkills,
         raw.domain, raw.seniority_level, raw.seniority_score, raw.city,
         JSON.stringify(normalized.skills || []),
         id,
