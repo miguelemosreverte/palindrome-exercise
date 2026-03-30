@@ -1,0 +1,428 @@
+{
+  "items": [
+    {
+      "id": "demo-96b13bed",
+      "type": "INSIGHT",
+      "source": "opencode-ingest",
+      "title": "New: Natural language search",
+      "body": "Just type what you're looking for — \"senior React devs in Argentina\" or \"bikes under $200k with free shipping\".",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T22:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "feature": "nl-search"
+      }
+    },
+    {
+      "id": "demo-f6f8f5d4",
+      "type": "CANDIDATE_MATCH",
+      "source": "ar-senior-devs-linkedin",
+      "title": "High-match candidate: Jeremias Agustinoy",
+      "body": "Score: 100% · senior · AstroPay · AstroPay · Universidad Nacional de Córdoba",
+      "url": "https://www.linkedin.com/in/jeremias-agustinoy",
+      "thumbnail": "https://media.licdn.com/dms/image/v2/C4D03AQHHeVSg7ugUlg/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1603893042900?e=1776297600&v=beta&t=zgXPUybsdXPSGmTKBa2I86g719ZtXcJzqa0AThoT6JA",
+      "timestamp": "2026-03-30T21:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "matchScore": "100",
+        "seniority": "senior",
+        "company": "AstroPay",
+        "title": "Senior Software Engineer",
+        "location": "AstroPay · Universidad Nacional de Córdoba",
+        "skills": "[{\"path\":\"Engineering|Backend|Java\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Spring Boot\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Engineering|Backend|Microservices\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|REST APIs\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Engineering|Backend|C#\",\"confidence\":0.7,\"source\":\"inferred\"},{\"path\":\"Engineering|Databases|MySQL\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|MongoDB\",\"confidence\":0.6,\"source\":\"inferred\"},{\"path\":\"Engineering|Architecture|Distributed Systems\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Architecture|Systems Design\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Data|Science|AI-assisted development\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Product|FinTech\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|CI/CD|Git\",\"confidence\":0.6,\"source\":\"inferred\"},{\"path\":\"Languages|Programming|JavaScript\",\"confidence\":0.7,\"source\":\"inferred\"},{\"path\":\"Languages|Programming|TypeScript\",\"confidence\":0.7,\"source\":\"inferred\"},{\"path\":\"Engineering|Frontend|Angular\",\"confidence\":0.7,\"source\":\"inferred\"},{\"path\":\"Engineering|Databases|SQL Server\",\"confidence\":0.7,\"source\":\"inferred\"}]"
+      }
+    },
+    {
+      "id": "demo-281a1d7c",
+      "type": "NEW",
+      "source": "mercado-libre-bikes-cordoba",
+      "title": "Deal found: Bicicleta Mtb 29 Aluminio Battle 210 Shimano 21vel Rojo Talle 16",
+      "body": "$975.599 (66% OFF) · Llega gratis mañana",
+      "url": "https://www.mercadolibre.com.ar/bicicleta-mtb-29-aluminio-battle-210-shimano-21vel-rojo-talle-16/p/MLA64254797",
+      "thumbnail": "https://http2.mlstatic.com/D_Q_NP_2X_670823-MLA104233145618_012026-E.webp",
+      "timestamp": "2026-03-30T20:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "price": "975599",
+        "originalPrice": "$329.999",
+        "discount": "66% OFF",
+        "seller": "BATTLE",
+        "brand": "Tienda Newsan",
+        "freeShipping": "true"
+      }
+    },
+    {
+      "id": "demo-c0ba1747",
+      "type": "NEW",
+      "source": "youtube-claude-code-tutorials",
+      "title": "Trending video: CLAUDE CODE FULL COURSE 4 HOURS: Build & Sell (2026)",
+      "body": "Nick Saraev · 929,536 vistas · 4:10:43",
+      "url": "https://www.youtube.com/watch?v=QoQBzR1NIqI",
+      "thumbnail": "https://i.ytimg.com/vi/QoQBzR1NIqI/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLD25N0n5hlrOU8u8N9yxAiXo5wkgQ",
+      "timestamp": "2026-03-30T19:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "channel": "Nick Saraev",
+        "views": "929,536 vistas",
+        "viewsNum": "929536",
+        "duration": "4:10:43",
+        "published": "hace 1 mes"
+      }
+    },
+    {
+      "id": "demo-17dd3f34",
+      "type": "ALERT",
+      "source": "opencode-ingest",
+      "title": "v0.2: Gemini Flash-Lite support",
+      "body": "646ms query translation. Structured ingestion with pagination. 3 new paginatable steps.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T18:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "version": "0.2.0"
+      }
+    },
+    {
+      "id": "demo-0b78a31d",
+      "type": "INSIGHT",
+      "source": "opencode-ingest",
+      "title": "New: Skill tree filtering",
+      "body": "Click to explore candidates by technology. Interactive faceted filters built from your data.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T17:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "feature": "skill-tree"
+      }
+    },
+    {
+      "id": "demo-427d6dc7",
+      "type": "CANDIDATE_MATCH",
+      "source": "ar-senior-devs-linkedin",
+      "title": "High-match candidate: Leonardo Vettulo",
+      "body": "Score: 100% · senior · Nirvana · Nirvana · Universidad Nacional de Córdoba",
+      "url": "https://www.linkedin.com/in/leonardovettulo",
+      "thumbnail": "https://media.licdn.com/dms/image/v2/D5603AQG5_VLf9JqEMA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1709311236841?e=1776297600&v=beta&t=J7io9M3CCqVEcqHuhiTkyza5sWsyuqhpBcPsmfJpD1M",
+      "timestamp": "2026-03-30T16:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "matchScore": "100",
+        "seniority": "senior",
+        "company": "Nirvana",
+        "title": "Senior Software Engineer (Data)",
+        "location": "Nirvana · Universidad Nacional de Córdoba",
+        "skills": "[{\"path\":\"Data|Engineering|Data Warehousing\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Data|Science|Machine Learning\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Python\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|FastAPI\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|NoSQL|MongoDB\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|SQL|Snowflake\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|Data Pipelines|Dagster\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|SQL|Clickhouse\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Databases|Data Visualization|Metabase\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Data|Analysis|Data Analysis\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Data|Analysis|Data Visualization\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Data|Analysis|Data Cleaning\",\"confidence\":0.9,\"source\":\"inferred\"}]"
+      }
+    },
+    {
+      "id": "demo-6ed45f69",
+      "type": "NEW",
+      "source": "mercado-libre-bikes-cordoba",
+      "title": "Deal found: Bicicleta Mtb 29 Aluminio Battle 210 Shimano 21vel Negro Talle 16",
+      "body": "$975.599 (66% OFF) · Llega gratis mañana",
+      "url": "https://www.mercadolibre.com.ar/bicicleta-mtb-29-aluminio-battle-210-shimano-21vel-negro-talle-16/p/MLA64254805",
+      "thumbnail": "https://http2.mlstatic.com/D_Q_NP_2X_890217-MLA104233205432_012026-E.webp",
+      "timestamp": "2026-03-30T15:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "price": "975599",
+        "originalPrice": "$329.999",
+        "discount": "66% OFF",
+        "seller": "BATTLE",
+        "brand": "Tienda Newsan",
+        "freeShipping": "true"
+      }
+    },
+    {
+      "id": "demo-e839aac5",
+      "type": "NEW",
+      "source": "youtube-claude-code-tutorials",
+      "title": "Trending video: Claude Code Tutorial for Beginners",
+      "body": "Kevin Stratvert · 621,753 vistas · 14:44",
+      "url": "https://www.youtube.com/watch?v=eMZmDH3T2bY",
+      "thumbnail": "https://i.ytimg.com/vi/eMZmDH3T2bY/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLDdsdBVPQLIL31sXBZz7zdF3C1e4g",
+      "timestamp": "2026-03-30T14:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "channel": "Kevin Stratvert",
+        "views": "621,753 vistas",
+        "viewsNum": "621753",
+        "duration": "14:44",
+        "published": "hace 3 meses"
+      }
+    },
+    {
+      "id": "demo-ae50d743",
+      "type": "ALERT",
+      "source": "opencode-ingest",
+      "title": "v0.1: Faceted filter UI with skill tree",
+      "body": "Interactive exploration views. WSJ-inspired theme. Feed system with real-time updates.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T13:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "version": "0.1.0"
+      }
+    },
+    {
+      "id": "demo-d70afe11",
+      "type": "INSIGHT",
+      "source": "opencode-ingest",
+      "title": "How two-pass LLM labeling works",
+      "body": "Pass 1: Gemini Flash-Lite classifies at 646ms/record. Pass 2: GPT-4o refines edge cases. 95%+ accuracy on structured data.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T12:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "feature": "two-pass-labeling"
+      }
+    },
+    {
+      "id": "demo-d585664c",
+      "type": "CANDIDATE_MATCH",
+      "source": "ar-senior-devs-linkedin",
+      "title": "High-match candidate: Santiago Alcaide",
+      "body": "Score: 100% · senior · ICARO · Córdoba, Córdoba, Argentina",
+      "url": "https://www.linkedin.com/in/santiago-alcaide",
+      "thumbnail": "https://media.licdn.com/dms/image/v2/C4E03AQF_zXYXQERXpQ/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1582259198281?e=1776297600&v=beta&t=aCfUR8sRmBAzI_2Nwy_C8tEI2vxwpP4n2yIQ51QJ0Cg",
+      "timestamp": "2026-03-30T11:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "matchScore": "100",
+        "seniority": "senior",
+        "company": "ICARO",
+        "title": "Fundador",
+        "location": "Córdoba, Córdoba, Argentina",
+        "skills": "[{\"path\":\"Management|Leadership|Mentoring\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Operations|Networking\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Operations|Team Building\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"HR|Recruiting\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Strategy|Public Speaking\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Strategy|Event Planning\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Operations|MBA\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Management|Operations|Education\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Architecture|Biomedical Engineering\",\"confidence\":1,\"source\":\"explicit\"}]"
+      }
+    },
+    {
+      "id": "demo-1af96ee1",
+      "type": "NEW",
+      "source": "mercado-libre-bikes-cordoba",
+      "title": "Deal found: Bicicleta Infanti Rodado 12 Rosa Con Verde Agua Forest",
+      "body": "$74.220  · Llega gratis mañana",
+      "url": "https://www.mercadolibre.com.ar/bicicleta-infanti-rodado-12-rosa-con-verde-agua-forest/p/MLA51433976",
+      "thumbnail": "https://http2.mlstatic.com/D_Q_NP_2X_772933-MLA99930651649_112025-E.webp",
+      "timestamp": "2026-03-30T10:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "price": "74220",
+        "originalPrice": "$17.379",
+        "discount": "",
+        "seller": "MC Marcos Cordel",
+        "brand": "",
+        "freeShipping": "true"
+      }
+    },
+    {
+      "id": "demo-786e8773",
+      "type": "NEW",
+      "source": "youtube-claude-code-tutorials",
+      "title": "Trending video: Claude Code - Full Tutorial for Beginners",
+      "body": "Tech With Tim · 509,265 vistas · 35:49",
+      "url": "https://www.youtube.com/watch?v=ntDIxaeo3Wg",
+      "thumbnail": "https://i.ytimg.com/vi/ntDIxaeo3Wg/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLDjCL0ioxNkADJ_I8AjECTwrBG-aw",
+      "timestamp": "2026-03-30T09:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "channel": "Tech With Tim",
+        "views": "509,265 vistas",
+        "viewsNum": "509265",
+        "duration": "35:49",
+        "published": "hace 1 mes"
+      }
+    },
+    {
+      "id": "demo-7198fbaa",
+      "type": "ALERT",
+      "source": "opencode-ingest",
+      "title": "v0.0: First ingestion run",
+      "body": "18 LinkedIn profiles, 491 bike listings, 38 YouTube videos — all from a single CLI command.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T08:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "version": "0.0.1"
+      }
+    },
+    {
+      "id": "demo-6f28fc2b",
+      "type": "INSIGHT",
+      "source": "opencode-ingest",
+      "title": "Browser-based ingestion",
+      "body": "Your Chrome session IS the universal API. No tokens, no rate limits. Just your browser visiting pages.",
+      "url": "",
+      "thumbnail": "",
+      "timestamp": "2026-03-30T07:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "feature": "browser-ingestion"
+      }
+    },
+    {
+      "id": "demo-52d50fc4",
+      "type": "CANDIDATE_MATCH",
+      "source": "ar-senior-devs-linkedin",
+      "title": "High-match candidate: Emanuel Matulich",
+      "body": "Score: 90% · senior · Pomelo · Córdoba, Córdoba, Argentina",
+      "url": "https://www.linkedin.com/in/emanuelmatulich",
+      "thumbnail": "https://media.licdn.com/dms/image/v2/D4D03AQHWz-kdNlKiZg/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1722441175439?e=1776297600&v=beta&t=_09h6l1TaEuq-DsE3IV8QrLkODklipK65YStbjNZSeI",
+      "timestamp": "2026-03-30T06:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "matchScore": "90",
+        "seniority": "senior",
+        "company": "Pomelo",
+        "title": "Sr Software Engineer",
+        "location": "Córdoba, Córdoba, Argentina",
+        "skills": "[{\"path\":\"Engineering|Backend|Java\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Spring Boot\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Go\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Microservices\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Engineering|Architecture|CQRS\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Engineering|Architecture|Payment Processing\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Engineering|Architecture|E-commerce\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Engineering|Architecture|Finance\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"Management|Project|Agile\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Management|Project|Project Management\",\"confidence\":0.8,\"source\":\"inferred\"},{\"path\":\"DevOps|Cloud|AWS\",\"confidence\":1,\"source\":\"explicit\"}]"
+      }
+    },
+    {
+      "id": "demo-9354f8c6",
+      "type": "NEW",
+      "source": "mercado-libre-bikes-cordoba",
+      "title": "Deal found: Bicicleta Infantil Nena Rodado 12 Con Rueditas Baby Shopping",
+      "body": "$85.859 (18% OFF) · Llega gratis mañana",
+      "url": "https://www.mercadolibre.com.ar/bicicleta-infantil-nena-rodado-12-con-rueditas-baby-shopping/up/MLAU3424359879",
+      "thumbnail": "https://http2.mlstatic.com/D_Q_NP_2X_684705-MLA93989387169_102025-E.webp",
+      "timestamp": "2026-03-30T05:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "price": "85859",
+        "originalPrice": "$70.318",
+        "discount": "18% OFF",
+        "seller": "",
+        "brand": "",
+        "freeShipping": "true"
+      }
+    },
+    {
+      "id": "demo-25f0802b",
+      "type": "NEW",
+      "source": "youtube-claude-code-tutorials",
+      "title": "Trending video: CLAUDE EXPLICADO FÁCIL #ia #ai #inteligenciaartificial #chatgpt #bigdata #data #",
+      "body": "maxmaxdata · 415,635 vistas · 2:28",
+      "url": "https://www.youtube.com/watch?v=d8cCSohFcug",
+      "thumbnail": "https://i.ytimg.com/vi/d8cCSohFcug/hq720.jpg?sqp=-oaymwFBCNAFEJQDSFryq4qpAzMIARUAAIhCGADYAQHiAQoIGBACGAY4AUAB8AEB-AG2CIACgA-KAgwIABABGGUgRShPMA8=&rs=AOn4CLDf6hhSUWteD7HUuPKGgBn4gEQFIw",
+      "timestamp": "2026-03-30T04:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "channel": "maxmaxdata",
+        "views": "415,635 vistas",
+        "viewsNum": "415635",
+        "duration": "2:28",
+        "published": "hace 8 meses"
+      }
+    },
+    {
+      "id": "demo-ecb548e6",
+      "type": "CANDIDATE_MATCH",
+      "source": "ar-senior-devs-linkedin",
+      "title": "High-match candidate: Joaquin Bassano",
+      "body": "Score: 90% · senior · Naranja X · Córdoba, Córdoba, Argentina",
+      "url": "https://www.linkedin.com/in/joaquin-bassano",
+      "thumbnail": "https://media.licdn.com/dms/image/v2/C4E03AQF5p1cBYPt0KA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1559322263857?e=1776297600&v=beta&t=k8HjXRGgckJsv63wK6zzAVMzi6GJJfNqjeysOBwXZ34",
+      "timestamp": "2026-03-30T03:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "matchScore": "90",
+        "seniority": "senior",
+        "company": "Naranja X",
+        "title": "Software Engineer Senior",
+        "location": "Córdoba, Córdoba, Argentina",
+        "skills": "[{\"path\":\"Engineering|Frontend|JavaScript\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Backend|Node.js\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|AWS\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|DynamoDB\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|CloudFormation\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|API Gateway\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|Lambda\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|SQS\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Cloud|SNS\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"DevOps|Monitoring|CloudWatch\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Engineering|Architecture|Software Design\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Management|Leadership|Team Leadership\",\"confidence\":1,\"source\":\"explicit\"},{\"path\":\"Management|Leadership|Mentoring\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Practices|Quality|Problem Solving\",\"confidence\":0.9,\"source\":\"inferred\"},{\"path\":\"Practices|Quality|Adaptability\",\"confidence\":0.9,\"source\":\"inferred\"}]"
+      }
+    },
+    {
+      "id": "demo-a17b3e35",
+      "type": "NEW",
+      "source": "mercado-libre-bikes-cordoba",
+      "title": "Deal found: Bicicleta Infantil Rodado 12 Reforzada Niños Ruedas Goma Eva Color Gris Fiat Tam",
+      "body": "$85.859 (19% OFF) · Llega gratis mañana",
+      "url": "https://www.mercadolibre.com.ar/bicicleta-infantil-rodado-12-reforzada-ninos-ruedas-goma-eva-color-gris-fiat-tamano-del-cuadro-12/p/MLA44391901",
+      "thumbnail": "https://http2.mlstatic.com/D_Q_NP_2X_846501-MLA95843815399_102025-E.webp",
+      "timestamp": "2026-03-30T02:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "price": "85859",
+        "originalPrice": "$68.826",
+        "discount": "19% OFF",
+        "seller": "",
+        "brand": "",
+        "freeShipping": "true"
+      }
+    },
+    {
+      "id": "demo-8c443b34",
+      "type": "NEW",
+      "source": "youtube-claude-code-tutorials",
+      "title": "Trending video: Every Claude Code Concept Explained for Normal People",
+      "body": "Simon Scrapes · 397,244 vistas · 27:24",
+      "url": "https://www.youtube.com/watch?v=ZlDnsf_DOzg",
+      "thumbnail": "https://i.ytimg.com/vi/ZlDnsf_DOzg/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLBCYiOwsGtCU5eo2KdVQGO-WO46MA",
+      "timestamp": "2026-03-30T01:32:59.543Z",
+      "read": false,
+      "dismissed": false,
+      "demo": true,
+      "data": {
+        "channel": "Simon Scrapes",
+        "views": "397,244 vistas",
+        "viewsNum": "397244",
+        "duration": "27:24",
+        "published": "hace 1 mes"
+      }
+    }
+  ],
+  "generated": "2026-03-30T22:32:59.543Z",
+  "demo": true
+}
