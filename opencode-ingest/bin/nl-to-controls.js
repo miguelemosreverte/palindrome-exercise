@@ -121,7 +121,12 @@ QUERY: "${query}"
 Example: {"domain":"engineering","city":"Argentina|Córdoba","skill_categories":["Engineering"],"skill_subcategories":["Backend"],"skills":["Java"]}
 For country-level: {"city":"Argentina"} matches ALL cities in Argentina.
 
-Notes: "sr"→senior, "devs"→engineering, "HR"→domain:hr. Only set fields the user mentions.`;
+Notes:
+- "sr"→senior, "devs"→engineering, "HR"→domain:hr
+- ONLY set fields the user explicitly mentions. Do NOT add extra filters.
+- "devs in argentina" = {domain:engineering, city:Argentina} — NO skill_categories, NO skills
+- "senior engineers" = {domain:engineering, seniority_level:senior} — NO subcategories
+- Less is more. Only filter what the user asked for.`;
 }
 
 // ─── Call LLM ────────────────────────────────────────────────────────
@@ -329,6 +334,9 @@ if (process.argv[1]?.endsWith('nl-to-controls.js')) {
       'frontend developers',
       'everyone with machine learning skills',
       'show architects and leads',
+      'devs in argentina',
+      'HR in córdoba',
+      'senior engineers',
     ];
 
     // Check if OpenCode is running
