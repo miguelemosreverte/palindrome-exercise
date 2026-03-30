@@ -1,267 +1,224 @@
 /**
- * LinkedIn — LLM-powered labeling
+ * LinkedIn — Two-pass LLM labeling pipeline
  *
- * Reads each record, sends to an LLM, gets back structured labels.
- * Labels are written as new columns in SQLite.
+ * Pass 1 (Extract): LLM reads profile, outputs raw labels — everything it finds.
+ *   No constraints. Explicit + inferred with confidence. → raw_labels column.
  *
- * Model catalog: easily swap between providers/models.
+ * Pass 2 (Normalize): LLM receives raw labels + the known taxonomy.
+ *   Maps to pipe-delimited hierarchy: "DevOps|Containers|Docker"
+ *   Infers missing labels from the taxonomy. → normalized label columns.
+ *
+ * Pipe format: parent|child|grandchild (unlimited depth, queryable with LIKE)
  */
 
 import initSqlJs from 'sql.js';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync } from 'fs';
 
 // ─── Model Catalog ───────────────────────────────────────────────────
 
 export const MODELS = {
-  // ChutesAI models (OpenAI-compatible, fast, cheap)
-  'mistral-nemo': {
-    provider: 'chutes',
-    id: 'unsloth/Mistral-Nemo-Instruct-2407',
-    cost: '$0.02/$0.04 per 1M tokens',
-  },
-  'mistral-small': {
-    provider: 'chutes',
-    id: 'chutesai/Mistral-Small-3.2-24B-Instruct-2506',
-    cost: '$0.06/$0.18 per 1M tokens',
-  },
-  'gemma-4b': {
-    provider: 'chutes',
-    id: 'unsloth/gemma-3-4b-it',
-    cost: '$0.01/$0.03 per 1M tokens (cheapest)',
-  },
-  'hermes-14b': {
-    provider: 'chutes',
-    id: 'NousResearch/Hermes-4-14B',
-    cost: '$0.01/$0.05 per 1M tokens',
-  },
-  'qwen-32b': {
-    provider: 'chutes',
-    id: 'Qwen/Qwen3-32B-TEE',
-    cost: '$0.08/$0.24 per 1M tokens (best quality)',
-  },
-  'deephermes': {
-    provider: 'chutes',
-    id: 'NousResearch/DeepHermes-3-Mistral-24B-Preview',
-    cost: '$0.02/$0.10 per 1M tokens',
-  },
-
-  // OpenCode models (free, slower)
-  'opencode-nemotron': {
-    provider: 'opencode',
-    id: 'opencode/nemotron-3-super-free',
-    cost: 'free',
-  },
-  'opencode-bigpickle': {
-    provider: 'opencode',
-    id: 'opencode/big-pickle',
-    cost: 'free',
-  },
+  'mistral-nemo':  { provider: 'chutes', id: 'unsloth/Mistral-Nemo-Instruct-2407', cost: '$0.02/$0.04' },
+  'mistral-small': { provider: 'chutes', id: 'chutesai/Mistral-Small-3.2-24B-Instruct-2506', cost: '$0.06/$0.18' },
+  'gemma-4b':      { provider: 'chutes', id: 'unsloth/gemma-3-4b-it', cost: '$0.01/$0.03' },
+  'hermes-14b':    { provider: 'chutes', id: 'NousResearch/Hermes-4-14B', cost: '$0.01/$0.05' },
+  'qwen-32b':      { provider: 'chutes', id: 'Qwen/Qwen3-32B-TEE', cost: '$0.08/$0.24' },
 };
 
-const DEFAULT_MODEL = 'mistral-nemo';
+// ─── LLM Call ────────────────────────────────────────────────────────
 
-// ─── LLM Providers ──────────────────────────────────────────────────
-
-async function callChutes(modelId, prompt, apiKey) {
+async function callLLM(modelId, prompt, apiKey) {
   const res = await fetch('https://llm.chutes.ai/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: modelId,
-      response_format: { type: 'json_object' },
+      model: modelId, response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 400,
-      temperature: 0.1,
+      max_tokens: 800, temperature: 0.1,
     }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  return data.choices[0].message.content;
+  const text = data.choices[0].message.content;
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON in response');
+  return JSON.parse(match[0]);
 }
 
-async function callOpenCode(prompt, port = 9001) {
-  const session = await fetch(`http://127.0.0.1:${port}/session`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-  }).then(r => r.json());
+// ─── Pass 1: Extract ─────────────────────────────────────────────────
 
-  await fetch(`http://127.0.0.1:${port}/session/${session.id}/message`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts: [{ type: 'text', text: prompt }] }),
-  });
-
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    try {
-      const msgs = await fetch(`http://127.0.0.1:${port}/session/${session.id}/message`).then(r => r.json());
-      for (const m of (Array.isArray(msgs) ? msgs : []).reverse()) {
-        if (m.info?.role !== 'assistant') continue;
-        if ((m.parts || []).some(p => p.type === 'step-finish')) {
-          return (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
-        }
-      }
-    } catch {}
-  }
-  throw new Error('OpenCode timeout');
-}
-
-// ─── Labeling ────────────────────────────────────────────────────────
-
-const PROMPT_TEMPLATE = `You are a technical recruiter classifying a LinkedIn profile. Return ONLY valid JSON.
+const EXTRACT_PROMPT = `You are a senior technical recruiter. Extract ALL skills from this LinkedIn profile.
 
 Profile:
 - Name: {name}
 - Title: {title}
 - Headline: {headline}
-- Raw Skills (NOISY — may contain names, UI text, Spanish phrases. IGNORE those, extract only REAL skills): {skills}
+- Raw Skills (NOISY — may contain names, UI text. IGNORE non-skills): {skills}
 - Company: {company}
 - Location: {location}
 
-Return this JSON:
+Return JSON:
 {
   "domain": "engineering|hr|design|data|product|management|sales|other",
   "seniority_level": "junior|mid|senior|staff|principal|lead|manager|director|vp|cto",
-  "role_type": "individual_contributor|team_lead|manager|executive|founder|consultant",
-  "remote_status": "remote|hybrid|onsite|unknown",
-  "skills": [{"name":"Spring Boot","parent":"Java Ecosystem"}, {"name":"AWS","parent":"Cloud"}],
-  "skill_tree": {"Java Ecosystem":["Spring Boot","Maven"], "Cloud":["AWS","OpenShift"]},
-  "industries": ["fintech","enterprise"],
-  "city": "Córdoba",
   "seniority_score": 65,
-  "relevance_score": 85
+  "city": "Normalized City Name",
+  "labels": [
+    {"label": "Spring Boot", "confidence": 1.0, "source": "explicit"},
+    {"label": "Docker", "confidence": 0.85, "source": "inferred"},
+    ...
+  ]
 }
 
-Rules:
-- skills: 5-10 REAL technical/professional skills. NO names, NO Spanish UI text, NO "Mostrar todo", "Validar", "Recibidas" etc.
-- Each skill MUST have a parent category (e.g. "Programming Languages", "Cloud", "Architecture", "Databases", "Frameworks", "DevOps", "Management", "HR", "Data")
-- skill_tree: hierarchy map of parent→[children]
-- Extract skills from BOTH the headline AND the raw skills field
-- If the person is non-technical (HR, sales), use professional skills like "Talent Acquisition", "Recruiting", "Executive Search" with parents like "HR", "Sales"
-- seniority_score: junior=15, mid=35, senior=60, staff=75, principal=85, lead=70, manager=80, director=90, vp=95, cto=100`;
+RULES:
+- Extract EVERY real skill/technology/competency. Min 5, max 15.
+- "explicit": directly mentioned in title, headline, or skills
+- "inferred": not mentioned but highly likely given the role. A Java backend dev probably knows Maven, Git, REST APIs, SQL. An HR recruiter probably knows ATS systems, interviewing, sourcing.
+- Confidence 0-1: how sure are you this person has this skill
+- Disambiguate by domain: "Automation" for HR = "HR Process Automation". "Automation" for DevOps = "CI/CD Automation"
+- NO names, NO Spanish UI text, NO "Mostrar todo"/"Validar"/etc.
+- Include soft skills for non-tech roles (negotiation, stakeholder management, etc.)`;
 
-function buildPrompt(record) {
-  return PROMPT_TEMPLATE
-    .replace('{name}', record.name || '')
-    .replace('{title}', record.title || '')
-    .replace('{headline}', record.headline || '')
-    .replace('{skills}', record.skills || '')
-    .replace('{company}', record.company || '')
-    .replace('{location}', record.location || '');
+// ─── Pass 2: Normalize ───────────────────────────────────────────────
+
+const NORMALIZE_PROMPT = `You are normalizing skill labels into a standard taxonomy using pipe-delimited hierarchy.
+
+Format: "Parent|Child|Grandchild" — left is broader, right is more specific.
+
+EXISTING TAXONOMY (use these paths when possible, add new ones if needed):
+{taxonomy}
+
+RAW LABELS from previous extraction:
+{raw_labels}
+
+Person's domain: {domain}
+
+Return JSON:
+{
+  "skills": [
+    {"path": "Engineering|Backend|Java", "confidence": 1.0, "source": "explicit"},
+    {"path": "Engineering|Backend|Spring Boot", "confidence": 1.0, "source": "explicit"},
+    {"path": "DevOps|Containers|Docker", "confidence": 0.85, "source": "inferred"},
+    {"path": "Engineering|Practices|REST APIs", "confidence": 0.9, "source": "inferred"},
+    ...
+  ]
 }
 
-function parseLabels(text) {
-  // Extract JSON from response (might be wrapped in markdown)
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON in response');
-  const labels = JSON.parse(jsonMatch[0]);
+RULES:
+- Map EACH raw label to a pipe-delimited path in the taxonomy
+- If a raw label doesn't fit existing paths, create a new path following the pattern
+- Keep confidence and source from the raw labels
+- You may infer skills ONLY if they are directly implied by the person's actual role/domain.
+  Do NOT copy skills from the taxonomy that don't match the person's domain.
+  An Operations Manager should NOT get Java/Docker/Kubernetes unless their profile mentions coding.
+- Every path MUST have at least 2 levels (parent|child). No orphan top-level labels.
+- Each skill can only appear ONCE in the taxonomy. If "Kubernetes" already has a path, reuse it.
+- The domain context is critical: HR person → HR paths. Manager → Management paths. Engineer → Engineering paths.
+- Normalize spelling: "Kubernetes" not "k8s", "JavaScript" not "js"`;
 
-  // Validate + normalize
-  const valid = {
-    domain: ['engineering', 'hr', 'design', 'data', 'product', 'management', 'sales', 'other'],
-    seniority_level: ['junior', 'mid', 'senior', 'staff', 'principal', 'lead', 'manager', 'director', 'vp', 'cto'],
-    role_type: ['individual_contributor', 'team_lead', 'manager', 'executive', 'founder', 'consultant'],
-    remote_status: ['remote', 'hybrid', 'onsite', 'unknown'],
-  };
-
-  for (const [key, values] of Object.entries(valid)) {
-    if (!values.includes(labels[key])) labels[key] = values.at(-1); // default to last
-  }
-
-  // Skills: array of {name, parent}
-  labels.skills = Array.isArray(labels.skills) ? labels.skills.filter(s => s.name && s.parent) : [];
-  // Flatten to tech_stack for backward compat
-  labels.tech_stack = labels.skills.map(s => s.name);
-  // Skill tree: {parent: [children]}
-  labels.skill_tree = typeof labels.skill_tree === 'object' && !Array.isArray(labels.skill_tree) ? labels.skill_tree : {};
-  labels.industries = Array.isArray(labels.industries) ? labels.industries : [];
-  labels.city = typeof labels.city === 'string' ? labels.city : '';
-  labels.seniority_score = Math.max(0, Math.min(100, parseInt(labels.seniority_score) || 50));
-  labels.relevance_score = Math.max(0, Math.min(100, parseInt(labels.relevance_score) || 50));
-
-  return labels;
-}
+// ─── Pipeline ────────────────────────────────────────────────────────
 
 /**
- * Label all unlabeled records in a task's database.
- * @param {string} dbPath — path to SQLite database
- * @param {string} modelName — key from MODELS catalog
- * @param {object} options — { apiKey, openCodePort, concurrency }
+ * Run the two-pass labeling pipeline.
+ * @param {string} dbPath
+ * @param {object} options - { model, apiKey, limit, offset }
  */
-export async function labelRecords(dbPath, modelName = DEFAULT_MODEL, options = {}) {
-  const { apiKey, openCodePort = 9001, onProgress } = options;
-  const model = MODELS[modelName];
-  if (!model) throw new Error(`Unknown model: ${modelName}. Available: ${Object.keys(MODELS).join(', ')}`);
-
-  if (model.provider === 'chutes' && !apiKey) {
-    throw new Error('ChutesAI API key required. Set CHUTESAI_API_KEY env var.');
-  }
+export async function labelRecords(dbPath, options = {}) {
+  const { model = 'mistral-nemo', apiKey, limit = 0, offset = 0 } = options;
+  const modelConfig = MODELS[model];
+  if (!modelConfig) throw new Error(`Unknown model: ${model}. Available: ${Object.keys(MODELS).join(', ')}`);
+  if (!apiKey) throw new Error('API key required. Set CHUTESAI_API_KEY.');
 
   const SQL = await initSqlJs();
   const db = new SQL.Database(readFileSync(dbPath));
 
-  // Add label columns if they don't exist
-  const labelCols = ['_labeled', 'domain', 'seniority_level', 'role_type', 'remote_status', 'tech_stack', 'skill_tree', 'industries', 'city', 'seniority_score', 'relevance_score'];
-  for (const col of labelCols) {
-    try { db.run(`ALTER TABLE records ADD COLUMN "${col}" TEXT`); } catch {} // ignore if exists
+  // Add columns
+  for (const col of ['_labeled', 'raw_labels', 'domain', 'seniority_level', 'seniority_score', 'city', 'skills_normalized']) {
+    try { db.run(`ALTER TABLE records ADD COLUMN "${col}" TEXT`); } catch {}
   }
 
   // Get unlabeled records
-  const unlabeled = db.exec('SELECT _id, name, title, headline, skills, company, location FROM records WHERE _labeled IS NULL OR _labeled = 0');
-  if (!unlabeled.length || !unlabeled[0].values.length) {
-    console.log('All records already labeled');
-    db.close();
-    return 0;
-  }
+  const q = `SELECT _id, name, title, headline, skills, company, location FROM records WHERE _labeled IS NULL OR _labeled = 0`
+    + (limit > 0 ? ` LIMIT ${limit} OFFSET ${offset}` : '');
+  const unlabeled = db.exec(q);
+  if (!unlabeled.length || !unlabeled[0].values.length) { console.log('All records labeled'); db.close(); return 0; }
 
   const records = unlabeled[0].values;
   const cols = unlabeled[0].columns;
-  console.log(`Labeling ${records.length} records with ${modelName} (${model.id})...`);
+
+  // Build existing taxonomy from already-labeled records
+  let taxonomy = [];
+  try {
+    const existing = db.exec("SELECT skills_normalized FROM records WHERE skills_normalized IS NOT NULL AND skills_normalized != ''");
+    if (existing.length) {
+      const paths = new Set();
+      existing[0].values.forEach(row => {
+        try { JSON.parse(row[0]).forEach(s => paths.add(s.path)); } catch {}
+      });
+      taxonomy = [...paths].sort();
+    }
+  } catch {}
+
+  console.log(`Labeling ${records.length} records with ${model} (${modelConfig.id})`);
+  console.log(`Existing taxonomy: ${taxonomy.length} paths`);
 
   let labeled = 0;
   for (const row of records) {
     const record = Object.fromEntries(cols.map((c, i) => [c, row[i]]));
     const id = record._id;
-    const prompt = buildPrompt(record);
 
     try {
-      let response;
-      if (model.provider === 'chutes') {
-        response = await callChutes(model.id, prompt, apiKey);
-      } else {
-        response = await callOpenCode(prompt, openCodePort);
-      }
+      // ── Pass 1: Extract raw labels ──
+      const extractPrompt = EXTRACT_PROMPT
+        .replace('{name}', record.name || '')
+        .replace('{title}', record.title || '')
+        .replace('{headline}', record.headline || '')
+        .replace('{skills}', record.skills || '')
+        .replace('{company}', record.company || '')
+        .replace('{location}', record.location || '');
 
-      const labels = parseLabels(response);
+      const raw = await callLLM(modelConfig.id, extractPrompt, apiKey);
 
-      // Overwrite the messy 'skills' column with clean tech_stack names
-      const cleanSkills = labels.tech_stack.join(', ');
+      // ── Pass 2: Normalize to taxonomy ──
+      const rawLabelsStr = (raw.labels || []).map(l => `${l.label} (${l.confidence}, ${l.source})`).join('\n');
+      const taxonomyStr = taxonomy.length ? taxonomy.join('\n') : '(empty — you are building the initial taxonomy)';
 
+      const normPrompt = NORMALIZE_PROMPT
+        .replace('{taxonomy}', taxonomyStr)
+        .replace('{raw_labels}', rawLabelsStr)
+        .replace('{domain}', raw.domain || 'unknown');
+
+      const normalized = await callLLM(modelConfig.id, normPrompt, apiKey);
+
+      // Update taxonomy with new paths
+      (normalized.skills || []).forEach(s => { if (s.path && !taxonomy.includes(s.path)) taxonomy.push(s.path); });
+      taxonomy.sort();
+
+      // Clean skills column — explicit skills only, comma-separated
+      const cleanSkills = (normalized.skills || [])
+        .filter(s => s.confidence >= 0.7)
+        .map(s => s.path.split('|').pop())
+        .join(', ');
+
+      // Write to DB
       db.run(`UPDATE records SET
-        _labeled = 1,
-        skills = ?,
-        domain = ?, seniority_level = ?, role_type = ?, remote_status = ?,
-        tech_stack = ?, skill_tree = ?, industries = ?, city = ?,
-        seniority_score = ?, relevance_score = ?
-        WHERE _id = ?`,
-        [
-          cleanSkills,
-          labels.domain, labels.seniority_level, labels.role_type, labels.remote_status,
-          JSON.stringify(labels.skills), JSON.stringify(labels.skill_tree), JSON.stringify(labels.industries), labels.city,
-          labels.seniority_score, labels.relevance_score,
-          id,
-        ]);
+        _labeled = 1, raw_labels = ?, skills = ?,
+        domain = ?, seniority_level = ?, seniority_score = ?, city = ?,
+        skills_normalized = ?
+        WHERE _id = ?`, [
+        JSON.stringify(raw),
+        cleanSkills,
+        raw.domain, raw.seniority_level, raw.seniority_score, raw.city,
+        JSON.stringify(normalized.skills || []),
+        id,
+      ]);
 
       labeled++;
       const pct = Math.round(labeled / records.length * 100);
-      console.log(`  [${pct}%] ${record.name} → ${labels.domain}/${labels.seniority_level} (${labels.tech_stack.join(', ') || 'no stack'}) score:${labels.seniority_score}`);
-      if (onProgress) onProgress(labeled, records.length, record.name, labels);
+      const skillSummary = (normalized.skills || []).slice(0, 4).map(s => s.path.split('|').pop()).join(', ');
+      console.log(`  [${pct}%] ${record.name} → ${raw.domain}/${raw.seniority_level} | ${skillSummary}`);
 
     } catch (err) {
-      console.log(`  ✗ ${record.name} — ${err.message.substring(0, 60)}`);
+      console.log(`  ✗ ${record.name} — ${err.message.substring(0, 80)}`);
     }
   }
 
@@ -269,6 +226,6 @@ export async function labelRecords(dbPath, modelName = DEFAULT_MODEL, options = 
   writeFileSync(dbPath, Buffer.from(db.export()));
   db.close();
 
-  console.log(`Labeled ${labeled}/${records.length} records`);
+  console.log(`\nLabeled ${labeled}/${records.length}. Taxonomy: ${taxonomy.length} paths.`);
   return labeled;
 }
