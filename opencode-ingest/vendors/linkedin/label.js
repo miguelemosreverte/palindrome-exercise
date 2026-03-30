@@ -111,28 +111,37 @@ async function callOpenCode(prompt, port = 9001) {
 
 // ─── Labeling ────────────────────────────────────────────────────────
 
-const PROMPT_TEMPLATE = `Given this LinkedIn profile, return ONLY a valid JSON object with structured labels. No explanation, no markdown, just JSON.
+const PROMPT_TEMPLATE = `You are a technical recruiter classifying a LinkedIn profile. Return ONLY valid JSON.
 
 Profile:
 - Name: {name}
 - Title: {title}
 - Headline: {headline}
-- Skills: {skills}
+- Raw Skills (NOISY — may contain names, UI text, Spanish phrases. IGNORE those, extract only REAL skills): {skills}
 - Company: {company}
 - Location: {location}
 
-Return this exact JSON structure:
+Return this JSON:
 {
   "domain": "engineering|hr|design|data|product|management|sales|other",
   "seniority_level": "junior|mid|senior|staff|principal|lead|manager|director|vp|cto",
   "role_type": "individual_contributor|team_lead|manager|executive|founder|consultant",
   "remote_status": "remote|hybrid|onsite|unknown",
-  "tech_stack": ["normalized", "tech", "names", "only"],
-  "industries": ["industry", "tags"],
-  "city": "Normalized City Name",
-  "seniority_score": 60,
+  "skills": [{"name":"Spring Boot","parent":"Java Ecosystem"}, {"name":"AWS","parent":"Cloud"}],
+  "skill_tree": {"Java Ecosystem":["Spring Boot","Maven"], "Cloud":["AWS","OpenShift"]},
+  "industries": ["fintech","enterprise"],
+  "city": "Córdoba",
+  "seniority_score": 65,
   "relevance_score": 85
-}`;
+}
+
+Rules:
+- skills: 5-10 REAL technical/professional skills. NO names, NO Spanish UI text, NO "Mostrar todo", "Validar", "Recibidas" etc.
+- Each skill MUST have a parent category (e.g. "Programming Languages", "Cloud", "Architecture", "Databases", "Frameworks", "DevOps", "Management", "HR", "Data")
+- skill_tree: hierarchy map of parent→[children]
+- Extract skills from BOTH the headline AND the raw skills field
+- If the person is non-technical (HR, sales), use professional skills like "Talent Acquisition", "Recruiting", "Executive Search" with parents like "HR", "Sales"
+- seniority_score: junior=15, mid=35, senior=60, staff=75, principal=85, lead=70, manager=80, director=90, vp=95, cto=100`;
 
 function buildPrompt(record) {
   return PROMPT_TEMPLATE
@@ -162,7 +171,12 @@ function parseLabels(text) {
     if (!values.includes(labels[key])) labels[key] = values.at(-1); // default to last
   }
 
-  labels.tech_stack = Array.isArray(labels.tech_stack) ? labels.tech_stack : [];
+  // Skills: array of {name, parent}
+  labels.skills = Array.isArray(labels.skills) ? labels.skills.filter(s => s.name && s.parent) : [];
+  // Flatten to tech_stack for backward compat
+  labels.tech_stack = labels.skills.map(s => s.name);
+  // Skill tree: {parent: [children]}
+  labels.skill_tree = typeof labels.skill_tree === 'object' && !Array.isArray(labels.skill_tree) ? labels.skill_tree : {};
   labels.industries = Array.isArray(labels.industries) ? labels.industries : [];
   labels.city = typeof labels.city === 'string' ? labels.city : '';
   labels.seniority_score = Math.max(0, Math.min(100, parseInt(labels.seniority_score) || 50));
@@ -190,7 +204,7 @@ export async function labelRecords(dbPath, modelName = DEFAULT_MODEL, options = 
   const db = new SQL.Database(readFileSync(dbPath));
 
   // Add label columns if they don't exist
-  const labelCols = ['_labeled', 'domain', 'seniority_level', 'role_type', 'remote_status', 'tech_stack', 'industries', 'city', 'seniority_score', 'relevance_score'];
+  const labelCols = ['_labeled', 'domain', 'seniority_level', 'role_type', 'remote_status', 'tech_stack', 'skill_tree', 'industries', 'city', 'seniority_score', 'relevance_score'];
   for (const col of labelCols) {
     try { db.run(`ALTER TABLE records ADD COLUMN "${col}" TEXT`); } catch {} // ignore if exists
   }
@@ -223,15 +237,20 @@ export async function labelRecords(dbPath, modelName = DEFAULT_MODEL, options = 
 
       const labels = parseLabels(response);
 
+      // Overwrite the messy 'skills' column with clean tech_stack names
+      const cleanSkills = labels.tech_stack.join(', ');
+
       db.run(`UPDATE records SET
         _labeled = 1,
+        skills = ?,
         domain = ?, seniority_level = ?, role_type = ?, remote_status = ?,
-        tech_stack = ?, industries = ?, city = ?,
+        tech_stack = ?, skill_tree = ?, industries = ?, city = ?,
         seniority_score = ?, relevance_score = ?
         WHERE _id = ?`,
         [
+          cleanSkills,
           labels.domain, labels.seniority_level, labels.role_type, labels.remote_status,
-          JSON.stringify(labels.tech_stack), JSON.stringify(labels.industries), labels.city,
+          JSON.stringify(labels.skills), JSON.stringify(labels.skill_tree), JSON.stringify(labels.industries), labels.city,
           labels.seniority_score, labels.relevance_score,
           id,
         ]);
