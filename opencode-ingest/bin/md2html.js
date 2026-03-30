@@ -1038,14 +1038,18 @@ const CSS_LAYOUTS = `
   .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
   .facet-tag-sub.active { background: #2c5070; }
-  .stree-row { margin-bottom: 0.5rem; }
-  .stree-parent { display: inline-block; }
-  .stree-children { display: none; margin-top: 0.3rem; margin-left: 0.5rem; padding-left: 0.8rem; border-left: 2px solid #e0d8cf; }
-  .stree-children[style*="block"], .stree-children[style*="flex"] { display: block !important; }
-  .stree-mid { margin-bottom: 0.4rem; }
-  .stree-leaves { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.2rem; margin-left: 1rem; }
+  .facet-tags { flex-direction: column !important; }
+  .stree-row { margin-bottom: 0.15rem; }
+  .stree-parent { display: block; }
+  .stree-parent .facet-tag-parent { display: flex; align-items: center; gap: 0.3rem; width: 100%; text-align: left; justify-content: space-between; padding: 0.35rem 0.7rem; }
+  .stree-parent .facet-tag-parent::after { content: '▸'; font-size: 0.7rem; opacity: 0.5; transition: transform 0.15s; }
+  .stree-parent .facet-tag-parent.expanded::after { transform: rotate(90deg); }
+  .stree-children { display: none; margin: 0.2rem 0 0.3rem 0; padding-left: 1rem; border-left: 2px solid #d4cdc4; }
+  .stree-mid { margin-bottom: 0.3rem; }
+  .stree-mid .facet-tag-sub { display: inline-flex; align-items: center; gap: 0.2rem; }
+  .stree-leaves { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.15rem; margin-left: 0.8rem; }
   @media (max-width: 640px) {
-    .stree-children { margin-left: 0.2rem; padding-left: 0.4rem; }
+    .stree-children { padding-left: 0.5rem; }
     .stree-leaves { margin-left: 0.3rem; }
   }
   .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
