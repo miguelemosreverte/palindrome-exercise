@@ -1,5 +1,7 @@
 import { marked } from 'marked';
 import { readFileSync, writeFileSync } from 'fs';
+import { renderMapContainer, renderMapScript, MAP_CDN, MAP_CSS } from './map.js';
+import { getKnownGeocode } from './geocode.js';
 
 /**
  * Universal Markdown → HTML converter with:
@@ -52,7 +54,8 @@ export function md2html(inputPath, outputPath) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <style>${CSS_BASE}${CSS_LAYOUTS}</style>
+  ${layout === 'graph' ? MAP_CDN : ''}
+  <style>${CSS_BASE}${CSS_LAYOUTS}${layout === 'graph' ? MAP_CSS : ''}</style>
 </head>
 <body>
   <div class="page">
@@ -436,6 +439,8 @@ function buildGraph(records, columns, showcaseResults) {
       <div class="chart-card" id="skills-chart"></div>
     </div>
 
+    ${renderMapContainer()}
+
     <div class="query-section">
       <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
         <button id="query-export" class="query-btn-export" title="Export CSV">Export CSV</button>
@@ -450,7 +455,9 @@ function buildGraph(records, columns, showcaseResults) {
 function buildDataScript(layout, data) {
   if (layout !== 'graph') return '';
   // Client-side table engine with sort, paginate, query showcase
-  return TABLE_ENGINE_JS;
+  const geocodeTable = getKnownGeocode();
+  const mapScript = renderMapScript(geocodeTable);
+  return TABLE_ENGINE_JS + '\n' + mapScript;
 }
 
 const TABLE_ENGINE_JS = `
@@ -642,6 +649,7 @@ const TABLE_ENGINE_JS = `
     renderActiveFilters();
     updateTreeCounts(filtered);
     renderCharts(filtered);
+    if (window.__updateMap) window.__updateMap(filtered);
   }
 
   const BAR_COLOR = '#93b5cf';
