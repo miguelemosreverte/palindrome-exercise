@@ -630,25 +630,16 @@ const TABLE_ENGINE_JS = `
       }
     }
 
-    // ── Seniority: vertical bell curve, fixed x-axis left=junior right=cto ──
-    const SEN_BUCKETS = ['junior', 'mid', 'senior', 'staff', 'lead', 'manager', 'director', 'vp', 'cto'];
+    // ── Seniority: horizontal bars, ordered junior→cto, only show non-zero ──
+    const SEN_BUCKETS = ['Junior', 'Mid', 'Senior', 'Staff', 'Lead', 'Manager', 'Director', 'VP', 'CTO'];
+    const SEN_MAP = { junior: 'Junior', mid: 'Mid', senior: 'Senior', staff: 'Staff', lead: 'Lead', manager: 'Manager', director: 'Director', vp: 'VP', cto: 'CTO' };
     const senCounts = {};
     SEN_BUCKETS.forEach(s => senCounts[s] = 0);
-    filtered.forEach(r => { const s = r.seniority_level; if (s && senCounts.hasOwnProperty(s)) senCounts[s]++; });
+    filtered.forEach(r => { const mapped = SEN_MAP[r.seniority_level]; if (mapped) senCounts[mapped]++; });
     const senEl = document.getElementById('seniority-chart');
     if (senEl) {
-      const max = Math.max(...Object.values(senCounts), 1);
-      const bars = SEN_BUCKETS.map(label => {
-        const value = senCounts[label];
-        const pct = Math.round(value / max * 100);
-        return '<div class="vbar-col">' +
-          '<div class="vbar-value">' + (value || '') + '</div>' +
-          '<div class="vbar-track"><div class="vbar-fill" style="height:' + pct + '%;background:' + BAR_COLOR + '"></div></div>' +
-          '<div class="vbar-label">' + label.substring(0, 3) + '</div>' +
-          '</div>';
-      }).join('');
-      senEl.innerHTML = '<h4 class="chart-title">Seniority</h4><div class="vbar-chart">' + bars + '</div>' +
-        '<div class="vbar-axis"><span>← junior</span><span>senior →</span></div>';
+      const items = SEN_BUCKETS.map(label => [label, senCounts[label]]).filter(([, v]) => v > 0);
+      senEl.innerHTML = '<h4 class="chart-title">Seniority</h4>' + renderHBars(items);
     }
 
     // ── Skills cloud ──
@@ -1315,15 +1306,6 @@ const CSS_LAYOUTS = `
   .hbar-track { flex: 1; height: 16px; background: #f0ebe4; border-radius: 3px; overflow: hidden; }
   .hbar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; min-width: 2px; }
   .hbar-count { font-size: 0.7rem; color: #999; width: 24px; text-align: right; flex-shrink: 0; }
-  /* Vertical bar chart (seniority bell curve) */
-  .vbar-chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; padding: 0 0.2rem; }
-  .vbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-  .vbar-value { font-size: 0.6rem; color: #999; height: 14px; }
-  .vbar-track { width: 100%; height: 60px; display: flex; align-items: flex-end; }
-  .vbar-fill { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.4s ease; min-height: 1px; }
-  .vbar-label { font-size: 0.6rem; color: #888; margin-top: 2px; }
-  .vbar-axis { display: flex; justify-content: space-between; font-size: 0.6rem; color: #bbb; margin-top: 2px; padding: 0 0.2rem; }
-
   .cloud-tags { line-height: 2; text-align: center; }
   .cloud-tag { display: inline-block; padding: 0.1rem 0.4rem; margin: 0.1rem; background: #f0ebe4; border-radius: 3px; color: #2c3e50; cursor: default; transition: opacity 0.3s; }
   .cloud-tag:hover { opacity: 1 !important; background: #e0d8cf; }
