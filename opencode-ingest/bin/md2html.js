@@ -351,16 +351,29 @@ function buildGraph(records, columns, showcaseResults) {
 
   const tableData = JSON.stringify({ allRecords: records, columns });
 
+  // Embed controls schema for NL→Controls
+  const controlsSchema = JSON.stringify({
+    domains: Object.keys(facets.domain),
+    seniority_levels: Object.keys(facets.seniority_level),
+    cities: Object.keys(facets.city),
+    skill_categories: [...new Set(Object.entries(nestedTree).filter(([k]) => !k.startsWith('_')).map(([k]) => k))],
+  });
+
   return `<section class="layout-section">
     ${stats}
 
     ${isLabeled ? `<div class="facets">
+      <div class="nl-bar">
+        <input id="nl-input" class="nl-input" placeholder="Describe who you're looking for... (e.g. senior java devs in córdoba)" autocomplete="off">
+        <span id="nl-status" class="nl-status"></span>
+      </div>
       <div class="facet-row">
         ${dropdown('domain', 'Domains', facets.domain)}
         ${dropdown('seniority_level', 'Seniority', facets.seniority_level)}
         ${dropdown('city', 'Cities', facets.city)}
         <button id="facet-clear" class="facet-clear">Clear all</button>
       </div>
+    <script id="controls-schema" type="application/json">${controlsSchema}</script>
       <div class="facet-row">
         <label class="slider-label">Seniority Score: <span id="slider-val">0</span>+</label>
         <input type="range" id="facet-seniority-score" class="facet-slider" min="0" max="100" value="0">
@@ -730,6 +743,88 @@ const TABLE_ENGINE_JS = `
   });
 
 
+  // ─── NL→Controls Input ───
+  const nlInput = document.getElementById('nl-input');
+  const nlStatus = document.getElementById('nl-status');
+  const TASK = document.querySelector('meta[name=task]')?.content || 'ar-senior-devs-linkedin';
+
+  nlInput?.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter' || !nlInput.value.trim()) return;
+    const query = nlInput.value.trim();
+    nlStatus.textContent = 'Thinking...';
+    nlStatus.className = 'nl-status loading';
+
+    try {
+      const res = await fetch('http://localhost:3456/api/nl-controls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: TASK, query }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const c = data.controls;
+      nlStatus.textContent = data.model + ' · ' + data.elapsed + 'ms';
+      nlStatus.className = 'nl-status';
+
+      // Clear existing filters first
+      document.getElementById('facet-clear')?.click();
+
+      // Apply controls to UI
+
+      // 1. Dropdowns
+      if (c.domain) {
+        const sel = document.querySelector('.facet-select[data-facet="domain"]');
+        if (sel) { sel.value = c.domain; sel.dispatchEvent(new Event('change')); }
+      }
+      if (c.seniority_level) {
+        const sel = document.querySelector('.facet-select[data-facet="seniority_level"]');
+        if (sel) { sel.value = c.seniority_level; sel.dispatchEvent(new Event('change')); }
+      }
+      if (c.city) {
+        const sel = document.querySelector('.facet-select[data-facet="city"]');
+        if (sel) { sel.value = c.city; sel.dispatchEvent(new Event('change')); }
+      }
+
+      // 2. Skill categories (click parent pills)
+      if (c.skill_categories) {
+        for (const cat of c.skill_categories) {
+          const btn = document.querySelector('.facet-tag-parent[data-group="' + cat + '"]');
+          if (btn && !btn.classList.contains('active')) btn.click();
+        }
+      }
+
+      // 3. Skill subcategories (click sub pills — need parent expanded first)
+      if (c.skill_subcategories) {
+        // Wait a tick for parents to expand
+        await new Promise(r => setTimeout(r, 100));
+        for (const sub of c.skill_subcategories) {
+          const btn = document.querySelector('.facet-tag-sub[data-group="' + sub + '"]');
+          if (btn && !btn.classList.contains('active')) btn.click();
+        }
+      }
+
+      // 4. Specific skills (click leaf tags)
+      if (c.skills) {
+        await new Promise(r => setTimeout(r, 100));
+        for (const skill of c.skills) {
+          const btn = document.querySelector('.facet-tag-child[data-value="' + skill + '"]');
+          if (btn && !btn.classList.contains('active')) btn.click();
+        }
+      }
+
+      // 5. Seniority slider
+      if (c.seniority_min) {
+        const slider = document.getElementById('facet-seniority-score');
+        if (slider) { slider.value = c.seniority_min; slider.dispatchEvent(new Event('input')); }
+      }
+
+    } catch (err) {
+      nlStatus.textContent = err.message.includes('fetch') ? 'Start server: node bin/serve.js' : err.message;
+      nlStatus.className = 'nl-status error';
+    }
+  });
+
   // Initial render — show all
   render();
 })();
@@ -1090,6 +1185,14 @@ const CSS_LAYOUTS = `
   .facet-tag-sub { background: #5a7d9a; color: #fff; border-color: #5a7d9a; font-weight: 500; font-size: 0.72rem; }
   .facet-tag-sub:hover { background: #4a6d8a; }
   .facet-tag-sub.active { background: #2c5070; }
+  .nl-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+  .nl-input { flex: 1; padding: 0.55rem 0.8rem; border: 2px solid #d4cdc4; border-radius: 8px; font-size: 0.9rem; outline: none; transition: border-color 0.15s; }
+  .nl-input:focus { border-color: #c0392b; }
+  .nl-input::placeholder { color: #aaa; }
+  .nl-status { font-size: 0.75rem; color: #999; white-space: nowrap; }
+  .nl-status.loading { color: #c0392b; }
+  .nl-status.error { color: #e74c3c; }
+
   .facet-tags { flex-direction: column !important; align-items: flex-start !important; }
   .stree-row { margin-bottom: 0.15rem; }
   .stree-parent { display: block; }

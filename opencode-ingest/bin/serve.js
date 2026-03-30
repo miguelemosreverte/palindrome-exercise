@@ -249,6 +249,53 @@ const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
+  // API: NL→Controls (natural language → UI filter states)
+  if (url.pathname === '/api/nl-controls' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { task, query } = JSON.parse(body);
+        if (!task || !query) { res.writeHead(400); res.end(JSON.stringify({ error: 'task + query required' })); return; }
+
+        const { loadControls, translateQuery, validateAndFix } = await import('./nl-to-controls.js');
+        const controls = await loadControls(task);
+
+        // Try models in order: gemini (fastest) → chutes → opencode (free fallback)
+        let geminiKey, chutesKey;
+        try { const env = readFileSync(join(ROOT, '..', '.env'), 'utf8'); geminiKey = env.match(/GEMINI_API_KEY=(.+)/)?.[1]?.trim(); chutesKey = env.match(/CHUTESAI_API_KEY=(.+)/)?.[1]?.trim(); } catch {}
+        geminiKey = geminiKey || process.env.GEMINI_API_KEY;
+        chutesKey = chutesKey || process.env.CHUTESAI_API_KEY;
+
+        const attempts = [];
+        if (geminiKey) attempts.push({ model: 'gemini-flash-lite', apiKey: chutesKey, geminiKey });
+        if (chutesKey) attempts.push({ model: 'mistral-nemo', apiKey: chutesKey });
+        attempts.push({ model: 'oc-nemotron', openCodePort: OC_PORT });
+
+        let result = null, usedModel = null;
+        for (const attempt of attempts) {
+          try {
+            result = await translateQuery(query, controls, attempt);
+            validateAndFix(result, controls);
+            usedModel = attempt.model;
+            break;
+          } catch (err) {
+            console.log(`[nl-controls] ${attempt.model} failed: ${err.message.substring(0, 50)}`);
+          }
+        }
+
+        if (!result) { res.writeHead(500); res.end(JSON.stringify({ error: 'All models failed' })); return; }
+
+        const { _meta, ...controlState } = result;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ controls: controlState, model: usedModel, elapsed: _meta?.elapsedMs }));
+      } catch (err) {
+        res.writeHead(500); res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
   // API: NL→SQL→results
   if (url.pathname === '/api/query' && req.method === 'POST') {
     let body = '';
