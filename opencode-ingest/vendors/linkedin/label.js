@@ -359,10 +359,41 @@ export async function labelRecords(dbPath, options = {}) {
         raw.seniority_level = valid.includes(s) ? s : (s === 'co-founder' ? 'director' : 'senior');
       }
 
-      // Post-process city
+      // Post-process city → hierarchical Country|City
       if (raw.city) {
-        const cityMap = { 'cordoba': 'Córdoba', 'córdoba': 'Córdoba', 'buenos aires': 'Buenos Aires' };
-        raw.city = cityMap[raw.city.toLowerCase()] || raw.city;
+        let city = raw.city.trim();
+        // Normalize known cities to Country|City format
+        const cityNorm = {
+          'córdoba': 'Argentina|Córdoba', 'cordoba': 'Argentina|Córdoba',
+          'buenos aires': 'Argentina|Buenos Aires', 'bsas': 'Argentina|Buenos Aires',
+          'rosario': 'Argentina|Rosario', 'mendoza': 'Argentina|Mendoza',
+          'tucumán': 'Argentina|Tucumán', 'tucuman': 'Argentina|Tucumán',
+          'santa fe': 'Argentina|Santa Fe', 'mar del plata': 'Argentina|Mar del Plata',
+          'argentina': 'Argentina', // country only — no city specified
+          // Brazil
+          'são paulo': 'Brazil|São Paulo', 'sao paulo': 'Brazil|São Paulo',
+          'rio de janeiro': 'Brazil|Rio de Janeiro',
+          // Chile
+          'santiago': 'Chile|Santiago',
+          // Uruguay
+          'montevideo': 'Uruguay|Montevideo',
+          // Colombia
+          'bogotá': 'Colombia|Bogotá', 'bogota': 'Colombia|Bogotá',
+          'medellín': 'Colombia|Medellín', 'medellin': 'Colombia|Medellín',
+        };
+        const lower = city.toLowerCase();
+        // Check direct match
+        if (cityNorm[lower]) {
+          raw.city = cityNorm[lower];
+        } else if (city.includes(',')) {
+          // "Córdoba, Argentina" → take city part
+          const parts = city.split(',').map(s => s.trim());
+          const cityPart = cityNorm[parts[0].toLowerCase()];
+          raw.city = cityPart || ('Argentina|' + parts[0]);
+        } else if (!city.includes('|')) {
+          // Unknown city, assume Argentina
+          raw.city = 'Argentina|' + city;
+        }
       }
 
       const t3 = Date.now();
