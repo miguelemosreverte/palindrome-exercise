@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome — Bridge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+
+<div class="onboarding">
+
+  <!-- Step 1: Welcome -->
+  <div class="step active" id="step-1">
+    <div class="logo-mark">🌉</div>
+    <h1>Bridge</h1>
+    <p class="subtitle">Your personal command center for the internet. Track what matters, discover what's next.</p>
+    <button class="btn btn-primary" onclick="goTo(2)">Let's get started <span style="font-size:1.2em">→</span></button>
+  </div>
+
+  <!-- Step 2: Name & Avatar -->
+  <div class="step" id="step-2">
+    <h2>What should we call you?</h2>
+    <p class="subtitle">Pick a name and an avatar that feels like you.</p>
+    <div class="avatar-picker" id="avatar-picker"></div>
+    <div class="input-group">
+      <input class="input-field" id="name-input" type="text" placeholder="Your name" maxlength="30" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="btn-step2" disabled onclick="goTo(3)">Continue</button>
+  </div>
+
+  <!-- Step 3: Interests -->
+  <div class="step" id="step-3">
+    <h2>What interests you?</h2>
+    <p class="subtitle">Pick one or more. You can always change these later.</p>
+    <div class="catalog-grid" id="catalog"></div>
+    <button class="btn btn-primary" id="btn-step3" disabled onclick="goTo(4)">Continue</button>
+  </div>
+
+  <!-- Step 4: Summary -->
+  <div class="step" id="step-4">
+    <div class="summary-avatar" id="summary-avatar"></div>
+    <h2 id="summary-greeting"></h2>
+    <p class="subtitle">Here's what we've set up for you.</p>
+    <div class="summary-interests" id="summary-interests"></div>
+    <button class="btn btn-primary" onclick="finish()">Go to Dashboard <span style="font-size:1.2em">→</span></button>
+  </div>
+
+</div>
+
+<!-- Progress dots -->
+<div class="progress" id="progress"></div>
+
+<script src="../store/user.js"></script>
+<script>
+(function () {
+  // ── Data ──────────────────────────────────────────────
+  const AVATARS = ['😊','🚀','🎯','🧑‍💻','🐱','🌊','🔥','🎨','🦊','🌿'];
+
+  const EXPERIENCES = [
+    { id: 'marketplace', icon: '🏍️', title: 'Marketplace',  desc: 'Track prices, find deals, compare products' },
+    { id: 'video',       icon: '📺', title: 'Video Feed',   desc: 'Discover tutorials, track channels, never miss a video' },
+    { id: 'talent',      icon: '👔', title: 'Talent Search', desc: 'Find candidates, explore skills, build your network' },
+    { id: 'places',      icon: '🍽️', title: 'Places',        desc: 'Discover restaurants, cafes, and points of interest' },
+    { id: 'travel',      icon: '✈️', title: 'Travel',        desc: 'Track flights, compare hotels, plan trips' },
+  ];
+
+  const TOTAL_STEPS = 4;
+  let currentStep = 1;
+  let selectedAvatar = AVATARS[0];
+  let selectedInterests = new Set();
+
+  // ── Skip if already onboarded ─────────────────────────
+  if (UserStore.isOnboarded()) {
+    document.querySelector('.onboarding').innerHTML =
+      '<div class="step active" style="opacity:1;transform:none"><h2>Welcome back, ' +
+      UserStore.get('name') + '!</h2><p class="subtitle">You\'re all set up.</p>' +
+      '<button class="btn btn-secondary" onclick="UserStore.reset();location.reload()">Reset onboarding</button></div>';
+  }
+
+  // ── Build avatar picker ───────────────────────────────
+  const pickerEl = document.getElementById('avatar-picker');
+  if (pickerEl) {
+    AVATARS.forEach((emoji, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'avatar-option' + (i === 0 ? ' selected' : '');
+      btn.textContent = emoji;
+      btn.setAttribute('aria-label', 'Avatar ' + emoji);
+      btn.onclick = () => {
+        document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedAvatar = emoji;
+      };
+      pickerEl.appendChild(btn);
+    });
+  }
+
+  // ── Build catalog ─────────────────────────────────────
+  const catalogEl = document.getElementById('catalog');
+  if (catalogEl) {
+    EXPERIENCES.forEach(exp => {
+      const card = document.createElement('div');
+      card.className = 'exp-card';
+      card.setAttribute('data-id', exp.id);
+      card.innerHTML =
+        '<span class="icon">' + exp.icon + '</span>' +
+        '<div class="title">' + exp.title + '</div>' +
+        '<div class="desc">' + exp.desc + '</div>' +
+        '<div class="check">✓</div>';
+      card.onclick = () => {
+        card.classList.toggle('selected');
+        if (selectedInterests.has(exp.id)) {
+          selectedInterests.delete(exp.id);
+        } else {
+          selectedInterests.add(exp.id);
+        }
+        document.getElementById('btn-step3').disabled = selectedInterests.size === 0;
+      };
+      catalogEl.appendChild(card);
+    });
+  }
+
+  // ── Name input validation ─────────────────────────────
+  const nameInput = document.getElementById('name-input');
+  const btnStep2 = document.getElementById('btn-step2');
+  if (nameInput && btnStep2) {
+    nameInput.addEventListener('input', () => {
+      btnStep2.disabled = nameInput.value.trim().length === 0;
+    });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && nameInput.value.trim()) goTo(3);
+    });
+  }
+
+  // ── Progress dots ─────────────────────────────────────
+  const progressEl = document.getElementById('progress');
+  function renderProgress() {
+    if (!progressEl) return;
+    progressEl.innerHTML = '';
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === currentStep ? ' active' : '');
+      progressEl.appendChild(dot);
+    }
+  }
+  renderProgress();
+
+  // ── Navigation ────────────────────────────────────────
+  window.goTo = function (step) {
+    const prev = document.getElementById('step-' + currentStep);
+    const next = document.getElementById('step-' + step);
+    if (!prev || !next) return;
+
+    prev.classList.remove('active');
+    prev.classList.add('exiting');
+
+    setTimeout(() => {
+      prev.classList.remove('exiting');
+      prev.style.display = 'none';
+
+      // Populate summary on step 4
+      if (step === 4) buildSummary();
+
+      next.classList.add('active');
+      currentStep = step;
+      renderProgress();
+
+      // Auto-focus name input
+      if (step === 2 && nameInput) {
+        setTimeout(() => nameInput.focus(), 350);
+      }
+    }, 280);
+  };
+
+  function buildSummary() {
+    const name = nameInput ? nameInput.value.trim() : '';
+    document.getElementById('summary-avatar').textContent = selectedAvatar;
+    document.getElementById('summary-greeting').textContent = 'All set, ' + name + '!';
+    const container = document.getElementById('summary-interests');
+    container.innerHTML = '';
+    EXPERIENCES.filter(e => selectedInterests.has(e.id)).forEach(exp => {
+      const tag = document.createElement('span');
+      tag.className = 'interest-tag';
+      tag.textContent = exp.icon + ' ' + exp.title;
+      container.appendChild(tag);
+    });
+  }
+
+  // ── Finish ────────────────────────────────────────────
+  window.finish = function () {
+    const name = nameInput ? nameInput.value.trim() : '';
+    UserStore.completeOnboarding({
+      name: name,
+      avatar: selectedAvatar,
+      interests: Array.from(selectedInterests),
+    });
+    // In a real app, redirect to dashboard. For now, show confirmation.
+    document.querySelector('.onboarding').innerHTML =
+      '<div class="step active" style="opacity:1;transform:none">' +
+      '<div class="summary-avatar" style="margin-bottom:16px">' + selectedAvatar + '</div>' +
+      '<h2>Welcome aboard, ' + name + '!</h2>' +
+      '<p class="subtitle">Your dashboard is ready. This is where the magic happens.</p></div>';
+    document.getElementById('progress').style.display = 'none';
+  };
+})();
+</script>
+
+</body>
+</html>
