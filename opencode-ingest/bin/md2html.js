@@ -277,15 +277,46 @@ function buildGraph(records, columns, showcaseResults) {
       .filter(Boolean)
       .join('');
 
+    // Deduplicate children:
+    // 1. Remove siblings with identical people sets (keep highest count)
+    // 2. Remove children whose people set equals the parent's (not discriminating)
+    // 3. Remove children with count=1 if another sibling covers the same person
+    const childEntries = children.sort((a, b) => (b[1]._count || 0) - (a[1]._count || 0));
+    const parentPeopleKey = [...people].sort().join(',');
+    const seenPeopleSets = new Map();
+    const uniqueChildren = [];
+    for (const [cName, cNode] of childEntries) {
+      const cPeople = cNode._people || new Set();
+      const key = [...cPeople].sort().join(',');
+      // Skip if same people as parent (doesn't discriminate)
+      if (key === parentPeopleKey && depth > 0) continue;
+      // Skip if same people as already-seen sibling
+      if (key && seenPeopleSets.has(key)) continue;
+      if (key) seenPeopleSets.set(key, cName);
+      uniqueChildren.push([cName, cNode]);
+    }
+
+    // If there are many children, hide the ones with only 1 person (noise)
+    // unless they're the only children left
+    if (uniqueChildren.length > 2) {
+      const meaningful = uniqueChildren.filter(([, n]) => (n._people?.size || 0) >= 2);
+      if (meaningful.length >= 2) {
+        uniqueChildren.length = 0;
+        uniqueChildren.push(...meaningful);
+      }
+    }
+
+    const uniqueChildHtml = uniqueChildren
+      .map(([k, v]) => renderTreeNode(k, v, depth + 1))
+      .filter(Boolean)
+      .join('');
+
     if (depth === 0) {
-      // Top-level: always visible as parent pill
-      return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${count}">${escHtml(name)} <small>${count}</small></button>${childHtml ? '<span class="skill-children" style="display:none">' + childHtml + '</span>' : ''}</span>`;
-    } else if (children.length > 0) {
-      // Mid-level with children: acts as sub-parent
-      return `<span class="skill-subgroup"><button class="facet-tag facet-tag-sub" data-group="${escHtml(name)}" data-count="${count}">${escHtml(name)} <small>${count}</small></button>${childHtml ? '<span class="skill-children" style="display:none">' + childHtml + '</span>' : ''}</span>`;
+      return `<span class="skill-group"><button class="facet-tag facet-tag-parent" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>${uniqueChildHtml ? '<span class="skill-children" style="display:none">' + uniqueChildHtml + '</span>' : ''}</span>`;
+    } else if (uniqueChildren.length > 0) {
+      return `<span class="skill-subgroup"><button class="facet-tag facet-tag-sub" data-group="${escHtml(name)}" data-count="${people.size}">${escHtml(name)} <small>${people.size}</small></button>${uniqueChildHtml ? '<span class="skill-children" style="display:none">' + uniqueChildHtml + '</span>' : ''}</span>`;
     } else {
-      // Leaf node
-      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(name)}" data-count="${count}" style="display:none">${escHtml(name)} <small>${count}</small></button>`;
+      return `<button class="facet-tag facet-tag-child" data-facet="tech_stack" data-value="${escHtml(name)}" data-count="${people.size}" style="display:none">${escHtml(name)} <small>${people.size}</small></button>`;
     }
   }
 
