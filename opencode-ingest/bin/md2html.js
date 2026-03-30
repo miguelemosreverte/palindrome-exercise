@@ -288,23 +288,15 @@ function buildGraph(records, columns, showcaseResults) {
     for (const [cName, cNode] of childEntries) {
       const cPeople = cNode._people || new Set();
       const key = [...cPeople].sort().join(',');
-      // Skip if same people as parent (doesn't discriminate)
-      if (key === parentPeopleKey && depth > 0) continue;
+      // Skip if same people as parent AND it's the only child (collapsible)
+      // Keep it if there are other siblings — user needs to see the split
+      if (key === parentPeopleKey && depth > 0 && childEntries.length === 1) continue;
       // Skip if same people as already-seen sibling
       if (key && seenPeopleSets.has(key)) continue;
       if (key) seenPeopleSets.set(key, cName);
       uniqueChildren.push([cName, cNode]);
     }
 
-    // If there are many children, hide the ones with only 1 person (noise)
-    // unless they're the only children left
-    if (uniqueChildren.length > 2) {
-      const meaningful = uniqueChildren.filter(([, n]) => (n._people?.size || 0) >= 2);
-      if (meaningful.length >= 2) {
-        uniqueChildren.length = 0;
-        uniqueChildren.push(...meaningful);
-      }
-    }
 
     const uniqueChildHtml = uniqueChildren
       .map(([k, v]) => renderTreeNode(k, v, depth + 1))
