@@ -917,5 +917,232 @@
     "issues": [],
     "elapsed": 25269,
     "tokens": 0
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "show me senior backend java developers in córdoba",
+    "result": {
+      "seniority_level": "senior",
+      "city": "Córdoba",
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Backend"
+      ],
+      "skills": [
+        "Java"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 823,
+        "tokens": 275,
+        "promptTokens": 245
+      }
+    },
+    "issues": [],
+    "elapsed": 823,
+    "tokens": 275
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "HR people who do recruiting",
+    "result": {
+      "domain": "hr",
+      "skill_categories": [
+        "HR"
+      ],
+      "skill_subcategories": [
+        "Recruiting"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 537,
+        "tokens": 260,
+        "promptTokens": 241
+      }
+    },
+    "issues": [],
+    "elapsed": 537,
+    "tokens": 260
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "find me data scientists",
+    "result": {
+      "domain": "data",
+      "skill_categories": [
+        "Data"
+      ],
+      "skill_subcategories": [
+        "Science"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 738,
+        "tokens": 258,
+        "promptTokens": 240
+      }
+    },
+    "issues": [],
+    "elapsed": 738,
+    "tokens": 258
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "managers in buenos aires",
+    "result": {
+      "domain": "management",
+      "city": "Buenos Aires",
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 515,
+        "tokens": 250,
+        "promptTokens": 240
+      }
+    },
+    "issues": [],
+    "elapsed": 515,
+    "tokens": 250
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "devops engineers with docker experience",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "DevOps"
+      ],
+      "skill_subcategories": [
+        "Containers"
+      ],
+      "skills": [
+        "Docker"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 780,
+        "tokens": 272,
+        "promptTokens": 242
+      }
+    },
+    "issues": [],
+    "elapsed": 780,
+    "tokens": 272
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "senior engineers who know python or go",
+    "result": {
+      "seniority_level": "senior",
+      "domain": "engineering",
+      "skill_categories": [
+        "Engineering",
+        "Languages"
+      ],
+      "skill_subcategories": [
+        "Backend",
+        "Programming"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 567,
+        "tokens": 272,
+        "promptTokens": 243
+      }
+    },
+    "issues": [],
+    "elapsed": 567,
+    "tokens": 272
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "people in consulting",
+    "result": {
+      "domain": "consulting",
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 645,
+        "tokens": 245,
+        "promptTokens": 239
+      }
+    },
+    "issues": [],
+    "elapsed": 645,
+    "tokens": 245
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "frontend developers",
+    "result": {
+      "domain": "engineering",
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Frontend"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 585,
+        "tokens": 256,
+        "promptTokens": 238
+      }
+    },
+    "issues": [],
+    "elapsed": 585,
+    "tokens": 256
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "everyone with machine learning skills",
+    "result": {
+      "skill_categories": [
+        "Data"
+      ],
+      "skill_subcategories": [
+        "Science"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 702,
+        "tokens": 258,
+        "promptTokens": 241
+      }
+    },
+    "issues": [],
+    "elapsed": 702,
+    "tokens": 258
+  },
+  {
+    "model": "gemini-flash-lite",
+    "query": "show architects and leads",
+    "result": {
+      "skill_categories": [
+        "Engineering"
+      ],
+      "skill_subcategories": [
+        "Architecture"
+      ],
+      "_meta": {
+        "model": "gemini-flash-lite",
+        "provider": "gemini",
+        "elapsedMs": 565,
+        "tokens": 257,
+        "promptTokens": 240
+      }
+    },
+    "issues": [],
+    "elapsed": 565,
+    "tokens": 257
   }
 ]

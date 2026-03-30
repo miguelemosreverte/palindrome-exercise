@@ -130,13 +130,38 @@ export async function translateQuery(query, controls, options = {}) {
     'oc-minimax': 'opencode/minimax-m2.5-free',
   };
 
+  const GEMINI_MODELS = {
+    'gemini-flash-lite': 'gemini-2.5-flash-lite',
+    'gemini-flash': 'gemini-2.5-flash',
+  };
+
   const isOpenCode = model.startsWith('oc-');
+  const isGemini = model.startsWith('gemini-');
   const prompt = buildPrompt(query, controls);
   const start = Date.now();
 
   let text, tokens = 0, promptTokens = 0;
 
-  if (isOpenCode) {
+  if (isGemini) {
+    // ── Google Gemini API ──
+    const geminiKey = options.geminiKey || process.env.GEMINI_API_KEY;
+    if (!geminiKey) throw new Error('GEMINI_API_KEY required');
+    const modelId = GEMINI_MODELS[model] || model.replace('gemini-', 'gemini-');
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 300, temperature: 0.1 },
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    tokens = data.usageMetadata?.totalTokenCount || 0;
+    promptTokens = data.usageMetadata?.promptTokenCount || 0;
+  } else if (isOpenCode) {
     // ── OpenCode API ──
     const OC = `http://127.0.0.1:${openCodePort}`;
     const session = await fetch(OC + '/session', {
@@ -194,7 +219,7 @@ export async function translateQuery(query, controls, options = {}) {
   const result = JSON.parse(match[0]);
   result._meta = {
     model,
-    provider: isOpenCode ? 'opencode' : 'chutes',
+    provider: isGemini ? 'gemini' : isOpenCode ? 'opencode' : 'chutes',
     elapsedMs: elapsed,
     tokens,
     promptTokens,
@@ -288,11 +313,51 @@ if (process.argv[1]?.endsWith('nl-to-controls.js')) {
     try { await fetch(`http://127.0.0.1:9001/`); ocAvailable = true; } catch {}
 
     const models = ['gemma-4b', 'mistral-nemo'];
-    if (ocAvailable) models.push('oc-bigpickle', 'oc-nemotron');
-    else console.log('  (OpenCode not running — skipping oc-* models. Start with: opencode serve --port=9001)\n');
-    const results = [];
 
-    for (const m of models) {
+    // Add Gemini if key available
+    let geminiKey;
+    try { geminiKey = process.env.GEMINI_API_KEY || readFileSync(join(ROOT, '..', '.env'), 'utf8').match(/GEMINI_API_KEY=(.+)/)?.[1]?.trim(); } catch {}
+    if (geminiKey) models.push('gemini-flash-lite');
+    else console.log('  (No GEMINI_API_KEY — skipping Gemini models)\n');
+
+    if (ocAvailable) models.push('oc-bigpickle', 'oc-nemotron');
+    else console.log('  (OpenCode not running — skipping oc-* models)\n');
+    const rebuild = process.argv.includes('--rebuild');
+    const specifiedModels = process.argv.filter(a => a.startsWith('--model=')).map(a => a.split('=')[1]);
+
+    // Load existing results
+    const benchPath = join(ROOT, 'tests', 'nl-controls-benchmark.json');
+    let existingResults = [];
+    try { existingResults = JSON.parse(readFileSync(benchPath, 'utf8')); } catch {}
+
+    // Only run models that are missing (or specified, or --rebuild)
+    const modelsToRun = specifiedModels.length ? specifiedModels :
+      rebuild ? models :
+      models.filter(m => !existingResults.some(r => r.model === m));
+
+    if (!modelsToRun.length) {
+      console.log('  All models already benchmarked. Use --rebuild to re-run all.');
+      const results = existingResults;
+      // Print summary from cache
+      const modelSet = [...new Set(results.map(r => r.model))];
+      console.log('\n  ╔══════════════════════════════════════╗');
+      console.log('  ║     NL→Controls Benchmark Summary     ║');
+      console.log('  ╚══════════════════════════════════════╝');
+      for (const m of modelSet) {
+        const mr = results.filter(r => r.model === m);
+        const passed = mr.filter(r => !r.error && (!r.issues || r.issues.length === 0 || r.issues.every(i => i.startsWith('unknown')))).length;
+        const avgMs = Math.round(mr.reduce((s, r) => s + (r.elapsed || 0), 0) / mr.length);
+        console.log(`  ${m.padEnd(22)} ${passed}/${mr.length} valid  avg ${avgMs}ms`);
+      }
+      process.exit(0);
+    }
+
+    console.log(`  Running: ${modelsToRun.join(', ')}${rebuild ? ' (rebuild)' : ' (new only)'}`);
+
+    // Keep results from models we're NOT re-running
+    const results = rebuild ? [] : existingResults.filter(r => !modelsToRun.includes(r.model));
+
+    for (const m of modelsToRun) {
       console.log(`\n  ── ${m} ──`);
       for (const q of testQueries) {
         try {
@@ -310,7 +375,6 @@ if (process.argv[1]?.endsWith('nl-to-controls.js')) {
     }
 
     // Save benchmark results
-    const benchPath = join(ROOT, 'tests', 'nl-controls-benchmark.json');
     writeFileSync(benchPath, JSON.stringify(results, null, 2));
     console.log(`\nBenchmark saved: ${benchPath}`);
 
