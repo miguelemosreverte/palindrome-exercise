@@ -432,12 +432,14 @@ export async function labelRecords(dbPath, options = {}) {
           const a = leaves[i], b = leaves[j];
           const al = a.toLowerCase(), bl = b.toLowerCase();
           if (al === bl && a !== b) { synonyms[b] = a; } // case diff
-          else if (al.replace(/[^a-z]/g, '') === bl.replace(/[^a-z]/g, '')) { synonyms[leafCounts[a] < leafCounts[b] ? a : b] = leafCounts[a] >= leafCounts[b] ? a : b; }
+          else if (al.replace(/[^a-z]/g, '') === bl.replace(/[^a-z]/g, '') && !notSynonyms.has(a) && !notSynonyms.has(b)) { synonyms[leafCounts[a] < leafCounts[b] ? a : b] = leafCounts[a] >= leafCounts[b] ? a : b; }
           else if (al === bl + 's' || bl === al + 's') { synonyms[a.length > b.length ? a : b] = a.length <= b.length ? a : b; } // plural
         }
       }
       // Known synonyms
-      const knownSynonyms = { 'Golang': 'Go', 'Spring Framework': 'Spring Boot', 'Problem-Solving': 'Problem Solving', 'Problem-solving': 'Problem Solving', 'Code Reviews': 'Code Review' };
+      const knownSynonyms = { 'Golang': 'Go', 'Spring Framework': 'Spring Boot', 'Problem-Solving': 'Problem Solving', 'Problem-solving': 'Problem Solving', 'Code Reviews': 'Code Review', 'Agile methodologies': 'Agile Methodologies', 'REST': 'REST APIs' };
+      // Protect known distinct pairs
+      const notSynonyms = new Set(['C++', 'C#']); // these are different despite fuzzy match
       Object.assign(synonyms, knownSynonyms);
 
       if (Object.keys(synonyms).length) {
