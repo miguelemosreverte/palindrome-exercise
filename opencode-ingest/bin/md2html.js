@@ -52,7 +52,6 @@ export function md2html(inputPath, outputPath) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/sql-wasm.min.js"></script>
   <style>${CSS_BASE}${CSS_LAYOUTS}</style>
 </head>
 <body>
@@ -202,65 +201,75 @@ function buildFeed(records, columns) {
 }
 
 function buildGraph(records, columns, showcaseResults) {
-  const nameCol = columns.find(c => /^name$/i.test(c)) || columns[0];
-  const companyCol = columns.find(c => /company|org/i.test(c));
-  const seniorityCol = columns.find(c => /seniority|level/i.test(c));
-  const skillsCol = columns.find(c => /skills|tech/i.test(c));
+  // Collect facet values from labeled data
+  const facets = {
+    domain: {}, seniority_level: {}, role_type: {}, city: {},
+  };
+  const allTechStack = {};
+  const allIndustries = {};
 
-  // Stats
-  const companies = {};
-  const seniorities = {};
-  const allSkills = {};
   records.forEach(r => {
-    const co = r[companyCol] || '';
-    if (co && co.length > 1) companies[co] = (companies[co] || 0) + 1;
-    const sen = r[seniorityCol] || 'senior';
-    seniorities[sen] = (seniorities[sen] || 0) + 1;
-    (r[skillsCol] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
-      allSkills[s] = (allSkills[s] || 0) + 1;
-    });
+    for (const f of Object.keys(facets)) {
+      const v = r[f];
+      if (v && v.length > 0) facets[f][v] = (facets[f][v] || 0) + 1;
+    }
+    try { JSON.parse(r.tech_stack || '[]').forEach(t => { allTechStack[t] = (allTechStack[t] || 0) + 1; }); } catch {}
+    try { JSON.parse(r.industries || '[]').forEach(t => { allIndustries[t] = (allIndustries[t] || 0) + 1; }); } catch {}
   });
 
-  const statCards = `<div class="stat-cards">
+  const isLabeled = records.some(r => r.domain);
+
+  // Stat cards
+  const stats = `<div class="stat-cards">
     <div class="stat-card"><div class="stat-number">${records.length}</div><div class="stat-label">Professionals</div></div>
-    <div class="stat-card"><div class="stat-number">${Object.keys(companies).length}</div><div class="stat-label">Companies</div></div>
-    <div class="stat-card"><div class="stat-number">${Object.keys(allSkills).length}</div><div class="stat-label">Unique Skills</div></div>
+    <div class="stat-card"><div class="stat-number">${Object.keys(facets.city).length}</div><div class="stat-label">Cities</div></div>
+    <div class="stat-card"><div class="stat-number">${Object.keys(allTechStack).length}</div><div class="stat-label">Technologies</div></div>
   </div>`;
 
-  // Seniority pills
-  const senPills = Object.entries(seniorities).sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => `<span class="tag tag-sen">${escHtml(name)} (${count})</span>`).join(' ');
+  // Build facet dropdowns
+  const dropdown = (id, label, values) => {
+    const opts = Object.entries(values).sort((a,b) => b[1]-a[1])
+      .map(([v, c]) => `<option value="${escHtml(v)}">${escHtml(v)} (${c})</option>`).join('');
+    return `<select class="facet-select" data-facet="${id}"><option value="">All ${label}</option>${opts}</select>`;
+  };
 
-  // Showcase query dropdown options
-  const showcaseOptions = (showcaseResults || [])
-    .map(q => `<option value="${escHtml(q.id)}">${escHtml(q.label)} (${q.rows?.length || 0})</option>`)
-    .join('');
+  // Build tag pills (top 20 tech stack)
+  const topTech = Object.entries(allTechStack).sort((a,b) => b[1]-a[1]).slice(0, 25);
+  const techPills = topTech.map(([t, c]) =>
+    `<button class="facet-tag" data-facet="tech_stack" data-value="${escHtml(t)}">${escHtml(t)} <small>${c}</small></button>`
+  ).join('');
 
-  // Embed ALL data + showcase results as JSON for the client-side table engine
-  const tableData = JSON.stringify({
-    allRecords: records,
-    columns,
-    showcase: (showcaseResults || []).map(q => ({ id: q.id, label: q.label, sql: q.sql, columns: q.columns, rows: q.rows })),
-  });
+  const topIndustries = Object.entries(allIndustries).sort((a,b) => b[1]-a[1]).slice(0, 15);
+  const industryPills = topIndustries.map(([t, c]) =>
+    `<button class="facet-tag" data-facet="industries" data-value="${escHtml(t)}">${escHtml(t)} <small>${c}</small></button>`
+  ).join('');
+
+  const tableData = JSON.stringify({ allRecords: records, columns });
 
   return `<section class="layout-section">
-    ${statCards}
-    <div class="seniority-row"><strong>Seniority:</strong> ${senPills}</div>
+    ${stats}
+
+    ${isLabeled ? `<div class="facets">
+      <div class="facet-row">
+        ${dropdown('domain', 'Domains', facets.domain)}
+        ${dropdown('seniority_level', 'Seniority', facets.seniority_level)}
+        ${dropdown('role_type', 'Role Type', facets.role_type)}
+        ${dropdown('city', 'Cities', facets.city)}
+        <button id="facet-clear" class="facet-clear">Clear all</button>
+      </div>
+      <div class="facet-row">
+        <label class="slider-label">Seniority Score: <span id="slider-val">0</span>+</label>
+        <input type="range" id="facet-seniority-score" class="facet-slider" min="0" max="100" value="0">
+      </div>
+      ${techPills ? `<div class="facet-tags"><span class="facet-tags-label">Stack:</span> ${techPills}</div>` : ''}
+      ${industryPills ? `<div class="facet-tags"><span class="facet-tags-label">Industry:</span> ${industryPills}</div>` : ''}
+      <div id="active-filters" class="active-filters"></div>
+    </div>` : '<p style="color:#999;font-size:0.85rem">Run <code>node bin/label.js ar-senior-devs-linkedin</code> to enable faceted filters</p>'}
 
     <div class="query-section">
-      <div class="query-bar">
-        <div class="query-input-row">
-          <select id="query-showcase" class="query-select">
-            <option value="">Select a query...</option>
-            ${showcaseOptions}
-            <option value="__all">Show all records</option>
-          </select>
-          <input id="query-input" class="query-input" placeholder="Type a question (e.g. 'Show people with React skills')">
-          <button id="query-export" class="query-btn-export" title="Export CSV">CSV</button>
-        </div>
-        <div id="query-sql" class="query-sql"></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
+        <button id="query-export" class="query-btn-export" title="Export CSV">Export CSV</button>
       </div>
-
       <div id="query-table" class="query-table"></div>
       <div id="query-pagination" class="query-pagination"></div>
     </div>
@@ -369,32 +378,116 @@ const TABLE_ENGINE_JS = `
     document.getElementById('pag-size')?.addEventListener('change', (e) => { perPage = parseInt(e.target.value); page = 0; render(); });
   }
 
-  // Showcase query handler
-  selectEl?.addEventListener('change', (e) => {
-    const id = e.target.value;
-    if (id === '__all' || !id) {
-      currentRows = DATA.allRecords;
-      currentCols = DATA.columns.filter(c => !c.startsWith('_') && c !== 'source');
-      currentLabel = 'All records';
-      sqlEl.textContent = '';
-      page = 0; sortCol = null;
-      render();
-      return;
+  // ─── Faceted Filtering ───
+
+  const activeFilters = {};  // { facetName: value | Set }
+
+  function applyFilters() {
+    let filtered = DATA.allRecords;
+
+    for (const [facet, value] of Object.entries(activeFilters)) {
+      if (!value || (value instanceof Set && value.size === 0)) continue;
+
+      if (facet === 'seniority_score_min') {
+        filtered = filtered.filter(r => parseInt(r.seniority_score) >= value);
+      } else if (facet === 'tech_stack' || facet === 'industries') {
+        // Multi-select: record must have ALL selected tags
+        const tags = value; // Set
+        filtered = filtered.filter(r => {
+          try {
+            const arr = JSON.parse(r[facet] || '[]').map(s => s.toLowerCase());
+            return [...tags].every(t => arr.some(a => a.includes(t.toLowerCase())));
+          } catch { return false; }
+        });
+      } else {
+        // Enum: exact match
+        filtered = filtered.filter(r => r[facet] === value);
+      }
     }
-    const q = DATA.showcase?.find(s => s.id === id);
-    if (!q) return;
-    currentLabel = q.label;
-    sqlEl.textContent = q.sql;
-    if (q.columns?.length && q.rows?.length) {
-      currentCols = q.columns;
-      currentRows = q.rows.map(row => Object.fromEntries(q.columns.map((c, i) => [c, row[i]])));
-    } else {
-      currentRows = [];
-      currentCols = DATA.columns.filter(c => !c.startsWith('_') && c !== 'source');
-    }
-    page = 0; sortCol = null;
+
+    currentRows = filtered;
+    currentLabel = Object.entries(activeFilters)
+      .filter(([,v]) => v && (!(v instanceof Set) || v.size > 0))
+      .map(([k,v]) => v instanceof Set ? [...v].join('+') : v)
+      .join(', ') || 'All records';
+    page = 0;
     render();
+    renderActiveFilters();
+  }
+
+  // Dropdown facets
+  document.querySelectorAll('.facet-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const facet = sel.dataset.facet;
+      activeFilters[facet] = sel.value || undefined;
+      if (!sel.value) delete activeFilters[facet];
+      applyFilters();
+    });
   });
+
+  // Tag pills (toggle)
+  document.querySelectorAll('.facet-tag').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const facet = btn.dataset.facet;
+      const value = btn.dataset.value;
+      if (!activeFilters[facet]) activeFilters[facet] = new Set();
+      if (activeFilters[facet].has(value)) {
+        activeFilters[facet].delete(value);
+        btn.classList.remove('active');
+      } else {
+        activeFilters[facet].add(value);
+        btn.classList.add('active');
+      }
+      applyFilters();
+    });
+  });
+
+  // Seniority slider
+  const slider = document.getElementById('facet-seniority-score');
+  const sliderVal = document.getElementById('slider-val');
+  slider?.addEventListener('input', () => {
+    const v = parseInt(slider.value);
+    sliderVal.textContent = v;
+    if (v > 0) activeFilters.seniority_score_min = v;
+    else delete activeFilters.seniority_score_min;
+    applyFilters();
+  });
+
+  // Clear all
+  document.getElementById('facet-clear')?.addEventListener('click', () => {
+    for (const key of Object.keys(activeFilters)) delete activeFilters[key];
+    document.querySelectorAll('.facet-select').forEach(s => s.value = '');
+    document.querySelectorAll('.facet-tag.active').forEach(b => b.classList.remove('active'));
+    if (slider) { slider.value = 0; sliderVal.textContent = '0'; }
+    applyFilters();
+  });
+
+  // Render active filter chips
+  function renderActiveFilters() {
+    const el = document.getElementById('active-filters');
+    if (!el) return;
+    const chips = [];
+    for (const [k, v] of Object.entries(activeFilters)) {
+      if (!v || (v instanceof Set && v.size === 0)) continue;
+      if (v instanceof Set) {
+        for (const t of v) chips.push('<span class="filter-chip">' + k + ': ' + t + ' <button data-facet="' + k + '" data-value="' + t + '">×</button></span>');
+      } else if (k === 'seniority_score_min') {
+        chips.push('<span class="filter-chip">Score ≥ ' + v + ' <button data-facet="__score">×</button></span>');
+      } else {
+        chips.push('<span class="filter-chip">' + k + ': ' + v + ' <button data-facet="' + k + '">×</button></span>');
+      }
+    }
+    el.innerHTML = chips.length ? chips.join('') + ' <span class="filter-count">' + currentRows.length + ' results</span>' : '';
+    el.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const f = btn.dataset.facet;
+        if (f === '__score') { delete activeFilters.seniority_score_min; if (slider) slider.value = 0; if (sliderVal) sliderVal.textContent = '0'; }
+        else if (activeFilters[f] instanceof Set) { activeFilters[f].delete(btn.dataset.value); document.querySelector('.facet-tag[data-value=\"'+btn.dataset.value+'\"]')?.classList.remove('active'); }
+        else { delete activeFilters[f]; document.querySelector('.facet-select[data-facet=\"'+f+'\"]').value = ''; }
+        applyFilters();
+      });
+    });
+  }
 
   // CSV export
   exportBtn?.addEventListener('click', () => {
@@ -404,85 +497,6 @@ const TABLE_ENGINE_JS = `
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();
   });
 
-  // Build in-browser SQLite DB from embedded data
-  let clientDB = null;
-  async function getClientDB() {
-    if (clientDB) return clientDB;
-    if (typeof initSqlJs === 'undefined') return null;
-    const SQL = await initSqlJs({ locateFile: f => 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/' + f });
-    clientDB = new SQL.Database();
-    // Create table from data
-    const cols = DATA.columns;
-    const colDefs = cols.map(c => '"' + c + '" TEXT').join(', ');
-    clientDB.run('CREATE TABLE records (_id INTEGER PRIMARY KEY AUTOINCREMENT, ' + colDefs + ')');
-    const placeholders = cols.map(() => '?').join(',');
-    const stmt = clientDB.prepare('INSERT INTO records (' + cols.map(c => '"' + c + '"').join(',') + ') VALUES (' + placeholders + ')');
-    for (const r of DATA.allRecords) {
-      stmt.run(cols.map(c => r[c] == null ? null : String(r[c])));
-    }
-    stmt.free();
-    return clientDB;
-  }
-
-  // Execute SQL on client-side DB
-  async function execSQL(sql) {
-    const db = await getClientDB();
-    if (!db) return null;
-    const result = db.exec(sql);
-    if (!result.length) return { columns: [], rows: [] };
-    return { columns: result[0].columns, rows: result[0].values };
-  }
-
-  // Live query via API + client-side execution
-  const queryInput = document.getElementById('query-input');
-  queryInput?.addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter' || !queryInput.value.trim()) return;
-    const question = queryInput.value.trim();
-    sqlEl.textContent = 'Translating...';
-
-    try {
-      // Try local server first, then Vercel
-      const TASK = document.querySelector('meta[name=task]')?.content || 'ar-senior-devs-linkedin';
-      const apis = ['http://localhost:3456', 'https://palindrome-exercise.vercel.app'];
-      let data = null;
-
-      for (const api of apis) {
-        try {
-          const endpoint = api.includes('localhost') ? '/api/query' : '/api/bridge/query';
-          const body = api.includes('localhost')
-            ? { task: TASK, question }
-            : { question, schema: DATA.columns.map(c => ({ name: c, type: 'TEXT' })) };
-          const r = await fetch(api + endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
-          data = await r.json();
-          if (data.sql) break;
-        } catch {}
-      }
-
-      if (!data || data.error) { sqlEl.textContent = 'Error: ' + (data?.error || 'No server available. Run: node bin/serve.js'); return; }
-      sqlEl.textContent = data.sql;
-
-      // If server returned rows, use them directly. Otherwise execute client-side.
-      if (data.rows) {
-        currentCols = data.columns;
-        currentRows = data.rows.map(row => Object.fromEntries(data.columns.map((c, i) => [c, row[i]])));
-      } else {
-        const result = await execSQL(data.sql);
-        if (result) {
-          currentCols = result.columns;
-          currentRows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c, row[i]])));
-        }
-      }
-      currentLabel = question;
-      page = 0; sortCol = null;
-      render();
-    } catch (err) {
-      sqlEl.textContent = 'Error: ' + err.message;
-    }
-  });
 
   // Initial render — show all
   render();
@@ -824,17 +838,35 @@ const CSS_LAYOUTS = `
   .seniority-row { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
   .tag-sen { background: #2c3e50; color: #fff; padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.75rem; }
 
-  /* ─── Queryable Table ─── */
-  .query-section { margin: 1.5rem 0; }
-  .query-bar { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.8rem; }
-  .query-input-row { display: flex; gap: 0.5rem; align-items: center; }
-  .query-select { flex: 1; padding: 0.55rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.85rem; background: #fff; min-width: 0; }
-  .query-input { flex: 1; padding: 0.55rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.85rem; }
-  .query-input:disabled { background: #f4f4f5; color: #a1a1aa; }
-  .query-btn-export { padding: 0.55rem 0.8rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+  /* ─── Faceted Filters ─── */
+  .facets { background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; padding: 0.8rem; margin: 1rem 0; }
+  .facet-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+  .facet-select { padding: 0.4rem 0.6rem; border: 1px solid #d4cdc4; border-radius: 6px; font-size: 0.8rem; background: #fff; }
+  .facet-clear { padding: 0.4rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.75rem; color: #c0392b; }
+  .facet-clear:hover { background: #fef2f2; }
+  .facet-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-bottom: 0.5rem; }
+  .facet-tags-label { font-size: 0.75rem; font-weight: 600; color: #666; margin-right: 0.3rem; }
+  .facet-tag { padding: 0.2rem 0.5rem; border: 1px solid #d4cdc4; border-radius: 4px; font-size: 0.72rem; cursor: pointer; background: #fff; color: #555; transition: all 0.15s; }
+  .facet-tag:hover { border-color: #2c3e50; color: #2c3e50; }
+  .facet-tag.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+  .facet-tag small { opacity: 0.6; margin-left: 2px; }
+  .slider-label { font-size: 0.78rem; color: #666; margin-right: 0.5rem; }
+  .slider-label span { font-weight: 600; color: #c0392b; }
+  .facet-slider { flex: 1; max-width: 300px; accent-color: #c0392b; }
+  .active-filters { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-top: 0.4rem; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 4px; font-size: 0.72rem; color: #3730a3; }
+  .filter-chip button { background: none; border: none; cursor: pointer; color: #6366f1; font-size: 0.85rem; padding: 0; line-height: 1; }
+  .filter-count { font-size: 0.75rem; color: #666; font-weight: 500; margin-left: 0.5rem; }
+
+  .query-section { margin: 1rem 0; }
+  .query-btn-export { padding: 0.4rem 0.7rem; border: 1px solid #d4cdc4; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 500; }
   .query-btn-export:hover { background: #f0ebe4; }
-  .query-sql { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem; color: #666; margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: #f8f5f0; border-radius: 4px; display: none; }
-  .query-sql:not(:empty) { display: block; }
+
+  @media (max-width: 640px) {
+    .facet-row { flex-direction: column; align-items: stretch; }
+    .facet-select { width: 100%; }
+    .facet-slider { max-width: 100%; }
+  }
 
   .qt { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; border: 1px solid #e0d8cf; border-radius: 8px; overflow: hidden; }
   .qt thead { position: sticky; top: 0; z-index: 2; }
