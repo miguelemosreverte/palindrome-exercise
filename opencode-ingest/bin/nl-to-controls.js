@@ -74,72 +74,130 @@ export async function loadControls(taskName) {
 // ─── Build prompt for the LLM ────────────────────────────────────────
 
 export function buildPrompt(query, controls) {
-  return `You are a UI control translator. The user describes what they want to find in natural language. You map their words to EXACT filter control values.
+  // Build a flat list of all leaf skills for easy matching
+  const allLeaves = [];
+  for (const [sub, leaves] of Object.entries(controls.skills)) {
+    allLeaves.push(...leaves);
+  }
 
-AVAILABLE CONTROLS:
-- domain: [${controls.domains.join(', ')}]
-- seniority_level: [${controls.seniority_levels.join(', ')}]
-- city: [${controls.cities.join(', ')}]
-- skill_categories (top-level): [${controls.skill_categories.join(', ')}]
-- skill_subcategories: ${JSON.stringify(controls.skill_subcategories)}
-- skills (leaves): ${JSON.stringify(controls.skills)}
-- seniority_min: 0-100 (slider)
+  // Build the tree as a readable format
+  const treeLines = [];
+  for (const cat of controls.skill_categories) {
+    const subs = controls.skill_subcategories[cat] || [];
+    if (subs.length) {
+      const subStr = subs.map(s => {
+        const leaves = (controls.skills[s] || []).slice(0, 8);
+        return leaves.length ? `${s} → [${leaves.join(', ')}]` : s;
+      }).join('; ');
+      treeLines.push(`  ${cat}: ${subStr}`);
+    } else {
+      treeLines.push(`  ${cat}`);
+    }
+  }
 
-USER QUERY: "${query}"
+  return `Map this query to filters. Return ONLY JSON. Omit fields that should stay at default.
 
-Return ONLY valid JSON with the controls to activate. Omit controls that should stay at "all"/default.
-Example: {"domain": "engineering", "city": "Córdoba", "skill_categories": ["Backend"], "skills": ["Java"]}
+FILTERS:
+  domain: ${controls.domains.join(' | ')}
+  seniority_level: ${controls.seniority_levels.join(' | ')}
+  city: ${controls.cities.join(' | ')}
+  skill_categories: ${controls.skill_categories.join(' | ')}
+  skill_subcategories: ${Object.entries(controls.skill_subcategories).map(([k,v]) => k + '→[' + v.join(', ') + ']').join('; ')}
 
-RULES:
-- Use EXACT values from the lists above. Do not invent values.
-- "sr devs" = seniority_level: "senior", domain: "engineering"
-- "HR people" = domain: "hr"
-- "backend java developers" = domain: "engineering", skill_categories: ["Engineering"], skill_subcategories: ["Backend"], skills: ["Java"]
-- "people in cordoba who know python" = city: "Córdoba", skills: ["Python"]
-- If the user mentions a skill not in the list, find the closest match or omit it.`;
+QUERY: "${query}"
+
+Example: {"domain":"engineering","city":"Córdoba","skill_categories":["Engineering"],"skill_subcategories":["Backend"],"skills":["Java"]}
+
+Notes: "sr"→senior, "devs"→engineering, "HR"→domain:hr. Only set fields the user mentions.`;
 }
 
 // ─── Call LLM ────────────────────────────────────────────────────────
 
 export async function translateQuery(query, controls, options = {}) {
-  const { model = 'mistral-nemo', apiKey } = options;
+  const { model = 'gemma-4b', apiKey, openCodePort = 9001 } = options;
 
-  const MODELS = {
+  const CHUTES_MODELS = {
     'mistral-nemo': 'unsloth/Mistral-Nemo-Instruct-2407',
     'gemma-4b': 'unsloth/gemma-3-4b-it',
     'hermes-14b': 'NousResearch/Hermes-4-14B',
     'qwen-32b': 'Qwen/Qwen3-32B-TEE',
   };
 
-  const modelId = MODELS[model] || model;
+  const OPENCODE_MODELS = {
+    'oc-bigpickle': 'opencode/big-pickle',
+    'oc-nemotron': 'opencode/nemotron-3-super-free',
+    'oc-gpt5nano': 'opencode/gpt-5-nano',
+    'oc-minimax': 'opencode/minimax-m2.5-free',
+  };
+
+  const isOpenCode = model.startsWith('oc-');
   const prompt = buildPrompt(query, controls);
-
   const start = Date.now();
-  const res = await fetch('https://llm.chutes.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: modelId, response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300, temperature: 0.1,
-    }),
-  });
-  const data = await res.json();
+
+  let text, tokens = 0, promptTokens = 0;
+
+  if (isOpenCode) {
+    // ── OpenCode API ──
+    const OC = `http://127.0.0.1:${openCodePort}`;
+    const session = await fetch(OC + '/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }).then(r => r.json());
+
+    await fetch(OC + '/session/' + session.id + '/message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parts: [{ type: 'text', text: prompt }] }),
+    });
+
+    // Poll for response (max 60s)
+    text = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const msgs = await fetch(OC + '/session/' + session.id + '/message').then(r => r.json());
+        for (let j = (Array.isArray(msgs) ? msgs : []).length - 1; j >= 0; j--) {
+          const m = msgs[j];
+          if (m.info?.role !== 'assistant') continue;
+          if ((m.parts || []).some(p => p.type === 'step-finish')) {
+            text = (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+            break;
+          }
+        }
+      } catch {}
+      if (text) break;
+    }
+    if (!text) throw new Error('OpenCode timeout');
+  } else {
+    // ── ChutesAI API ──
+    const modelId = CHUTES_MODELS[model] || model;
+    if (!apiKey) throw new Error('ChutesAI API key required');
+
+    const res = await fetch('https://llm.chutes.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: modelId, response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300, temperature: 0.1,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    text = data.choices[0].message.content;
+    tokens = data.usage?.total_tokens || 0;
+    promptTokens = data.usage?.prompt_tokens || 0;
+  }
+
   const elapsed = Date.now() - start;
-
-  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-  const text = data.choices[0].message.content;
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('No JSON in response');
+  if (!match) throw new Error('No JSON in response: ' + text.substring(0, 100));
 
   const result = JSON.parse(match[0]);
   result._meta = {
     model,
-    modelId,
+    provider: isOpenCode ? 'opencode' : 'chutes',
     elapsedMs: elapsed,
-    tokens: data.usage?.total_tokens || 0,
-    promptTokens: data.usage?.prompt_tokens || 0,
+    tokens,
+    promptTokens,
   };
 
   return result;
@@ -147,32 +205,54 @@ export async function translateQuery(query, controls, options = {}) {
 
 // ─── Validate result against controls ────────────────────────────────
 
-export function validateResult(result, controls) {
+export function validateAndFix(result, controls) {
   const issues = [];
 
-  if (result.domain && !controls.domains.includes(result.domain)) {
-    issues.push(`domain "${result.domain}" not in [${controls.domains}]`);
+  // Fix case: domain, seniority are lowercase enums
+  if (result.domain) {
+    const fixed = controls.domains.find(d => d.toLowerCase() === result.domain.toLowerCase());
+    if (fixed) result.domain = fixed;
+    else { issues.push(`domain "${result.domain}" not in [${controls.domains}]`); delete result.domain; }
   }
-  if (result.seniority_level && !controls.seniority_levels.includes(result.seniority_level)) {
-    issues.push(`seniority "${result.seniority_level}" not in [${controls.seniority_levels}]`);
+  if (result.seniority_level) {
+    const fixed = controls.seniority_levels.find(s => s.toLowerCase() === result.seniority_level.toLowerCase());
+    if (fixed) result.seniority_level = fixed;
+    else { issues.push(`seniority "${result.seniority_level}"`); delete result.seniority_level; }
   }
-  if (result.city && !controls.cities.includes(result.city)) {
-    issues.push(`city "${result.city}" not in [${controls.cities}]`);
+  // Fix city: match case-insensitively, reject multi-value
+  if (result.city) {
+    const cityStr = String(result.city).split(',')[0].trim(); // take first if comma-separated
+    const fixed = controls.cities.find(c => c.toLowerCase() === cityStr.toLowerCase());
+    if (fixed) result.city = fixed;
+    else { issues.push(`city "${result.city}"`); delete result.city; }
   }
+  // Fix skill_categories
   if (result.skill_categories) {
-    for (const cat of result.skill_categories) {
-      if (!controls.skill_categories.includes(cat)) issues.push(`skill_category "${cat}" not available`);
-    }
+    result.skill_categories = result.skill_categories
+      .map(c => controls.skill_categories.find(sc => sc.toLowerCase() === c.toLowerCase()))
+      .filter(Boolean);
+    if (!result.skill_categories.length) delete result.skill_categories;
   }
+  // Fix skills: only keep valid leaves
   if (result.skills) {
     const allLeaves = Object.values(controls.skills).flat();
-    for (const skill of result.skills) {
-      if (!allLeaves.includes(skill)) issues.push(`skill "${skill}" not in available leaves`);
-    }
+    const valid = result.skills.filter(s => allLeaves.some(l => l.toLowerCase() === s.toLowerCase()));
+    const invalid = result.skills.filter(s => !allLeaves.some(l => l.toLowerCase() === s.toLowerCase()));
+    if (invalid.length) issues.push(`unknown skills removed: [${invalid.join(', ')}]`);
+    result.skills = valid.length ? valid : undefined;
+    if (!result.skills) delete result.skills;
+  }
+  // Remove empty arrays/fields
+  for (const k of Object.keys(result)) {
+    if (Array.isArray(result[k]) && result[k].length === 0) delete result[k];
+    if (result[k] === '' || result[k] === null) delete result[k];
   }
 
   return issues;
 }
+
+// Backward compat
+export const validateResult = validateAndFix;
 
 // ─── CLI: test + benchmark ───────────────────────────────────────────
 
@@ -203,7 +283,13 @@ if (process.argv[1]?.endsWith('nl-to-controls.js')) {
       'show architects and leads',
     ];
 
-    const models = ['mistral-nemo', 'gemma-4b', 'hermes-14b'];
+    // Check if OpenCode is running
+    let ocAvailable = false;
+    try { await fetch(`http://127.0.0.1:9001/`); ocAvailable = true; } catch {}
+
+    const models = ['gemma-4b', 'mistral-nemo'];
+    if (ocAvailable) models.push('oc-bigpickle', 'oc-nemotron');
+    else console.log('  (OpenCode not running — skipping oc-* models. Start with: opencode serve --port=9001)\n');
     const results = [];
 
     for (const m of models) {
