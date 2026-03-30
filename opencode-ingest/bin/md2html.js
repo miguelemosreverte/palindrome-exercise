@@ -408,15 +408,34 @@ const TABLE_ENGINE_JS = `
   const imgCols = new Set(['photo', 'companyLogo', 'image', 'thumbnail', 'channelAvatar', 'richThumbnail']);
   const urlCols = new Set(['url', 'profileUrl', 'channelUrl']);
   const tagCols = new Set(['skills', 'badges']);
-  const hideCols = new Set(['headline', 'description', 'companyLogo', 'richThumbnail', 'location', 'raw_labels', 'domain', 'seniority', 'seniority_score', 'skills_normalized', 'city', 'seniority_level', 'source']);
+  const hideCols = new Set(['headline', 'description', 'companyLogo', 'richThumbnail', 'location', 'raw_labels', 'domain', 'seniority', 'seniority_score', 'city', 'seniority_level', 'source', 'skills', 'connections']);
 
-  function visibleCols() { return currentCols.filter(c => !hideCols.has(c)); }
+  // Column order: photo first, profileUrl last
+  const colOrder = { 'photo': -100, 'name': -90, 'title': -80, 'company': -70, 'skills_normalized': -60, 'profileUrl': 100 };
+  function visibleCols() {
+    return currentCols
+      .filter(c => !hideCols.has(c))
+      .sort((a, b) => (colOrder[a] || 0) - (colOrder[b] || 0));
+  }
+
+  // Rename columns for display
+  const colLabels = { 'skills_normalized': 'skills', 'profileUrl': 'profile' };
 
   function renderCell(val, col) {
     if (!val) return '<span class="cell-empty">—</span>';
     const s = String(val);
     if (imgCols.has(col) && s.startsWith('http')) return '<img class="cell-img" src="' + s + '" loading="lazy">';
     if (urlCols.has(col) && s.startsWith('http')) return '<a href="' + s + '" target="_blank" class="cell-link">View →</a>';
+    // skills_normalized: JSON array of {path, confidence, source} — render as leaf tags
+    if (col === 'skills_normalized') {
+      try {
+        const skills = JSON.parse(s);
+        return skills
+          .filter(sk => sk.confidence >= 0.7)
+          .map(sk => { const leaf = sk.path.split('|').pop(); return '<span class="cell-tag' + (sk.source === 'inferred' ? ' cell-tag-inferred' : '') + '">' + leaf + '</span>'; })
+          .join(' ');
+      } catch { return s; }
+    }
     if (tagCols.has(col)) return s.split(',').map(t => '<span class="cell-tag">' + t.trim() + '</span>').join(' ');
     if (s.length > 80) return '<span title="' + s.replace(/"/g, '&quot;') + '">' + s.substring(0, 80) + '…</span>';
     return s;
@@ -441,7 +460,8 @@ const TABLE_ENGINE_JS = `
     let html = '<table class="qt"><thead><tr>';
     for (const col of cols) {
       const arrow = sortCol === col ? (sortDir === 1 ? ' ↑' : ' ↓') : ' ↕';
-      html += '<th data-col="' + col + '">' + col + '<span class="sort-arrow">' + arrow + '</span></th>';
+      const label = colLabels[col] || col;
+      html += '<th data-col="' + col + '">' + label + '<span class="sort-arrow">' + arrow + '</span></th>';
     }
     html += '</tr></thead><tbody>';
 
@@ -1113,6 +1133,7 @@ const CSS_LAYOUTS = `
   .cell-link { color: #c0392b; text-decoration: none; font-weight: 500; font-size: 0.78rem; }
   .cell-link:hover { text-decoration: underline; }
   .cell-tag { display: inline-block; background: #f0ebe4; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.72rem; margin: 1px; color: #555; }
+  .cell-tag-inferred { background: transparent; border: 1px dashed #ccc; color: #999; }
   .cell-empty { color: #ccc; }
 
   .query-pagination { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; font-size: 0.8rem; color: #666; }
